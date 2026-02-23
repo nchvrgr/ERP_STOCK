@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -e
+
+if [ "$SKIP_DB_EXPORT" = "1" ]; then
+  exit 0
+fi
+
+echo "[pre-commit] Exportando semilla compartida de base de datos..."
+powershell -ExecutionPolicy Bypass -File herramientas/export-shared-seed.ps1
+
+git add servidor/scripts/sql/datos-compartidos.sql
+echo "[pre-commit] datos-compartidos.sql actualizado y agregado al commit."

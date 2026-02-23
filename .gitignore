@@ -1,0 +1,27 @@
+node_modules/
+**/node_modules/
+
+# .NET
+**/bin/
+**/obj/
+.vs/
+
+# Local SDK/cache
+.dotnet/
+.config/
+
+# Frontend build cache/output
+**/.vite/
+**/dist/
+**/dev-dist/
+
+# Logs and temp
+*.log
+**/logs/
+.DS_Store
+Thumbs.db
+
+# Local env files
+*.env
+*.env.local
+*.env.*.local

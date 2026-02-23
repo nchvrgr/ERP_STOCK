@@ -1,0 +1,48 @@
+name: CI Backend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: posdb
+          POSTGRES_USER: pos
+          POSTGRES_PASSWORD: pospass
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U pos -d posdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      TEST_DB_CONNECTION: Host=localhost;Port=5433;Database=posdb;Username=pos;Password=pospass
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore servidor/tests/Pruebas/Pruebas.csproj
+
+      - name: Vulnerability scan
+        run: dotnet list servidor/src/ApiWeb/ApiWeb.csproj package --vulnerable --include-transitive
+
+      - name: Run tests
+        run: dotnet test servidor/tests/Pruebas/Pruebas.csproj -m:1 --no-restore
