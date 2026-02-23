@@ -1,6 +1,26 @@
-# ERP_STOCK_V2
+# ERP_STOCK
 
-Guia rapida para clonar, levantar y compartir cambios.
+## Guia rápida
+Para levantar todo por primera vez, ejecuta solo estos 2 comandos desde la raiz del repo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File herramientas/configurar-entorno.ps1
+```
+
+```powershell
+cd cliente/pos-ui 
+npm run dev
+```
+
+Abre:
+- Cliente web: `http://localhost:5173/login`
+- API health: `http://localhost:8080/api/v1/health`
+
+Login demo:
+- usuario: `admin`
+- password: `admin`
+
+## Guia detallada
 
 ## Estructura del repositorio
 - `servidor/`: API, dominio y acceso a datos (.NET)
