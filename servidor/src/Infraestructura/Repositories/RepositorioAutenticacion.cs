@@ -17,6 +17,7 @@ public sealed class RepositorioAutenticacion : IRepositorioAutenticacion
 
     public async Task<UsuarioLoginDto?> GetLoginUserAsync(
         string firebaseEmail,
+        string? erpUsername,
         Guid? tenantId,
         Guid? sucursalId,
         CancellationToken cancellationToken = default)
@@ -24,10 +25,14 @@ public sealed class RepositorioAutenticacion : IRepositorioAutenticacion
         var normalizedEmail = firebaseEmail.Trim();
         var atIndex = normalizedEmail.IndexOf('@');
         var usernameAlias = atIndex > 0 ? normalizedEmail[..atIndex].Trim() : normalizedEmail;
+        var normalizedErpUsername = erpUsername?.Trim();
 
         var userQuery = _dbContext.Usuarios
             .AsNoTracking()
-            .Where(u => u.Username == normalizedEmail || u.Username == usernameAlias);
+            .Where(u =>
+                (!string.IsNullOrWhiteSpace(normalizedErpUsername) && u.Username == normalizedErpUsername)
+                || u.Username == normalizedEmail
+                || u.Username == usernameAlias);
         if (tenantId.HasValue)
         {
             userQuery = userQuery.Where(u => u.TenantId == tenantId.Value);

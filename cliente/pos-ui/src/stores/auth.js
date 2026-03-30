@@ -64,6 +64,10 @@ const normalizeSubscriptionStatus = (value) => {
     : 'inactive';
 };
 
+const normalizeErpUsername = (value) => {
+  return typeof value === 'string' ? value.trim() : '';
+};
+
 const buildInactiveSubscriptionMessage = () => {
   return 'Tu suscripcion esta inactiva. Debes realizar el pago para ingresar.';
 };
@@ -107,6 +111,7 @@ export const useAuthStore = defineStore('auth', {
     userId: '',
     firebaseUid: '',
     firebaseEmail: '',
+    erpUsername: '',
     subscriptionStatus: '',
     subscriptionChecked: false,
     accessMessage: '',
@@ -144,6 +149,7 @@ export const useAuthStore = defineStore('auth', {
         this.userId = data.userId || '';
         this.firebaseUid = data.firebaseUid || '';
         this.firebaseEmail = data.firebaseEmail || '';
+        this.erpUsername = data.erpUsername || '';
         this.subscriptionStatus = data.subscriptionStatus || '';
         this.subscriptionChecked = Boolean(data.subscriptionChecked);
         this.accessMessage = data.accessMessage || '';
@@ -165,6 +171,7 @@ export const useAuthStore = defineStore('auth', {
         userId: this.userId,
         firebaseUid: this.firebaseUid,
         firebaseEmail: this.firebaseEmail,
+        erpUsername: this.erpUsername,
         subscriptionStatus: this.subscriptionStatus,
         subscriptionChecked: this.subscriptionChecked,
         accessMessage: this.accessMessage,
@@ -186,6 +193,7 @@ export const useAuthStore = defineStore('auth', {
     clearSubscriptionState() {
       this.firebaseUid = '';
       this.firebaseEmail = '';
+      this.erpUsername = '';
       this.subscriptionStatus = '';
       this.subscriptionChecked = false;
       this.accessMessage = '';
@@ -203,6 +211,7 @@ export const useAuthStore = defineStore('auth', {
       this.userId = '';
       this.firebaseUid = '';
       this.firebaseEmail = '';
+      this.erpUsername = '';
       this.subscriptionStatus = '';
       this.subscriptionChecked = false;
       this.accessMessage = '';
@@ -263,6 +272,7 @@ export const useAuthStore = defineStore('auth', {
 
       const data = snapshot.data() || {};
       const status = normalizeSubscriptionStatus(data.subscriptionStatus);
+      this.erpUsername = normalizeErpUsername(data.erpUsername);
       const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
 
       this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
@@ -285,6 +295,7 @@ export const useAuthStore = defineStore('auth', {
 
           const data = snapshot.data() || {};
           const status = normalizeSubscriptionStatus(data.subscriptionStatus);
+          this.erpUsername = normalizeErpUsername(data.erpUsername);
           const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
 
           this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
@@ -377,6 +388,7 @@ export const useAuthStore = defineStore('auth', {
 
       const request = {
         firebaseEmail: (this.firebaseEmail || email || '').trim(),
+        erpUsername: this.erpUsername || null,
         tenantId: null,
         sucursalId: null
       };

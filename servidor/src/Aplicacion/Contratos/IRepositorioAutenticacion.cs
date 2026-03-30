@@ -6,6 +6,7 @@ public interface IRepositorioAutenticacion
 {
     Task<UsuarioLoginDto?> GetLoginUserAsync(
         string firebaseEmail,
+        string? erpUsername,
         Guid? tenantId,
         Guid? sucursalId,
         CancellationToken cancellationToken = default);

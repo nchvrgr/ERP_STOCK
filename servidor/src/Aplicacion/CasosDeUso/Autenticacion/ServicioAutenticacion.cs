@@ -37,6 +37,7 @@ public sealed class ServicioAutenticacion
 
         var usuarioLogin = await _repositorioAutenticacion.GetLoginUserAsync(
             request.FirebaseEmail.Trim(),
+            request.ErpUsername,
             request.TenantId,
             request.SucursalId,
             cancellationToken);
