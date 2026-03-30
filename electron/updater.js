@@ -240,6 +240,52 @@ function getMandatoryStatus(publishedAt) {
   return Date.now() - publishedDate.getTime() > SEVEN_DAYS_MS;
 }
 
+async function resolveUpdateState(options = {}) {
+  const log = typeof options.log === 'function' ? options.log : () => {};
+
+  const testRelease = getTestReleaseConfig();
+  const release = testRelease || await requestJson(process.env.ERP_STOCK_UPDATE_RELEASE_URL || RELEASES_URL);
+  const latestVersion = normalizeVersion(release?.tag_name);
+  const currentVersion = normalizeVersion(packageJson.version);
+
+  if (testRelease) {
+    log(`update check using test mode=${process.env.ERP_STOCK_UPDATE_TEST_MODE}`);
+  }
+
+  if (!latestVersion || !isNewerVersion(latestVersion, currentVersion)) {
+    log(`update skipped: latest=${latestVersion || 'none'} current=${currentVersion}`);
+    return {
+      status: 'up-to-date',
+      currentVersion,
+      latestVersion: latestVersion || currentVersion
+    };
+  }
+
+  const installerAsset = findInstallerAsset(release);
+  if (!hasUsableInstallerSource(installerAsset)) {
+    log(`update skipped: no usable installer asset found for platform=${process.platform}`);
+    return {
+      status: 'unavailable',
+      currentVersion,
+      latestVersion,
+      message: 'Hay una nueva version, pero no se encontro un instalador compatible.'
+    };
+  }
+
+  const isMandatory = getMandatoryStatus(release.published_at);
+  log(
+    `update available latest=${latestVersion} current=${currentVersion} mandatory=${isMandatory} localAsset=${Boolean(installerAsset.local_path)}`
+  );
+
+  return {
+    status: 'available',
+    currentVersion,
+    latestVersion,
+    isMandatory,
+    installerAsset
+  };
+}
+
 async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
   const options = isMandatory
     ? {
@@ -306,46 +352,69 @@ async function checkForUpdates(options = {}) {
   const mainWindow = options.mainWindow || null;
 
   try {
-    const testRelease = getTestReleaseConfig();
-    const release = testRelease || await requestJson(process.env.ERP_STOCK_UPDATE_RELEASE_URL || RELEASES_URL);
-    const latestVersion = normalizeVersion(release?.tag_name);
-    const currentVersion = normalizeVersion(packageJson.version);
-
-    if (testRelease) {
-      log(`update check using test mode=${process.env.ERP_STOCK_UPDATE_TEST_MODE}`);
-    }
-
-    if (!latestVersion || !isNewerVersion(latestVersion, currentVersion)) {
-      log(`update skipped: latest=${latestVersion || 'none'} current=${currentVersion}`);
+    const updateState = await resolveUpdateState({ log });
+    if (updateState.status !== 'available') {
       return;
     }
 
-    const installerAsset = findInstallerAsset(release);
-    if (!hasUsableInstallerSource(installerAsset)) {
-      log(`update skipped: no usable installer asset found for platform=${process.platform}`);
-      return;
-    }
-
-    const isMandatory = getMandatoryStatus(release.published_at);
-    log(
-      `update available latest=${latestVersion} current=${currentVersion} mandatory=${isMandatory} localAsset=${Boolean(installerAsset.local_path)}`
-    );
-    const accepted = await promptForUpdate(mainWindow, isMandatory, latestVersion);
+    const accepted = await promptForUpdate(mainWindow, updateState.isMandatory, updateState.latestVersion);
     log(`update prompt result accepted=${accepted}`);
 
     if (!accepted) {
-      if (isMandatory) {
+      if (updateState.isMandatory) {
         app.quit();
       }
       return;
     }
 
-    await runInstaller(installerAsset, mainWindow, log);
+    await runInstaller(updateState.installerAsset, mainWindow, log);
   } catch (error) {
     log('update check failed', error);
   }
 }
 
+async function checkForUpdatesOnDemand(options = {}) {
+  const log = typeof options.log === 'function' ? options.log : () => {};
+  const mainWindow = options.mainWindow || null;
+
+  try {
+    const updateState = await resolveUpdateState({ log });
+
+    if (updateState.status === 'up-to-date') {
+      return {
+        status: 'up-to-date',
+        currentVersion: updateState.currentVersion,
+        latestVersion: updateState.latestVersion,
+        message: `La app ya esta actualizada (${updateState.currentVersion}).`
+      };
+    }
+
+    if (updateState.status === 'unavailable') {
+      return {
+        status: 'error',
+        currentVersion: updateState.currentVersion,
+        latestVersion: updateState.latestVersion,
+        message: updateState.message
+      };
+    }
+
+    await runInstaller(updateState.installerAsset, mainWindow, log);
+    return {
+      status: 'installing',
+      currentVersion: updateState.currentVersion,
+      latestVersion: updateState.latestVersion,
+      message: `Instalando version ${updateState.latestVersion}.`
+    };
+  } catch (error) {
+    log('update on demand failed', error);
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 module.exports = {
-  checkForUpdates
+  checkForUpdates,
+  checkForUpdatesOnDemand
 };

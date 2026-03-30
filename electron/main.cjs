@@ -4,7 +4,7 @@ const http = require('node:http');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
-const { checkForUpdates } = require('./updater');
+const { checkForUpdates, checkForUpdatesOnDemand } = require('./updater');
 
 const APP_PORT = 18450;
 const APP_URL = `http://127.0.0.1:${APP_PORT}`;
@@ -333,6 +333,13 @@ ipcMain.handle('ticket-preview:open', async (_, payload) => {
     logElectron('ticket-preview open failed', error);
     throw error;
   }
+});
+
+ipcMain.handle('app:update:check', async () => {
+  return checkForUpdatesOnDemand({
+    mainWindow,
+    log: logElectron
+  });
 });
 
 app.on('before-quit', () => {

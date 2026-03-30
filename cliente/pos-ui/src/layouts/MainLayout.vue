@@ -49,6 +49,20 @@
             />
           </v-list>
         </div>
+        <v-divider />
+        <div class="pa-4">
+          <v-btn
+            block
+            variant="outlined"
+            color="primary"
+            class="text-none"
+            :loading="checkingUpdate"
+            :disabled="!canCheckUpdates"
+            @click="checkForAppUpdate"
+          >
+            Actualizar app
+          </v-btn>
+        </div>
       </div>
     </v-navigation-drawer>
 
@@ -87,6 +101,14 @@
         <router-view />
       </v-container>
     </v-main>
+    <v-snackbar
+      v-model="updateSnackbar.show"
+      :color="updateSnackbar.color"
+      location="top end"
+      timeout="2600"
+    >
+      {{ updateSnackbar.text }}
+    </v-snackbar>
   </v-layout>
 </template>
 
@@ -103,8 +125,15 @@ const stockAlerts = useStockAlertsStore();
 const router = useRouter();
 const route = useRoute();
 const drawer = ref(true);
+const checkingUpdate = ref(false);
+const updateSnackbar = ref({
+  show: false,
+  text: '',
+  color: 'primary'
+});
 const { mdAndUp } = useDisplay();
 const theme = useTheme();
+const desktopBridge = window.desktopBridge || null;
 
 const menuItems = [
   {
@@ -177,6 +206,7 @@ const currentTitle = computed(() => {
 });
 
 const stockAlertMeta = computed(() => stockAlerts.chipMeta);
+const canCheckUpdates = computed(() => typeof desktopBridge?.checkForAppUpdate === 'function');
 
 const isDarkMode = computed({
   get: () => theme.global.name.value === 'posNightTheme',
@@ -193,6 +223,42 @@ const refreshStockAlerts = () => {
     return;
   }
   stockAlerts.refreshSummary();
+};
+
+const showUpdateSnackbar = (text, color = 'primary') => {
+  updateSnackbar.value = {
+    show: true,
+    text,
+    color
+  };
+};
+
+const checkForAppUpdate = async () => {
+  if (!canCheckUpdates.value || checkingUpdate.value) {
+    return;
+  }
+
+  checkingUpdate.value = true;
+
+  try {
+    const result = await desktopBridge.checkForAppUpdate();
+
+    if (result?.status === 'up-to-date') {
+      showUpdateSnackbar(result.message || 'La app ya esta actualizada.', 'success');
+      return;
+    }
+
+    if (result?.status === 'installing') {
+      showUpdateSnackbar(result.message || 'Se inicio la actualizacion.', 'primary');
+      return;
+    }
+
+    showUpdateSnackbar(result?.message || 'No se pudo verificar la actualizacion.', 'error');
+  } catch (error) {
+    showUpdateSnackbar(error?.message || 'No se pudo verificar la actualizacion.', 'error');
+  } finally {
+    checkingUpdate.value = false;
+  }
 };
 
 watch(
