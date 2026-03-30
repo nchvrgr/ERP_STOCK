@@ -33,10 +33,16 @@ public sealed class ProveedorRepository : IProveedorRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(p =>
-                EF.Functions.ILike(p.Name, $"%{term}%")
-                || EF.Functions.ILike(p.Telefono, $"%{term}%")
-                || (p.Cuit != null && EF.Functions.ILike(p.Cuit, $"%{term}%")));
+            var pattern = $"%{term}%";
+            query = _dbContext.Database.IsNpgsql()
+                ? query.Where(p =>
+                    EF.Functions.ILike(p.Name, pattern)
+                    || EF.Functions.ILike(p.Telefono, pattern)
+                    || (p.Cuit != null && EF.Functions.ILike(p.Cuit, pattern)))
+                : query.Where(p =>
+                    EF.Functions.Like(p.Name, pattern)
+                    || EF.Functions.Like(p.Telefono, pattern)
+                    || (p.Cuit != null && EF.Functions.Like(p.Cuit, pattern)));
         }
 
         return await query

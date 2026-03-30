@@ -8,10 +8,17 @@ public sealed class PosDbContextFactory : IDesignTimeDbContextFactory<PosDbConte
     public PosDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
-            ?? "Host=127.0.0.1;Port=5433;Database=posdb;Username=pos;Password=pospass";
+            ?? "Data Source=pos-local.db";
 
         var optionsBuilder = new DbContextOptionsBuilder<PosDbContext>();
-        optionsBuilder.UseNpgsql(connectionString);
+        if (DependencyInjection.IsSqliteConnectionString(connectionString))
+        {
+            optionsBuilder.UseSqlite(connectionString);
+        }
+        else
+        {
+            optionsBuilder.UseNpgsql(connectionString);
+        }
 
         return new PosDbContext(optionsBuilder.Options);
     }

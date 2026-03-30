@@ -50,6 +50,15 @@ public sealed class CategoriasPrecioController : ControllerBase
         var actualizada = await _servicioCategoria.ActualizarAsync(id, solicitud, cancellationToken);
         return Ok(actualizada);
     }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "PERM_PRODUCTO_EDITAR")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Eliminar(Guid id, CancellationToken cancellationToken)
+    {
+        await _servicioCategoria.EliminarAsync(id, cancellationToken);
+        return NoContent();
+    }
 }
 
 

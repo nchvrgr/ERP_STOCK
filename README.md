@@ -71,6 +71,60 @@ Login demo:
 - API Docker: `8080`
 - Cliente Vite: `5173`
 
+## Aplicacion de escritorio instalable
+
+Ahora el repo tambien puede generar un instalador Windows `.exe` que:
+- instala una sola aplicacion de escritorio
+- crea accesos directos de escritorio y menu inicio desde el instalador
+- corre frontend + backend dentro de la misma app
+- usa una base SQLite local embebida, sin Docker ni PostgreSQL externo
+- conserva los datos al cerrar y reabrir la ventana
+
+### Construir el instalador
+
+Desde la raiz del repo:
+
+```powershell
+npm.cmd install
+npm.cmd run desktop:dist
+```
+
+Salida esperada:
+- Instalador: `release/ERP Stock Setup 1.0.0.exe`
+- App desempaquetada: `release/win-unpacked/`
+
+### Probar cambios sin reinstalar
+
+Para reconstruir la app de escritorio y abrirla sin pasar por el instalador:
+
+```powershell
+npm.cmd run desktop:refresh
+```
+
+Atajos utiles:
+
+```powershell
+npm.cmd run desktop:pack
+```
+
+Reconstruye `release/win-unpacked` con los cambios nuevos.
+
+```powershell
+npm.cmd run desktop:open
+```
+
+Abre la app ya reconstruida desde `release/win-unpacked`.
+
+### Donde se guardan los datos
+
+En modo escritorio, la base local se guarda en:
+
+```text
+%APPDATA%\ERP Stock\data\erp-stock.db
+```
+
+Eso evita depender de permisos de escritura sobre `Program Files` y mantiene los datos aunque cierres la aplicacion.
+
 ## 4) Flujo diario
 Si ya tenes todo instalado y no queres resetear DB:
 

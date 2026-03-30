@@ -15,32 +15,24 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Default");
-        var databaseUrl = configuration["DATABASE_URL"]
-            ?? configuration["DATABASE_PUBLIC_URL"]
-            ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-            ?? Environment.GetEnvironmentVariable("DATABASE_PUBLIC_URL");
-
-        var shouldResolveFromDatabaseUrl = string.IsNullOrWhiteSpace(connectionString)
-            || string.Equals(connectionString, "DATABASE_URL", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(connectionString, "DATABASE_PUBLIC_URL", StringComparison.OrdinalIgnoreCase)
-            || (!string.IsNullOrWhiteSpace(connectionString) && connectionString.StartsWith("postgres", StringComparison.OrdinalIgnoreCase));
-
-        if (shouldResolveFromDatabaseUrl && !string.IsNullOrWhiteSpace(databaseUrl))
-        {
-            connectionString = MapDatabaseUrl(databaseUrl) ?? connectionString;
-        }
-        else if (!string.IsNullOrWhiteSpace(connectionString) && connectionString.StartsWith("postgres", StringComparison.OrdinalIgnoreCase))
-        {
-            connectionString = MapDatabaseUrl(connectionString) ?? connectionString;
-        }
+        var connectionString = ResolveConnectionString(configuration);
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException("Connection string 'Default' is not configured.");
         }
 
-        services.AddDbContext<PosDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddDbContext<PosDbContext>(options =>
+        {
+            if (IsSqliteConnectionString(connectionString))
+            {
+                options.UseSqlite(connectionString);
+            }
+            else
+            {
+                options.UseNpgsql(connectionString);
+            }
+        });
         services.AddScoped<IRepositorioAutenticacion, RepositorioAutenticacion>();
         services.AddScoped<IRepositorioRolesUsuario, RepositorioRolesUsuario>();
         services.AddScoped<IAuditLogService, AuditLogService>();
@@ -68,6 +60,43 @@ public static class DependencyInjection
         services.AddScoped<IEmpresaDatosRepository, EmpresaDatosRepository>();
         services.AddSingleton<IPasswordHasher, Sha256PasswordHasher>();
         return services;
+    }
+
+    public static string ResolveConnectionString(IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("Default");
+        var databaseUrl = configuration["DATABASE_URL"]
+            ?? configuration["DATABASE_PUBLIC_URL"]
+            ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+            ?? Environment.GetEnvironmentVariable("DATABASE_PUBLIC_URL");
+
+        var shouldResolveFromDatabaseUrl = string.IsNullOrWhiteSpace(connectionString)
+            || string.Equals(connectionString, "DATABASE_URL", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(connectionString, "DATABASE_PUBLIC_URL", StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(connectionString) && connectionString.StartsWith("postgres", StringComparison.OrdinalIgnoreCase));
+
+        if (shouldResolveFromDatabaseUrl && !string.IsNullOrWhiteSpace(databaseUrl))
+        {
+            connectionString = MapDatabaseUrl(databaseUrl) ?? connectionString;
+        }
+        else if (!string.IsNullOrWhiteSpace(connectionString) && connectionString.StartsWith("postgres", StringComparison.OrdinalIgnoreCase))
+        {
+            connectionString = MapDatabaseUrl(connectionString) ?? connectionString;
+        }
+
+        return connectionString ?? string.Empty;
+    }
+
+    public static bool IsSqliteConnectionString(string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return false;
+        }
+
+        return connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains(".sqlite", StringComparison.OrdinalIgnoreCase)
+            || connectionString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? MapDatabaseUrl(string? databaseUrl)

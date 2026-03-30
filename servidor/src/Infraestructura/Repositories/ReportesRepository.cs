@@ -22,28 +22,18 @@ public sealed class ReportesRepository : IReportesRepository
         DateTimeOffset? hasta,
         CancellationToken cancellationToken = default)
     {
-        var ventasQuery = _dbContext.Ventas.AsNoTracking()
-            .Where(v => v.TenantId == tenantId && v.SucursalId == sucursalId && v.Estado == VentaEstado.Confirmada);
-
-        if (desde.HasValue)
-        {
-            ventasQuery = ventasQuery.Where(v => v.UpdatedAt >= desde.Value);
-        }
-
-        if (hasta.HasValue)
-        {
-            ventasQuery = ventasQuery.Where(v => v.UpdatedAt <= hasta.Value);
-        }
-
-        var ventas = await ventasQuery
-            .Select(v => new { v.Id, v.TotalNeto, v.Facturada })
+        var ventasRaw = await _dbContext.Ventas.AsNoTracking()
+            .Where(v => v.TenantId == tenantId && v.SucursalId == sucursalId && v.Estado == VentaEstado.Confirmada)
+            .Select(v => new { v.Id, v.TotalNeto, v.Facturada, v.UpdatedAt })
             .ToListAsync(cancellationToken);
+
+        var ventas = ApplyRange(ventasRaw, v => v.UpdatedAt, desde, hasta).ToList();
 
         var totalIngresos = ventas.Sum(v => v.TotalNeto);
         var totalFacturado = ventas.Where(v => v.Facturada).Sum(v => v.TotalNeto);
         var totalNoFacturado = ventas.Where(v => !v.Facturada).Sum(v => v.TotalNeto);
 
-        var costoProductosIngresadosQuery =
+        var costoProductosIngresadosRows = await (
             from item in _dbContext.StockMovimientoItems.AsNoTracking()
             join mov in _dbContext.StockMovimientos.AsNoTracking() on item.MovimientoId equals mov.Id
             join producto in _dbContext.Productos.AsNoTracking() on item.ProductoId equals producto.Id
@@ -56,55 +46,37 @@ public sealed class ReportesRepository : IReportesRepository
             {
                 Monto = item.Cantidad * producto.PrecioBase,
                 mov.Fecha
-            };
+            })
+            .ToListAsync(cancellationToken);
 
-        if (desde.HasValue)
-        {
-            costoProductosIngresadosQuery = costoProductosIngresadosQuery.Where(x => x.Fecha >= desde.Value);
-        }
+        var costoProductosIngresados = ApplyRange(costoProductosIngresadosRows, x => x.Fecha, desde, hasta)
+            .Sum(x => x.Monto);
 
-        if (hasta.HasValue)
-        {
-            costoProductosIngresadosQuery = costoProductosIngresadosQuery.Where(x => x.Fecha <= hasta.Value);
-        }
-
-        var costoProductosIngresados = await costoProductosIngresadosQuery.SumAsync(x => (decimal?)x.Monto, cancellationToken) ?? 0m;
-
-        var egresosCajaQuery = _dbContext.CajaMovimientos.AsNoTracking()
+        var egresosCajaRows = await _dbContext.CajaMovimientos.AsNoTracking()
             .Where(m => m.TenantId == tenantId
                         && (m.Tipo == CajaMovimientoTipo.Retiro
                             || m.Tipo == CajaMovimientoTipo.Gasto
-                            || m.Tipo == CajaMovimientoTipo.Egreso));
+                            || m.Tipo == CajaMovimientoTipo.Egreso))
+            .Select(x => new { x.Fecha, x.Monto })
+            .ToListAsync(cancellationToken);
 
-        if (desde.HasValue)
-        {
-            egresosCajaQuery = egresosCajaQuery.Where(x => x.Fecha >= desde.Value);
-        }
+        var egresosCaja = ApplyRange(egresosCajaRows, x => x.Fecha, desde, hasta)
+            .Sum(x => x.Monto);
 
-        if (hasta.HasValue)
-        {
-            egresosCajaQuery = egresosCajaQuery.Where(x => x.Fecha <= hasta.Value);
-        }
-
-        var egresosCaja = await egresosCajaQuery.SumAsync(x => (decimal?)x.Monto, cancellationToken) ?? 0m;
-
-        var diferenciasNegativasQuery = _dbContext.CajaSesiones.AsNoTracking()
+        var diferenciasNegativasRows = await _dbContext.CajaSesiones.AsNoTracking()
             .Where(s => s.TenantId == tenantId
                         && s.SucursalId == sucursalId
                         && s.CierreAt != null
-                        && s.DiferenciaTotal < 0);
+                        && s.DiferenciaTotal < 0)
+            .Select(x => new { x.CierreAt, x.DiferenciaTotal })
+            .ToListAsync(cancellationToken);
 
-        if (desde.HasValue)
-        {
-            diferenciasNegativasQuery = diferenciasNegativasQuery.Where(x => x.CierreAt >= desde.Value);
-        }
-
-        if (hasta.HasValue)
-        {
-            diferenciasNegativasQuery = diferenciasNegativasQuery.Where(x => x.CierreAt <= hasta.Value);
-        }
-
-        var diferenciasNegativas = await diferenciasNegativasQuery.SumAsync(x => (decimal?)(-x.DiferenciaTotal), cancellationToken) ?? 0m;
+        var diferenciasNegativas = ApplyRange(
+                diferenciasNegativasRows.Where(x => x.CierreAt.HasValue),
+                x => x.CierreAt!.Value,
+                desde,
+                hasta)
+            .Sum(x => -x.DiferenciaTotal);
 
         var totalEgresos = costoProductosIngresados + egresosCaja + diferenciasNegativas;
 
@@ -118,26 +90,12 @@ public sealed class ReportesRepository : IReportesRepository
         DateTimeOffset? hasta,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Ventas.AsNoTracking()
-            .Where(v => v.TenantId == tenantId && v.SucursalId == sucursalId && v.Estado == VentaEstado.Confirmada);
-
-        if (desde.HasValue)
-        {
-            query = query.Where(v => v.UpdatedAt >= desde.Value);
-        }
-
-        if (hasta.HasValue)
-        {
-            query = query.Where(v => v.UpdatedAt <= hasta.Value);
-        }
-
-        // Npgsql/EF puede fallar al traducir DateTimeOffset.Date dentro de GroupBy.
-        // Se materializan filas filtradas y se agrupa por dia UTC en memoria.
-        var raw = await query
+        var raw = await _dbContext.Ventas.AsNoTracking()
+            .Where(v => v.TenantId == tenantId && v.SucursalId == sucursalId && v.Estado == VentaEstado.Confirmada)
             .Select(v => new { v.UpdatedAt, v.TotalNeto })
             .ToListAsync(cancellationToken);
 
-        var result = raw
+        var result = ApplyRange(raw, v => v.UpdatedAt, desde, hasta)
             .GroupBy(v => v.UpdatedAt.UtcDateTime.Date)
             .Select(g => new VentaPorDiaItemDto(g.Key, g.Sum(x => x.TotalNeto)))
             .OrderBy(x => x.Fecha)
@@ -153,27 +111,17 @@ public sealed class ReportesRepository : IReportesRepository
         DateTimeOffset? hasta,
         CancellationToken cancellationToken = default)
     {
-        var query = from pago in _dbContext.VentaPagos.AsNoTracking()
+        var raw = await (
+            from pago in _dbContext.VentaPagos.AsNoTracking()
             join venta in _dbContext.Ventas.AsNoTracking() on pago.VentaId equals venta.Id
             where pago.TenantId == tenantId
                   && venta.TenantId == tenantId
                   && venta.SucursalId == sucursalId
                   && venta.Estado == VentaEstado.Confirmada
-            select new { pago.MedioPago, pago.Monto, venta.UpdatedAt };
+            select new { pago.MedioPago, pago.Monto, venta.UpdatedAt })
+            .ToListAsync(cancellationToken);
 
-        if (desde.HasValue)
-        {
-            query = query.Where(x => x.UpdatedAt >= desde.Value);
-        }
-
-        if (hasta.HasValue)
-        {
-            query = query.Where(x => x.UpdatedAt <= hasta.Value);
-        }
-
-        var raw = await query.ToListAsync(cancellationToken);
-
-        var result = raw
+        var result = ApplyRange(raw, x => x.UpdatedAt, desde, hasta)
             .GroupBy(x => x.MedioPago)
             .Select(g => new MedioPagoItemDto(g.Key, g.Sum(x => x.Monto)))
             .OrderByDescending(x => x.Total)
@@ -190,7 +138,8 @@ public sealed class ReportesRepository : IReportesRepository
         int top,
         CancellationToken cancellationToken = default)
     {
-        var query = from item in _dbContext.VentaItems.AsNoTracking()
+        var raw = await (
+            from item in _dbContext.VentaItems.AsNoTracking()
             join venta in _dbContext.Ventas.AsNoTracking() on item.VentaId equals venta.Id
             join producto in _dbContext.Productos.AsNoTracking() on item.ProductoId equals producto.Id
             where item.TenantId == tenantId
@@ -206,21 +155,10 @@ public sealed class ReportesRepository : IReportesRepository
                 item.Cantidad,
                 item.PrecioUnitario,
                 venta.UpdatedAt
-            };
+            })
+            .ToListAsync(cancellationToken);
 
-        if (desde.HasValue)
-        {
-            query = query.Where(x => x.UpdatedAt >= desde.Value);
-        }
-
-        if (hasta.HasValue)
-        {
-            query = query.Where(x => x.UpdatedAt <= hasta.Value);
-        }
-
-        var raw = await query.ToListAsync(cancellationToken);
-
-        var result = raw
+        var result = ApplyRange(raw, x => x.UpdatedAt, desde, hasta)
             .GroupBy(x => new { x.ProductoId, x.Name, x.Sku })
             .Select(g => new TopProductoItemDto(
                 g.Key.ProductoId,
@@ -242,7 +180,8 @@ public sealed class ReportesRepository : IReportesRepository
         DateTimeOffset? hasta,
         CancellationToken cancellationToken = default)
     {
-        var query = from item in _dbContext.StockMovimientoItems.AsNoTracking()
+        var raw = await (
+            from item in _dbContext.StockMovimientoItems.AsNoTracking()
             join mov in _dbContext.StockMovimientos.AsNoTracking() on item.MovimientoId equals mov.Id
             join producto in _dbContext.Productos.AsNoTracking() on item.ProductoId equals producto.Id
             where item.TenantId == tenantId
@@ -257,21 +196,10 @@ public sealed class ReportesRepository : IReportesRepository
                 item.Cantidad,
                 item.EsIngreso,
                 mov.Fecha
-            };
+            })
+            .ToListAsync(cancellationToken);
 
-        if (desde.HasValue)
-        {
-            query = query.Where(x => x.Fecha >= desde.Value);
-        }
-
-        if (hasta.HasValue)
-        {
-            query = query.Where(x => x.Fecha <= hasta.Value);
-        }
-
-        var raw = await query.ToListAsync(cancellationToken);
-
-        var result = raw
+        var result = ApplyRange(raw, x => x.Fecha, desde, hasta)
             .GroupBy(x => new { x.ProductoId, x.Name, x.Sku })
             .Select(g => new RotacionStockItemDto(
                 g.Key.ProductoId,
@@ -307,51 +235,54 @@ public sealed class ReportesRepository : IReportesRepository
                 venta.UpdatedAt
             };
 
-        if (desde.HasValue)
-        {
-            ventasItemsQuery = ventasItemsQuery.Where(x => x.UpdatedAt >= desde.Value);
-        }
+        var ventasItems = ApplyRange(
+                await ventasItemsQuery.ToListAsync(cancellationToken),
+                x => x.UpdatedAt,
+                desde,
+                hasta)
+            .ToList();
 
-        if (hasta.HasValue)
-        {
-            ventasItemsQuery = ventasItemsQuery.Where(x => x.UpdatedAt <= hasta.Value);
-        }
-
-        var vendidosByProducto = await ventasItemsQuery
+        var vendidosByProducto = ventasItems
             .GroupBy(x => x.ProductoId)
             .Select(g => new
             {
                 ProductoId = g.Key,
                 CantidadVendida = g.Sum(x => x.Cantidad)
             })
-            .ToDictionaryAsync(x => x.ProductoId, x => x.CantidadVendida, cancellationToken);
+            .ToDictionary(x => x.ProductoId, x => x.CantidadVendida);
 
         var saldosQuery = _dbContext.StockSaldos.AsNoTracking()
             .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId);
 
-        var saldosByProducto = await saldosQuery
+        var saldos = await saldosQuery.ToListAsync(cancellationToken);
+
+        var saldosByProducto = saldos
             .GroupBy(s => s.ProductoId)
             .Select(g => new
             {
                 ProductoId = g.Key,
                 Stock = g.Sum(x => x.CantidadActual)
             })
-            .ToDictionaryAsync(x => x.ProductoId, x => x.Stock, cancellationToken);
+            .ToDictionary(x => x.ProductoId, x => x.Stock);
 
-        var lastMovimientos = await (
+        var movimientos = await (
             from item in _dbContext.StockMovimientoItems.AsNoTracking()
             join mov in _dbContext.StockMovimientos.AsNoTracking() on item.MovimientoId equals mov.Id
             where item.TenantId == tenantId
                   && mov.TenantId == tenantId
                   && mov.SucursalId == sucursalId
-            group mov by item.ProductoId
-            into g
             select new
             {
-                ProductoId = g.Key,
-                UltimoMovimiento = g.Max(x => x.Fecha)
+                item.ProductoId,
+                mov.Fecha
             })
-            .ToDictionaryAsync(x => x.ProductoId, x => (DateTimeOffset?)x.UltimoMovimiento, cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        var lastMovimientos = movimientos
+            .GroupBy(x => x.ProductoId)
+            .ToDictionary(
+                g => g.Key,
+                g => (DateTimeOffset?)g.Max(x => x.Fecha));
 
         var productos = await _dbContext.Productos.AsNoTracking()
             .Where(p => p.TenantId == tenantId && p.IsActive)
@@ -385,6 +316,25 @@ public sealed class ReportesRepository : IReportesRepository
             .ToList();
 
         return result;
+    }
+
+    private static IEnumerable<T> ApplyRange<T>(
+        IEnumerable<T> source,
+        Func<T, DateTimeOffset> selector,
+        DateTimeOffset? desde,
+        DateTimeOffset? hasta)
+    {
+        if (desde.HasValue)
+        {
+            source = source.Where(x => selector(x) >= desde.Value);
+        }
+
+        if (hasta.HasValue)
+        {
+            source = source.Where(x => selector(x) <= hasta.Value);
+        }
+
+        return source;
     }
 }
 

@@ -130,6 +130,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { formatMoney } from '../utils/currency';
 
 const scanInputRef = ref(null);
 const scanInput = ref('');
@@ -175,9 +176,6 @@ const scanFlashClass = computed(() => {
   if (scanFlash.value === 'error') return 'scan-flash-error';
   return '';
 });
-
-const formatMoney = (value) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(value);
 
 const focusScan = () => {
   nextTick(() => {

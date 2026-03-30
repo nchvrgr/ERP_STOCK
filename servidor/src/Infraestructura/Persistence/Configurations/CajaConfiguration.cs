@@ -18,6 +18,7 @@ public sealed class CajaConfiguration : IEntityTypeConfiguration<Caja>
 
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Numero).HasMaxLength(50);
+        builder.Property(x => x.DefaultMontoInicial).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
         builder.Property(x => x.IsActive).IsRequired();
 
         builder.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone").IsRequired();

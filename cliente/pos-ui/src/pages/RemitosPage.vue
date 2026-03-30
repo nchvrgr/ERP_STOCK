@@ -31,58 +31,44 @@
         </v-col>
       </v-row>
 
-      <v-divider class="my-2" />
-
       <v-row dense>
-        <v-col cols="12" md="4">
-          <v-text-field
-            v-model="scanSku"
-            label="Escanear SKU"
-            variant="outlined"
-            density="comfortable"
-            clearable
-            @keyup.enter="scanAndSelect"
-          />
-        </v-col>
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="8">
           <v-autocomplete
+            :key="productoInputKey"
             v-model="selectedProductoId"
             v-model:search="productSearch"
             :items="productoOptions"
             item-title="label"
             item-value="id"
-            label="Producto (nombre o SKU)"
+            label="Buscar producto o escanear SKU"
             variant="outlined"
             density="comfortable"
             clearable
             :loading="loadingProductos"
-            :no-data-text="'Sin resultados'"
             @update:search="onProductSearch"
-          />
-        </v-col>
-        <v-col cols="12" md="2">
-          <v-text-field
-            v-model="addCantidad"
-            label="Cantidad"
-            type="number"
-            min="0.01"
-            step="0.01"
-            variant="outlined"
-            density="comfortable"
-          />
-        </v-col>
-        <v-col cols="12" md="2" class="d-flex align-center">
-          <v-btn
-            color="primary"
-            class="text-none w-100"
-            :disabled="!selectedProductoId || addingItem"
-            :loading="addingItem"
-            @click="addItem"
+            @update:model-value="onProductoSeleccionado"
+            @keydown.enter.prevent="handleProductInputEnter"
           >
-            Agregar
-          </v-btn>
+            <template #no-data>
+              <v-list-item
+                v-if="productSearch.trim()"
+                prepend-icon="mdi-plus-circle-outline"
+                :title="buildNewProductSuggestion(productSearch.trim())"
+                @click="openCreateProductDialog(productSearch.trim())"
+              />
+              <v-list-item
+                v-else
+                title="Sin resultados"
+              />
+            </template>
+          </v-autocomplete>
         </v-col>
       </v-row>
+
+      <div v-if="recentAddMessage" class="remitos-add-feedback">
+        <span class="remitos-add-feedback__dot" />
+        <span>{{ recentAddMessage }}</span>
+      </div>
 
       <v-divider class="my-3" />
 
@@ -93,20 +79,61 @@
         density="compact"
         height="360"
       >
+        <template v-slot:[`header.feedback`]>
+          <div class="remitos-marker-column" />
+        </template>
+        <template v-slot:[`header.cantidad`]>
+          <div class="text-center w-100">Cantidad</div>
+        </template>
+        <template v-slot:[`item.feedback`]="{ item }">
+          <div class="remitos-marker-column">
+            <span
+              v-if="recentlyAddedProductId === getTableItemData(item).productoId"
+              class="recent-product-dot"
+            />
+          </div>
+        </template>
+        <template v-slot:[`item.name`]="{ item }">
+          <span>{{ getTableItemData(item).name }}</span>
+        </template>
         <template v-slot:[`item.cantidad`]="{ item }">
-          <v-text-field
-            :model-value="item.cantidad"
-            type="number"
-            min="0.01"
-            step="0.01"
-            variant="outlined"
-            density="compact"
-            hide-details
-            @update:model-value="(v) => updateCantidad(item.productoId, v)"
-          />
+          <div class="quantity-stepper">
+            <v-btn
+              icon="mdi-minus"
+              size="small"
+              variant="text"
+              color="primary"
+              @click="decrementCantidad(getTableItemData(item).productoId)"
+            />
+            <v-text-field
+              :model-value="getTableItemData(item).cantidad"
+              type="number"
+              min="1"
+              step="1"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="quantity-stepper__input"
+              inputmode="numeric"
+              @update:model-value="(v) => updateCantidad(getTableItemData(item).productoId, v)"
+            />
+            <v-btn
+              icon="mdi-plus"
+              size="small"
+              variant="text"
+              color="primary"
+              @click="incrementCantidad(getTableItemData(item).productoId)"
+            />
+            <span class="recent-quantity-dot-slot">
+              <span
+                v-if="recentlyIncrementedProductId === getTableItemData(item).productoId"
+                class="recent-product-dot"
+              />
+            </span>
+          </div>
         </template>
         <template v-slot:[`item.actions`]="{ item }">
-          <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="removeItem(item.productoId)" />
+          <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="removeItem(getTableItemData(item).productoId)" />
         </template>
       </v-data-table>
 
@@ -114,11 +141,11 @@
         <div class="text-caption text-medium-emphasis">
           Productos: {{ items.length }}
         </div>
-        <div class="d-flex gap-2">
-          <v-btn variant="text" class="text-none" :disabled="saving" @click="clearForm">Limpiar</v-btn>
+        <div class="d-flex remitos-action-group">
+          <v-btn variant="outlined" color="secondary" class="text-none remitos-action-btn" :disabled="saving" @click="clearForm">Limpiar</v-btn>
           <v-btn
             color="primary"
-            class="text-none"
+            class="text-none remitos-action-btn"
             :loading="saving"
             :disabled="!canSave"
             @click="confirmarIngreso"
@@ -136,48 +163,191 @@
       </div>
     </v-snackbar>
 
-    <v-dialog v-model="createDialog" width="560">
-      <v-card>
-        <v-card-title>Crear producto</v-card-title>
-        <v-card-text>
-          <div class="text-caption text-medium-emphasis mb-3">
-            SKU no encontrado. Puedes crearlo ahora y seguir con el ingreso.
-          </div>
-          <v-text-field
-            v-model="createForm.sku"
-            label="SKU"
-            variant="outlined"
-            density="comfortable"
-          />
-          <v-text-field
-            v-model="createForm.name"
-            label="Nombre"
-            variant="outlined"
-            density="comfortable"
-          />
-          <v-autocomplete
-            v-model="createForm.proveedorId"
-            :items="proveedores"
-            item-title="name"
-            item-value="id"
-            label="Proveedor"
-            variant="outlined"
-            density="comfortable"
-          />
-          <v-text-field
-            v-model="createForm.precioBase"
-            label="Precio base"
-            variant="outlined"
-            density="comfortable"
-            type="number"
-            min="0"
-            step="0.01"
-          />
+    <v-dialog v-model="createDialog" persistent width="760">
+      <v-card class="pa-4">
+        <div>
+          <div class="text-h6">Nuevo producto</div>
+          <div class="text-caption text-medium-emphasis"></div>
+        </div>
+        <v-card-text class="pt-4 px-0">
+          <v-form class="mt-3" @submit.prevent="createProductFromIngreso">
+            <v-row dense class="product-price-row">
+              <v-col cols="12" md="7">
+                <v-text-field
+                  v-model="createForm.name"
+                  variant="outlined"
+                  density="comfortable"
+                  :error-messages="createErrors.name"
+                  @blur="validateCreateField('name')"
+                  required
+                >
+                  <template #label>
+                    Nombre <span class="required-asterisk">*</span>
+                  </template>
+                </v-text-field>
+              </v-col>
+              <v-col cols="12" md="5">
+                <v-text-field
+                  v-model="createForm.sku"
+                  variant="outlined"
+                  density="comfortable"
+                  :error-messages="createErrors.sku"
+                  inputmode="numeric"
+                  @update:model-value="onCreateSkuInput"
+                  @blur="validateCreateField('sku')"
+                  required
+                >
+                  <template #label>
+                    SKU <span class="required-asterisk">*</span>
+                  </template>
+                </v-text-field>
+              </v-col>
+              <v-col cols="12" md="7">
+                <v-autocomplete
+                  v-model="createForm.proveedorId"
+                  :items="proveedores"
+                  item-title="name"
+                  item-value="id"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                  :error-messages="createErrors.proveedorId"
+                  @blur="validateCreateField('proveedorId')"
+                  required
+                >
+                  <template #label>
+                    Proveedor <span class="required-asterisk">*</span>
+                  </template>
+                </v-autocomplete>
+              </v-col>
+            </v-row>
+
+            <div class="text-subtitle-2 product-section-title">Precio</div>
+            <v-row dense>
+              <v-col cols="12" md="4">
+                <MoneyField
+                  v-model="createForm.precioBase"
+                  label="Precio base"
+                  variant="outlined"
+                  density="comfortable"
+                  :error-messages="createErrors.precioBase"
+                  :step="100"
+                  @blur="validateCreateField('precioBase')"
+                />
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="createForm.pricingMode"
+                  :items="pricingModeItems"
+                  label="Modo de precio"
+                  variant="outlined"
+                  density="comfortable"
+                  item-title="title"
+                  item-value="value"
+                />
+              </v-col>
+              <v-col v-if="createForm.pricingMode === 'CATEGORIA'" cols="12" md="4">
+                <v-autocomplete
+                  v-model="createForm.categoriaId"
+                  :items="categoriasLookupDisplay"
+                  :loading="loadingCategorias"
+                  label="Categoria"
+                  item-title="displayTitle"
+                  item-value="id"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                  no-data-text="No hay categorias."
+                  @focus="ensureCategoriasLookup"
+                />
+              </v-col>
+              <v-col v-else-if="createForm.pricingMode === 'FIJO_PCT'" cols="12" md="4">
+                <v-text-field
+                  v-model="createForm.margenPct"
+                  label="% Ganancia fija"
+                  variant="outlined"
+                  density="comfortable"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  :error-messages="createErrors.margenPct"
+                  @blur="validateCreateField('margenPct')"
+                />
+              </v-col>
+              <v-col v-else-if="createForm.pricingMode === 'MANUAL'" cols="12" md="4">
+                <MoneyField
+                  v-model="createForm.precioVentaManual"
+                  label="Precio venta manual"
+                  variant="outlined"
+                  density="comfortable"
+                  :error-messages="createErrors.precioVentaManual"
+                  :step="100"
+                  @blur="validateCreateField('precioVentaManual')"
+                />
+              </v-col>
+              <v-col v-else cols="12" md="4" class="d-flex align-center">
+                <div class="text-caption text-medium-emphasis">
+                  Precio de venta calculado: {{ formatMoney(createPrecioVentaCalculado) }}
+                </div>
+              </v-col>
+            </v-row>
+            <div class="product-final-price">
+              <span class="product-final-price__label">Precio final:</span>
+              <span class="product-final-price__value">{{ formatMoney(createPrecioVentaCalculado) }}</span>
+            </div>
+
+            <div class="text-subtitle-2 product-section-title">Stock</div>
+            <v-row dense>
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model="createForm.stockInicial"
+                  label="Stock inicial"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  variant="outlined"
+                  density="comfortable"
+                  :error-messages="createErrors.stockInicial"
+                  @blur="validateCreateField('stockInicial')"
+                />
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model="createStockConfig.stockMinimo"
+                  label="Stock minimo"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  variant="outlined"
+                  density="comfortable"
+                  :error-messages="createErrors.stockMinimo"
+                  @blur="validateCreateField('stockMinimo')"
+                />
+              </v-col>
+              <v-col cols="12" md="4">
+                <div class="product-status-row">
+                  <span class="product-status-row__label">Estado:</span>
+                  <v-switch
+                    :model-value="createForm.isActive"
+                    color="primary"
+                    inset
+                    hide-details
+                    @update:model-value="(value) => (createForm.isActive = value)"
+                  >
+                    <template #label>
+                      {{ createForm.isActive ? 'Activo' : 'Inactivo' }}
+                    </template>
+                  </v-switch>
+                </div>
+              </v-col>
+            </v-row>
+            <button type="submit" class="d-none" aria-hidden="true" />
+          </v-form>
         </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="createDialog = false">Cancelar</v-btn>
-          <v-btn color="primary" class="text-none" :loading="creatingProduct" @click="createProductFromIngreso">
-            Crear producto
+        <v-card-actions class="justify-end px-0 pt-5">
+          <v-btn variant="outlined" color="secondary" class="text-none product-dialog-action" @click="closeCreateDialog">Cancelar</v-btn>
+          <v-btn color="primary" variant="elevated" class="text-none product-dialog-action" :loading="creatingProduct" @click="createProductFromIngreso">
+            Guardar
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -186,31 +356,60 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { getJson, postJson } from '../services/apiClient';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import MoneyField from '../components/MoneyField.vue';
+import { getJson, postJson, requestJson } from '../services/apiClient';
+import { formatMoney } from '../utils/currency';
 
 const loadingProveedores = ref(false);
 const loadingProductos = ref(false);
+const loadingCategorias = ref(false);
 const addingItem = ref(false);
 const saving = ref(false);
 
 const error = ref('');
 const proveedores = ref([]);
 const productos = ref([]);
+const categorias = ref([]);
 
 const selectedProveedorId = ref(null);
 const selectedProductoId = ref(null);
 const productSearch = ref('');
-const scanSku = ref('');
-const addCantidad = ref('1');
+const productoInputKey = ref(0);
+const suppressNextSearchClear = ref(false);
+const ignoreAutocompleteSearchEvents = ref(false);
 const items = ref([]);
+const remitoDraftStorageKey = 'vinedos-remito-ingreso-draft';
 const createDialog = ref(false);
 const creatingProduct = ref(false);
-const createForm = ref({
+const recentlyAddedProductId = ref('');
+const recentlyIncrementedProductId = ref('');
+const recentAddMessage = ref('');
+const createForm = reactive({
   sku: '',
   name: '',
-  proveedorId: null,
-  precioBase: '0'
+  proveedorId: '',
+  categoriaId: '',
+  precioBase: '',
+  pricingMode: 'FIJO_PCT',
+  margenPct: '30',
+  margenCategoriaPct: '0',
+  precioVentaManual: '',
+  stockInicial: '',
+  isActive: true
+});
+const createStockConfig = reactive({
+  stockMinimo: '0'
+});
+const createErrors = reactive({
+  name: '',
+  sku: '',
+  proveedorId: '',
+  precioBase: '',
+  margenPct: '',
+  precioVentaManual: '',
+  stockInicial: '',
+  stockMinimo: ''
 });
 
 const snackbar = ref({
@@ -221,10 +420,18 @@ const snackbar = ref({
 });
 
 const headers = [
+  { title: '', value: 'feedback', sortable: false, width: 28, align: 'center' },
   { title: 'Producto', value: 'name' },
+  { title: 'Proveedor', value: 'proveedor' },
   { title: 'SKU', value: 'sku' },
-  { title: 'Cantidad', value: 'cantidad', width: 180 },
+  { title: 'Cantidad', value: 'cantidad', width: 180, align: 'center' },
   { title: '', value: 'actions', sortable: false, align: 'end', width: 80 }
+];
+
+const pricingModeItems = [
+  { title: '% fijo', value: 'FIJO_PCT' },
+  { title: 'Por categoria', value: 'CATEGORIA' },
+  { title: 'Manual', value: 'MANUAL' }
 ];
 
 const productoOptions = computed(() =>
@@ -237,7 +444,32 @@ const productoOptions = computed(() =>
     }))
 );
 
+const categoriasLookupDisplay = computed(() =>
+  (categorias.value || []).map((item) => ({
+    ...item,
+    displayTitle: `${item.name || 'Sin nombre'} (${Number(item.margenGananciaPct || 0).toFixed(2)}%)`
+  }))
+);
+
+const createPrecioVentaCalculado = computed(() => {
+  const base = Number(createForm.precioBase);
+  if (Number.isNaN(base) || base <= 0) return 0;
+
+  if (createForm.pricingMode === 'MANUAL') {
+    const manual = Number(createForm.precioVentaManual);
+    return Number.isNaN(manual) || manual < 0 ? 0 : manual;
+  }
+
+  const margen = createForm.pricingMode === 'CATEGORIA'
+    ? Number(createForm.margenCategoriaPct || 0)
+    : Number(createForm.margenPct);
+  if (Number.isNaN(margen) || margen < 0) return base;
+  return base * (1 + margen / 100);
+});
+
 const canSave = computed(() => items.value.length > 0);
+
+const getTableItemData = (item) => item?.raw ?? item?.item?.raw ?? item?.item ?? item;
 
 const flash = (type, text) => {
   snackbar.value = {
@@ -303,93 +535,317 @@ const loadProductos = async (search = '') => {
   }
 };
 
+const loadCategorias = async () => {
+  loadingCategorias.value = true;
+  try {
+    const params = new URLSearchParams();
+    params.set('activo', 'true');
+    const { response, data } = await getJson(`/api/v1/categorias-precio?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    categorias.value = (data || [])
+      .slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+  } catch (err) {
+    error.value = err?.message || 'No se pudieron cargar categorias.';
+  } finally {
+    loadingCategorias.value = false;
+  }
+};
+
 const onProveedorChanged = async () => {
+  clearRecentAddFeedback();
   selectedProductoId.value = null;
   await loadProductos('');
 };
 
 const onProductSearch = async (value) => {
-  await loadProductos(value || '');
-};
-
-const addItem = async () => {
-  if (!selectedProductoId.value) return;
-
-  const qty = Number(addCantidad.value);
-  if (Number.isNaN(qty) || qty <= 0) {
-    flash('error', 'Cantidad invalida.');
+  if (ignoreAutocompleteSearchEvents.value) {
+    if (!(value || '').trim()) {
+      ignoreAutocompleteSearchEvents.value = false;
+    }
     return;
   }
 
+  if (suppressNextSearchClear.value && !(value || '').trim()) {
+    suppressNextSearchClear.value = false;
+    await loadProductos('');
+    return;
+  }
+
+  clearRecentAddFeedback();
+  await loadProductos(value || '');
+};
+
+const clearRecentAddFeedback = () => {
+  recentlyAddedProductId.value = '';
+  recentlyIncrementedProductId.value = '';
+  recentAddMessage.value = '';
+};
+
+const resetProductInput = async () => {
+  ignoreAutocompleteSearchEvents.value = true;
+  suppressNextSearchClear.value = true;
+  selectedProductoId.value = null;
+  productSearch.value = '';
+  await nextTick();
+  productoInputKey.value += 1;
+};
+
+const buildNewProductSuggestion = (term) => {
+  const normalized = (term || '').trim();
+  if (!normalized) return 'Agregar nuevo producto';
+
+  return /^\d+$/.test(normalized)
+    ? `Agregar nuevo producto: SKU ${normalized}`
+    : `Agregar nuevo producto: '${normalized}'`;
+};
+
+const addProducto = async (producto, qty = 1) => {
+  if (!producto) return;
   addingItem.value = true;
   try {
-    const producto = productos.value.find((p) => p.id === selectedProductoId.value);
-    if (!producto) {
-      flash('error', 'Producto no encontrado.');
-      return;
-    }
-
+    const normalizedQty = Math.max(1, Number.parseInt(qty, 10) || 1);
     const existing = items.value.find((i) => i.productoId === producto.id);
     if (existing) {
-      existing.cantidad = Number(existing.cantidad) + qty;
+      existing.cantidad = Math.max(1, Number.parseInt(existing.cantidad, 10) || 1) + normalizedQty;
+      recentlyIncrementedProductId.value = producto.id;
     } else {
       items.value.push({
         productoId: producto.id,
         name: producto.name,
+        proveedor: producto.proveedor || '',
         sku: producto.sku,
-        cantidad: qty
+        cantidad: normalizedQty
       });
+      recentlyIncrementedProductId.value = '';
     }
 
-    selectedProductoId.value = null;
-    addCantidad.value = '1';
+    recentlyAddedProductId.value = producto.id;
+    recentAddMessage.value = `${producto.name} añadido a la lista`;
+    await resetProductInput();
   } finally {
     addingItem.value = false;
   }
 };
 
+const onProductoSeleccionado = async (productId) => {
+  if (!productId || addingItem.value) return;
+
+  const producto = productos.value.find((p) => p.id === productId);
+  if (!producto) {
+    flash('error', 'Producto no encontrado.');
+    return;
+  }
+
+  await addProducto(producto);
+};
+
 const removeItem = (productId) => {
+  clearRecentAddFeedback();
   items.value = items.value.filter((i) => i.productoId !== productId);
 };
 
-const updateCantidad = (productId, value) => {
-  const qty = Number(value);
+const incrementCantidad = (productId) => {
+  clearRecentAddFeedback();
   const item = items.value.find((i) => i.productoId === productId);
   if (!item) return;
+  item.cantidad = Math.max(1, Number.parseInt(item.cantidad, 10) || 1) + 1;
+  recentlyIncrementedProductId.value = productId;
+};
+
+const decrementCantidad = (productId) => {
+  clearRecentAddFeedback();
+  const item = items.value.find((i) => i.productoId === productId);
+  if (!item) return;
+  const currentQty = Math.max(1, Number.parseInt(item.cantidad, 10) || 1);
+  item.cantidad = Math.max(1, currentQty - 1);
+};
+
+const updateCantidad = (productId, value) => {
+  clearRecentAddFeedback();
+  const qty = Number.parseInt(value, 10);
+  const item = items.value.find((i) => i.productoId === productId);
+  if (!item) return;
+  const previousQty = Math.max(1, Number.parseInt(item.cantidad, 10) || 1);
 
   if (Number.isNaN(qty) || qty <= 0) {
-    item.cantidad = 0;
+    item.cantidad = 1;
     return;
   }
   item.cantidad = qty;
+  if (qty > previousQty) {
+    recentlyIncrementedProductId.value = productId;
+  }
 };
 
 const clearForm = () => {
+  clearRecentAddFeedback();
   selectedProveedorId.value = null;
-  selectedProductoId.value = null;
-  productSearch.value = '';
-  addCantidad.value = '1';
+  resetProductInput();
   items.value = [];
   error.value = '';
+  localStorage.removeItem(remitoDraftStorageKey);
   loadProductos('');
 };
 
 const resetCreateForm = () => {
-  createForm.value = {
-    sku: '',
-    name: '',
-    proveedorId: selectedProveedorId.value || null,
-    precioBase: '0'
-  };
+  createForm.sku = '';
+  createForm.name = '';
+  createForm.proveedorId = selectedProveedorId.value || '';
+  createForm.categoriaId = '';
+  createForm.precioBase = '';
+  createForm.pricingMode = 'FIJO_PCT';
+  createForm.margenPct = '30';
+  createForm.margenCategoriaPct = '0';
+  createForm.precioVentaManual = '';
+  createForm.stockInicial = '';
+  createForm.isActive = true;
+  createStockConfig.stockMinimo = '0';
+  Object.keys(createErrors).forEach((key) => {
+    createErrors[key] = '';
+  });
 };
 
-const scanAndSelect = async () => {
-  const sku = (scanSku.value || '').trim();
-  if (!sku) return;
+const validateCreateField = (field) => {
+  if (field === 'name') {
+    createErrors.name = createForm.name.trim() ? '' : '* El nombre es obligatorio.';
+  }
+  if (field === 'sku') {
+    if (!createForm.sku.trim()) {
+      createErrors.sku = '* El SKU es obligatorio.';
+    } else if (!/^\d+$/.test(createForm.sku.trim())) {
+      createErrors.sku = '* El SKU debe contener solo numeros.';
+    } else {
+      createErrors.sku = '';
+    }
+  }
+  if (field === 'proveedorId') {
+    createErrors.proveedorId = createForm.proveedorId ? '' : '* El proveedor es obligatorio.';
+  }
+  if (field === 'precioBase') {
+    if (createForm.precioBase === '') {
+      createErrors.precioBase = '';
+    } else if (Number(createForm.precioBase) < 0 || Number.isNaN(Number(createForm.precioBase))) {
+      createErrors.precioBase = 'Precio base invalido.';
+    } else {
+      createErrors.precioBase = '';
+    }
+  }
+  if (field === 'margenPct') {
+    if (createForm.pricingMode !== 'FIJO_PCT') {
+      createErrors.margenPct = '';
+    } else if (createForm.margenPct === '') {
+      createErrors.margenPct = '';
+    } else if (Number(createForm.margenPct) < 0 || Number.isNaN(Number(createForm.margenPct))) {
+      createErrors.margenPct = 'Margen invalido.';
+    } else {
+      createErrors.margenPct = '';
+    }
+  }
+  if (field === 'precioVentaManual') {
+    if (createForm.pricingMode !== 'MANUAL') {
+      createErrors.precioVentaManual = '';
+    } else if (createForm.precioVentaManual === '') {
+      createErrors.precioVentaManual = 'Precio venta obligatorio.';
+    } else if (Number(createForm.precioVentaManual) < 0 || Number.isNaN(Number(createForm.precioVentaManual))) {
+      createErrors.precioVentaManual = 'Precio venta invalido.';
+    } else {
+      createErrors.precioVentaManual = '';
+    }
+  }
+  if (field === 'stockInicial') {
+    if (createForm.stockInicial === '') {
+      createErrors.stockInicial = '';
+    } else if (Number(createForm.stockInicial) < 0 || Number.isNaN(Number(createForm.stockInicial))) {
+      createErrors.stockInicial = 'Stock inicial invalido.';
+    } else {
+      createErrors.stockInicial = '';
+    }
+  }
+  if (field === 'stockMinimo') {
+    if (createStockConfig.stockMinimo === '') {
+      createErrors.stockMinimo = '';
+    } else if (Number(createStockConfig.stockMinimo) < 0 || Number.isNaN(Number(createStockConfig.stockMinimo))) {
+      createErrors.stockMinimo = 'Stock minimo invalido.';
+    } else {
+      createErrors.stockMinimo = '';
+    }
+  }
+};
+
+const validateCreateForm = () => {
+  validateCreateField('name');
+  validateCreateField('sku');
+  validateCreateField('proveedorId');
+  validateCreateField('precioBase');
+  validateCreateField('margenPct');
+  validateCreateField('precioVentaManual');
+  validateCreateField('stockInicial');
+  validateCreateField('stockMinimo');
+
+  return Object.values(createErrors).every((value) => !value);
+};
+
+const applyCategoriaMargin = () => {
+  const categoria = categorias.value.find((item) => item.id === createForm.categoriaId);
+  createForm.margenCategoriaPct = categoria ? Number(categoria.margenGananciaPct || 0).toString() : '0';
+};
+
+const ensureCategoriasLookup = async () => {
+  if (categorias.value.length > 0 || loadingCategorias.value) return;
+  await loadCategorias();
+};
+
+const openCreateProductDialog = async (term = '') => {
+  clearRecentAddFeedback();
+  resetCreateForm();
+  const normalized = (term || '').trim();
+  if (/^\d+$/.test(normalized)) {
+    createForm.sku = normalized;
+    createForm.name = '';
+  } else {
+    createForm.name = normalized;
+    createForm.sku = '';
+  }
+  createDialog.value = true;
+  await ensureCategoriasLookup();
+};
+
+const onCreateSkuInput = (value) => {
+  createForm.sku = (value || '').replace(/\D+/g, '');
+};
+
+const closeCreateDialog = () => {
+  createDialog.value = false;
+  resetCreateForm();
+};
+
+const handleProductInputEnter = async () => {
+  await nextTick();
+
+  const search = (productSearch.value || '').trim();
+  if (!search || addingItem.value) return;
+
+  const selectedProduct = productos.value.find((p) => p.id === selectedProductoId.value);
+  if (selectedProduct) {
+    await addProducto(selectedProduct);
+    flash('success', `Producto agregado: ${selectedProduct.name}`);
+    return;
+  }
+
+  if (productoOptions.value.length > 0) {
+    const firstMatch = productoOptions.value[0];
+    await addProducto(firstMatch);
+    flash('success', `Producto agregado: ${firstMatch.name}`);
+    return;
+  }
 
   const params = new URLSearchParams();
   params.set('activo', 'true');
-  params.set('search', sku);
+  params.set('search', search);
   const { response, data } = await getJson(`/api/v1/productos?${params.toString()}`);
   if (!response.ok) {
     flash('error', extractProblemMessage(data));
@@ -397,51 +853,55 @@ const scanAndSelect = async () => {
   }
 
   const all = data || [];
-  const exact = all.find((p) => (p.sku || '').trim().toLowerCase() === sku.toLowerCase());
+  const exact = all.find((p) => (p.sku || '').trim().toLowerCase() === search.toLowerCase());
   if (exact) {
-    await loadProductos(sku);
-    selectedProductoId.value = exact.id;
-    scanSku.value = '';
-    flash('success', `Producto encontrado: ${exact.name}`);
+    await addProducto(exact);
+    flash('success', `Producto agregado: ${exact.name}`);
     return;
   }
 
-  resetCreateForm();
-  createForm.value.sku = sku;
-  createForm.value.name = sku;
-  createDialog.value = true;
+  const exactName = all.find((p) => (p.name || '').trim().toLowerCase() === search.toLowerCase());
+  if (exactName) {
+    await addProducto(exactName);
+    flash('success', `Producto agregado: ${exactName.name}`);
+    return;
+  }
+
+  if (all.length > 0) {
+    await addProducto(all[0]);
+    flash('success', `Producto agregado: ${all[0].name}`);
+    return;
+  }
+
+  await openCreateProductDialog(search);
 };
 
 const createProductFromIngreso = async () => {
   if (creatingProduct.value) return;
+  if (!validateCreateForm()) return;
 
-  const sku = (createForm.value.sku || '').trim();
-  const name = (createForm.value.name || '').trim();
-  const proveedorId = createForm.value.proveedorId;
-  const precioBase = Number(createForm.value.precioBase || 0);
-
-  if (!sku) {
-    flash('error', 'SKU obligatorio.');
-    return;
-  }
-  if (!name) {
-    flash('error', 'Nombre obligatorio.');
-    return;
-  }
-  if (!proveedorId) {
-    flash('error', 'Proveedor obligatorio para crear producto.');
-    return;
-  }
+  const sku = createForm.sku.trim();
+  const name = createForm.name.trim();
+  const precioBase = createForm.precioBase === '' ? null : Number(createForm.precioBase);
+  const precioVenta = createForm.pricingMode === 'MANUAL'
+    ? (createForm.precioVentaManual === '' ? null : Number(createForm.precioVentaManual))
+    : (precioBase == null ? null : Number(createPrecioVentaCalculado.value));
+  const margenGananciaPct = createForm.pricingMode === 'FIJO_PCT'
+    ? (createForm.margenPct === '' ? null : Number(createForm.margenPct))
+    : null;
 
   creatingProduct.value = true;
   try {
     const payload = {
       name,
       sku,
-      proveedorId,
-      isActive: true,
-      precioBase: Number.isNaN(precioBase) ? 0 : precioBase,
-      precioVenta: Number.isNaN(precioBase) ? 0 : precioBase
+      proveedorId: createForm.proveedorId,
+      categoriaId: createForm.categoriaId || null,
+      isActive: createForm.isActive,
+      precioBase,
+      precioVenta,
+      pricingMode: createForm.pricingMode,
+      margenGananciaPct
     };
 
     const { response, data } = await postJson('/api/v1/productos', payload);
@@ -449,15 +909,44 @@ const createProductFromIngreso = async () => {
       throw new Error(extractProblemMessage(data));
     }
 
+    const stockPayload = {
+      stockMinimo: createStockConfig.stockMinimo === '' ? 0 : Number(createStockConfig.stockMinimo)
+    };
+    const stockConfigResponse = await requestJson(`/api/v1/productos/${data.id}/stock-config`, {
+      method: 'PATCH',
+      body: JSON.stringify(stockPayload)
+    });
+    if (!stockConfigResponse.response.ok) {
+      throw new Error(extractProblemMessage(stockConfigResponse.data));
+    }
+
+    const stockInicial = Number(createForm.stockInicial);
+    if (!Number.isNaN(stockInicial) && stockInicial > 0) {
+      const stockResp = await postJson('/api/v1/stock/ajustes', {
+        tipo: 'AJUSTE',
+        motivo: 'Stock inicial',
+        items: [
+          {
+            productoId: data.id,
+            cantidad: stockInicial,
+            esIngreso: true
+          }
+        ]
+      });
+      if (!stockResp.response.ok) {
+        throw new Error(extractProblemMessage(stockResp.data));
+      }
+    }
+
     await loadProductos(sku);
     const created = productos.value.find((p) => p.id === data.id) || productos.value.find((p) => p.sku === sku);
     if (created) {
-      selectedProductoId.value = created.id;
+      await addProducto(created);
+      recentAddMessage.value = `Nuevo producto "${created.name}" agregado al inventario`;
     }
 
-    createDialog.value = false;
-    scanSku.value = '';
-    flash('success', 'Producto creado. Ya puedes agregarlo al ingreso.');
+    closeCreateDialog();
+    flash('success', 'Producto creado y agregado al ingreso.');
   } catch (err) {
     flash('error', err?.message || 'No se pudo crear el producto.');
   } finally {
@@ -466,6 +955,7 @@ const createProductFromIngreso = async () => {
 };
 
 const confirmarIngreso = async () => {
+  clearRecentAddFeedback();
   if (saving.value || !canSave.value) return;
 
   const invalid = items.value.some((i) => Number(i.cantidad) <= 0);
@@ -506,16 +996,209 @@ const confirmarIngreso = async () => {
   }
 };
 
+const saveDraft = () => {
+  const payload = {
+    selectedProveedorId: selectedProveedorId.value,
+    items: items.value.map((item) => ({
+      productoId: item.productoId,
+      name: item.name,
+      proveedor: item.proveedor || '',
+      sku: item.sku,
+      cantidad: Number(item.cantidad)
+    }))
+  };
+  localStorage.setItem(remitoDraftStorageKey, JSON.stringify(payload));
+};
+
+const restoreDraft = () => {
+  const raw = localStorage.getItem(remitoDraftStorageKey);
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw);
+    selectedProveedorId.value = parsed.selectedProveedorId || null;
+    items.value = Array.isArray(parsed.items)
+      ? parsed.items.map((item) => ({
+          productoId: item.productoId,
+          name: item.name,
+          proveedor: item.proveedor || '',
+          sku: item.sku,
+          cantidad: Number(item.cantidad) > 0 ? Number(item.cantidad) : 1
+        }))
+      : [];
+  } catch {
+    localStorage.removeItem(remitoDraftStorageKey);
+  }
+};
+
 onMounted(async () => {
+  restoreDraft();
   await loadProveedores();
   await loadProductos('');
+  await loadCategorias();
   resetCreateForm();
 });
+
+watch(
+  () => createForm.pricingMode,
+  async (value) => {
+    if (value === 'MANUAL' && !createForm.precioVentaManual) {
+      createForm.precioVentaManual = createPrecioVentaCalculado.value.toFixed(2);
+    }
+    if (value === 'CATEGORIA') {
+      await ensureCategoriasLookup();
+      applyCategoriaMargin();
+    }
+    validateCreateField('margenPct');
+    validateCreateField('precioVentaManual');
+  }
+);
+
+watch(
+  () => createForm.categoriaId,
+  () => {
+    applyCategoriaMargin();
+  }
+);
+
+watch(
+  [selectedProveedorId, items],
+  () => {
+    saveDraft();
+  },
+  { deep: true }
+);
 </script>
 
 <style scoped>
 .remitos-page {
   animation: fade-in 0.3s ease;
+}
+
+.remitos-action-btn {
+  min-width: 150px;
+  min-height: 46px;
+  padding-inline: 20px;
+  font-weight: 700;
+}
+
+.remitos-action-group {
+  gap: 14px;
+}
+
+.remitos-add-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: rgb(21, 128, 61);
+  font-weight: 700;
+}
+
+.remitos-add-feedback__dot,
+.recent-product-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgb(34, 197, 94);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+}
+
+.required-asterisk {
+  color: rgb(220, 38, 38);
+  font-weight: 800;
+}
+
+.product-section-title {
+  margin: 16px 0 12px;
+}
+
+.product-final-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 0;
+  border-radius: 12px;
+  background: rgba(198, 164, 108, 0.14);
+}
+
+.product-price-row {
+  margin-bottom: -6px;
+}
+
+.product-final-price__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(90, 15, 28);
+}
+
+.product-final-price__value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: rgb(59, 10, 18);
+}
+
+.product-status-row {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.product-status-row__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgb(58, 58, 58);
+}
+
+.product-dialog-action {
+  min-width: 132px;
+  min-height: 44px;
+  padding-inline: 20px;
+  font-weight: 700;
+}
+
+.quantity-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+}
+
+.remitos-marker-column,
+.recent-product-dot-slot,
+.recent-quantity-dot-slot {
+  width: 14px;
+  min-width: 14px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.quantity-stepper__input {
+  width: 70px;
+}
+
+.quantity-stepper__input :deep(.v-field) {
+  min-height: 34px;
+  align-items: center;
+}
+
+.quantity-stepper__input :deep(.v-field__input) {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.quantity-stepper__input :deep(input) {
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.quantity-stepper__input :deep(input::-webkit-outer-spin-button),
+.quantity-stepper__input :deep(input::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
 }
 </style>
 

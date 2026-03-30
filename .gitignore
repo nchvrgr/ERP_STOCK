@@ -14,6 +14,8 @@ node_modules/
 **/.vite/
 **/dist/
 **/dev-dist/
+desktop-build/
+release/
 
 # Logs and temp
 *.log

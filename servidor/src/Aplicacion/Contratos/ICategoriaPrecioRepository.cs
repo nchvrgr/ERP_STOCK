@@ -27,6 +27,11 @@ public interface ICategoriaPrecioRepository
         CategoriaPrecioUpdateDto request,
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default);
+
+    Task<bool> DeleteAsync(
+        Guid tenantId,
+        Guid categoriaId,
+        CancellationToken cancellationToken = default);
 }
 
 

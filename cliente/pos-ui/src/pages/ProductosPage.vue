@@ -3,527 +3,262 @@
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="productos">Productos</v-tab>
       <v-tab value="proveedores">Proveedores</v-tab>
-      <v-tab value="listas-precio">Lista de precios</v-tab>
+      <v-tab value="listas-precio">Categorías</v-tab>
     </v-tabs>
 
     <v-window v-model="tab">
-      <v-window-item value="productos">
-        <v-card class="pos-card pa-4 mb-4">
-          <div class="d-flex flex-wrap align-center gap-3">
-            <div>
-              <div class="text-h6">Productos</div>
-              <div class="text-caption text-medium-emphasis">ABM + stock</div>
-            </div>
-            <v-spacer />
-            <v-btn color="primary" class="text-none" @click="resetForm">Nuevo</v-btn>
-            <v-btn
-              color="primary"
-              variant="tonal"
-              class="text-none"
-              :loading="barcodeLoading"
-              :disabled="products.length === 0"
-              @click="printBarcodes"
-            >
-              IMPRIMIR CODIGOS DE BARRA
-            </v-btn>
-          </div>
-
-          <div class="mt-4 d-flex flex-wrap align-center gap-3">
-            <v-text-field
-              v-model="search"
-              label="Buscar (nombre o SKU)"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="min-width: 260px"
-              @keyup.enter="loadProducts"
-            />
-            <v-text-field
-              v-model="scanInput"
-              label="Escanear SKU"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="min-width: 220px"
-              @keyup.enter="handleScan"
-            />
-            <v-btn-toggle v-model="activoFilter" density="comfortable" mandatory class="ml-2">
-              <v-btn value="all" class="text-none">Todos</v-btn>
-              <v-btn value="true" class="text-none">Activos</v-btn>
-              <v-btn value="false" class="text-none">Inactivos</v-btn>
-            </v-btn-toggle>
-            <v-btn
-              color="primary"
-              variant="tonal"
-              class="text-none"
-              :loading="loading"
-              @click="loadProducts"
-            >
-              Buscar
-            </v-btn>
-          </div>
-        </v-card>
-
+      <v-window-item value="productos" class="productos-window-item">
+        <div class="d-flex align-center flex-wrap gap-3 mb-4">
+          <v-btn color="primary" size="large" variant="elevated" class="text-none product-primary-action" prepend-icon="mdi-plus" @click="startNewProduct">
+            Nuevo producto
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            color="primary"
+            variant="text"
+            class="text-none product-print-action"
+            prepend-icon="mdi-printer-outline"
+            :loading="barcodeLoading"
+            :disabled="products.length === 0"
+            @click="printBarcodes"
+          >
+            Imprimir codigos de barra
+          </v-btn>
+        </div>
         <v-row dense>
-          <v-col cols="12" md="7">
-            <v-card class="pos-card pa-4">
-              <div class="text-h6">Listado</div>
-              <div class="text-caption text-medium-emphasis">Selecciona un producto para editar</div>
-              <v-data-table
-                :headers="headers"
-                :items="products"
-                item-key="id"
-                class="mt-3"
-                density="compact"
-                height="520"
-                @click:row="selectProduct"
-              >
-                <template v-slot:[`item.precioBase`]="{ item }">
-                  {{ formatMoney(item.precioBase) }}
-                </template>
-                <template v-slot:[`item.precioVenta`]="{ item }">
-                  {{ formatMoney(item.precioVenta) }}
-                </template>
-                <template v-slot:[`item.isActive`]="{ item }">
-                  <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
-                    {{ item.isActive ? 'Activo' : 'Inactivo' }}
-                  </v-chip>
-                </template>
-              </v-data-table>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" md="5">
-            <v-card class="pos-card pa-4">
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-h6">{{ form.id ? 'Editar producto' : 'Nuevo producto' }}</div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ form.id ? shortId(form.id) : 'Sin seleccionar' }}
-                  </div>
-                </div>
-                <v-btn
-                  color="primary"
-                  variant="tonal"
-                  class="text-none"
-                  :loading="saving"
-                  @click="saveProduct"
-                >
-                  Guardar
-                </v-btn>
+          <v-col cols="12">
+            <v-card class="pos-card pa-4 productos-list-card">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <div class="text-h6">Lista de productos</div>
+                <v-spacer />
+                <v-btn-toggle v-model="activoFilter" density="comfortable" mandatory>
+                  <v-btn value="all" class="text-none">Todos</v-btn>
+                  <v-btn value="true" class="text-none">Activos</v-btn>
+                  <v-btn value="false" class="text-none">Inactivos</v-btn>
+                </v-btn-toggle>
               </div>
-
-              <v-form class="mt-3">
+              <div class="mt-4 d-flex flex-wrap align-center gap-3">
                 <v-text-field
-                  v-model="form.name"
-                  label="Nombre"
+                  v-model="search"
+                  label="Buscar por nombre o SKU"
+                  prepend-inner-icon="mdi-magnify"
                   variant="outlined"
                   density="comfortable"
-                  :error-messages="errors.name"
-                  @blur="validateField('name')"
-                  required
-                />
-                <v-text-field
-                  v-model="form.sku"
-                  label="SKU"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="errors.sku"
-                  @blur="validateField('sku')"
-                  required
-                />
-                <v-autocomplete
-                  v-model="form.proveedorId"
-                  :items="proveedoresLookup"
-                  :loading="proveedorLoading"
-                  label="Proveedor"
-                  item-title="name"
-                  item-value="id"
-                  variant="outlined"
-                  density="comfortable"
-                  clearable
-                  :error-messages="errors.proveedorId"
-                  @update:search="searchProveedores"
-                  @blur="validateField('proveedorId')"
-                  required
-                />
-                <v-text-field
-                  v-model="form.precioBase"
-                  label="Precio base"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="errors.precioBase"
-                  @blur="validateField('precioBase')"
-                />
-                <v-select
-                  v-model="form.pricingMode"
-                  :items="pricingModeItems"
-                  label="Modo precio"
-                  variant="outlined"
-                  density="comfortable"
-                  item-title="title"
-                  item-value="value"
-                />
-                <v-autocomplete
-                  v-if="form.pricingMode === 'CATEGORIA'"
-                  v-model="form.categoriaId"
-                  :items="categoriasLookupDisplay"
-                  :loading="categoriaLoading"
-                  label="Categoria"
-                  item-title="displayTitle"
-                  item-value="id"
-                  variant="outlined"
-                  density="comfortable"
-                  clearable
-                  no-data-text="No hay categorias. Crea una en 'Lista de precios'."
-                  @update:search="searchCategorias"
-                  @focus="ensureCategoriasLookup"
-                />
-                <div
-                  v-if="form.pricingMode === 'CATEGORIA'"
-                  class="text-caption text-medium-emphasis mb-2"
-                >
-                  Categoria seleccionada: {{ categoriaSeleccionadaLabel }}
-                </div>
-                <v-text-field
-                  v-if="form.pricingMode === 'FIJO_PCT'"
-                  v-model="form.margenPct"
-                  label="% Ganancia fija"
-                  variant="outlined"
-                  density="comfortable"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  :error-messages="errors.margenPct"
-                  @blur="validateField('margenPct')"
-                />
-                <div v-if="form.pricingMode === 'CATEGORIA'" class="text-caption text-medium-emphasis mb-2">
-                  Margen categoria: {{ Number(form.margenCategoriaPct || 0).toFixed(2) }}%
-                </div>
-                <v-text-field
-                  v-if="form.pricingMode === 'MANUAL'"
-                  v-model="form.precioVentaManual"
-                  label="Precio venta manual"
-                  variant="outlined"
-                  density="comfortable"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  :error-messages="errors.precioVentaManual"
-                  @blur="validateField('precioVentaManual')"
-                />
-                <div v-else class="text-caption text-medium-emphasis">
-                  Precio venta calculado: {{ formatMoney(precioVentaCalculado) }}
-                </div>
-                <v-text-field
-                  v-model="stockConfig.stockMinimo"
-                  label="Stock minimo"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="errors.stockMinimo"
-                  @blur="validateField('stockMinimo')"
-                />
-                <v-text-field
-                  v-model="stockConfig.stockDeseado"
-                  label="Stock deseado"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="errors.stockDeseado"
-                  @blur="validateField('stockDeseado')"
-                />
-                <v-text-field
-                  v-model="stockConfig.toleranciaPct"
-                  label="Tolerancia (%)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  variant="outlined"
-                  density="comfortable"
-                  suffix="%"
-                  :error-messages="errors.toleranciaPct"
-                  @blur="validateField('toleranciaPct')"
-                />
-                <v-text-field
-                  v-model="form.stockInicial"
-                  label="Stock inicial"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  variant="outlined"
-                  density="comfortable"
-                  hint="Solo aplica al crear el producto"
-                  persistent-hint
-                  :disabled="!!form.id"
-                  :error-messages="errors.stockInicial"
-                  @blur="validateField('stockInicial')"
-                />
-                <v-switch
-                  :model-value="form.isActive"
-                  label="Activo"
-                  color="primary"
-                  inset
-                  @update:model-value="toggleActive"
-                />
-              </v-form>
-
-              <div class="d-flex justify-end mt-4">
-                <v-btn
-                  color="primary"
-                  variant="tonal"
-                  class="text-none"
-                  :loading="saving"
-                  @click="saveFromBottom"
-                >
-                  Guardar
-                </v-btn>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-window-item>
-
-      <v-window-item value="proveedores">
-        <v-card class="pos-card pa-4 mb-4">
-          <div class="d-flex flex-wrap align-center gap-3">
-            <div>
-              <div class="text-h6">Proveedores</div>
-              <div class="text-caption text-medium-emphasis">Alta y gestion</div>
-            </div>
-            <v-spacer />
-            <v-btn color="primary" class="text-none" @click="resetProveedorForm">Nuevo</v-btn>
-          </div>
-
-          <div class="mt-4 d-flex flex-wrap align-center gap-3">
-            <v-text-field
-              v-model="proveedorSearch"
-              label="Buscar proveedor"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="min-width: 260px"
-              @keyup.enter="loadProveedores"
-            />
-            <v-btn-toggle v-model="proveedorActivoFilter" density="comfortable" mandatory class="ml-2">
-              <v-btn value="all" class="text-none">Todos</v-btn>
-              <v-btn value="true" class="text-none">Activos</v-btn>
-              <v-btn value="false" class="text-none">Inactivos</v-btn>
-            </v-btn-toggle>
-            <v-btn
-              color="primary"
-              variant="tonal"
-              class="text-none"
-              :loading="proveedorLoadingTable"
-              @click="loadProveedores"
-            >
-              Buscar
-            </v-btn>
-          </div>
-        </v-card>
-
-        <v-row dense>
-          <v-col cols="12" md="7">
-            <v-card class="pos-card pa-4">
-              <div class="text-h6">Listado</div>
-              <div class="text-caption text-medium-emphasis">Selecciona para editar</div>
-              <v-data-table
-                :headers="proveedorHeaders"
-                :items="proveedoresTable"
-                item-key="id"
-                class="mt-3"
-                density="compact"
-                height="520"
-                @click:row="selectProveedor"
-              >
-                <template v-slot:[`item.isActive`]="{ item }">
-                  <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
-                    {{ item.isActive ? 'Activo' : 'Inactivo' }}
-                  </v-chip>
-                </template>
-              </v-data-table>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" md="5">
-            <v-card class="pos-card pa-4">
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-h6">{{ proveedorForm.id ? 'Editar proveedor' : 'Nuevo proveedor' }}</div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ proveedorForm.id ? shortId(proveedorForm.id) : 'Sin seleccionar' }}
-                  </div>
-                </div>
-                <v-btn
-                  color="primary"
-                  variant="tonal"
-                  class="text-none"
-                  :loading="proveedorSaving"
-                  @click="saveProveedor"
-                >
-                  Guardar
-                </v-btn>
-              </div>
-
-              <v-form class="mt-3">
-                <v-text-field
-                  v-model="proveedorForm.name"
-                  label="Nombre"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="proveedorErrors.name"
-                  @blur="validateProveedorField('name')"
-                  required
-                />
-                <v-text-field
-                  v-model="proveedorForm.telefono"
-                  label="Telefono"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="proveedorErrors.telefono"
-                  @blur="validateProveedorField('telefono')"
-                  required
-                />
-                <v-text-field
-                  v-model="proveedorForm.cuit"
-                  label="CUIT"
-                  variant="outlined"
-                  density="comfortable"
-                />
-                <v-text-field
-                  v-model="proveedorForm.direccion"
-                  label="Direccion"
-                  variant="outlined"
-                  density="comfortable"
-                />
-                <v-switch
-                  :model-value="proveedorForm.isActive"
-                  label="Activo"
-                  color="primary"
-                  inset
-                  @update:model-value="(value) => (proveedorForm.isActive = value)"
-                />
-              </v-form>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-window-item>
-
-      <v-window-item value="listas-precio">
-        <v-card class="pos-card pa-4 mb-4">
-          <div class="d-flex align-center gap-3">
-            <div>
-              <div class="text-h6">Lista de precios</div>
-              <div class="text-caption text-medium-emphasis">Margen por categoria</div>
-            </div>
-            <v-spacer />
-            <v-btn color="primary" class="text-none" @click="resetCategoriaForm">Nueva categoria</v-btn>
-          </div>
-
-          <div class="mt-4 d-flex flex-wrap align-center gap-3">
-            <v-text-field
-              v-model="categoriaSearch"
-              label="Buscar categoria"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="min-width: 280px"
-              @keyup.enter="loadCategorias"
-            />
-            <v-btn-toggle v-model="categoriaActivoFilter" density="comfortable" mandatory>
-              <v-btn value="all" class="text-none">Todos</v-btn>
-              <v-btn value="true" class="text-none">Activos</v-btn>
-              <v-btn value="false" class="text-none">Inactivos</v-btn>
-            </v-btn-toggle>
-            <v-btn color="primary" variant="tonal" class="text-none" :loading="categoriaLoadingTable" @click="loadCategorias">
-              Buscar
-            </v-btn>
-          </div>
-        </v-card>
-
-        <v-row dense>
-          <v-col cols="12" md="7">
-            <v-card class="pos-card pa-4">
-              <div class="text-h6">Categorias</div>
-              <v-data-table
-                :headers="categoriaHeaders"
-                :items="categoriasTable"
-                item-key="id"
-                class="mt-3"
-                density="compact"
-                height="520"
-                @click:row="selectCategoria"
-              >
-                <template v-slot:[`item.margenGananciaPct`]="{ item }">
-                  {{ Number(item.margenGananciaPct || 0).toFixed(2) }}%
-                </template>
-                <template v-slot:[`item.isActive`]="{ item }">
-                  <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
-                    {{ item.isActive ? 'Activo' : 'Inactivo' }}
-                  </v-chip>
-                </template>
-              </v-data-table>
-            </v-card>
-          </v-col>
-          <v-col cols="12" md="5">
-            <v-card class="pos-card pa-4">
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-h6">{{ categoriaForm.id ? 'Editar categoria' : 'Nueva categoria' }}</div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ categoriaForm.id ? shortId(categoriaForm.id) : 'Sin seleccionar' }}
-                  </div>
-                </div>
-                <v-btn color="primary" variant="tonal" class="text-none" :loading="categoriaSaving" @click="saveCategoria">
-                  Guardar
-                </v-btn>
-              </div>
-
-              <v-form class="mt-3">
-                <v-text-field
-                  v-model="categoriaForm.name"
-                  label="Nombre"
-                  variant="outlined"
-                  density="comfortable"
-                  :error-messages="categoriaErrors.name"
-                  @blur="validateCategoriaField('name')"
-                  required
-                />
-                <v-text-field
-                  v-model="categoriaForm.margenGananciaPct"
-                  label="% Ganancia"
-                  variant="outlined"
-                  density="comfortable"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  :error-messages="categoriaErrors.margenGananciaPct"
-                  @blur="validateCategoriaField('margenGananciaPct')"
-                  required
-                />
-                <v-checkbox
-                  v-model="categoriaForm.aplicarAProductos"
-                  label="Aplicar nuevo porcentaje a productos de la categoria"
-                  color="primary"
                   hide-details
+                  style="min-width: 320px"
+                  @keyup.enter="loadProducts"
                 />
-                <v-switch
-                  :model-value="categoriaForm.isActive"
-                  label="Activo"
-                  color="primary"
-                  inset
-                  @update:model-value="(value) => (categoriaForm.isActive = value)"
+              </div>
+              <div class="products-table-shell mt-3">
+                <v-data-table
+                  :headers="headers"
+                  :items="products"
+                  :items-per-page="10"
+                  item-key="id"
+                  class="products-table"
+                  density="compact"
+                >
+                  <template v-slot:[`item.precioBase`]="{ item }">
+                    {{ formatMoney(item.precioBase) }}
+                  </template>
+                  <template v-slot:[`item.precioVenta`]="{ item }">
+                    {{ formatMoney(item.precioVenta) }}
+                  </template>
+                  <template v-slot:[`item.isActive`]="{ item }">
+                    <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
+                      {{ item.isActive ? 'Activo' : 'Inactivo' }}
+                    </v-chip>
+                  </template>
+                  <template v-slot:[`item.actions`]="{ item }">
+                    <div class="table-actions">
+                      <v-btn
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        class="text-none"
+                        @click="openEditProduct(item)"
+                      >
+                        Editar producto
+                      </v-btn>
+                      <v-btn
+                        size="small"
+                        icon="mdi-delete-outline"
+                        variant="text"
+                        color="error"
+                        class="delete-row-action"
+                        @click="promptDelete('producto', item)"
+                      />
+                    </div>
+                  </template>
+                </v-data-table>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <v-window-item value="proveedores" class="productos-window-item">
+        <div class="d-flex align-center flex-wrap gap-3 mb-4">
+          <v-btn color="primary" size="large" variant="elevated" class="text-none product-primary-action" prepend-icon="mdi-plus" @click="openProveedorDialogFromList">
+            Nuevo proveedor
+          </v-btn>
+        </div>
+        <v-row dense>
+          <v-col cols="12">
+            <v-card class="pos-card pa-4 productos-list-card">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <div class="text-h6">Lista de proveedores</div>
+                <v-spacer />
+                <v-btn-toggle v-model="proveedorActivoFilter" density="comfortable" mandatory>
+                  <v-btn value="all" class="text-none">Todos</v-btn>
+                  <v-btn value="true" class="text-none">Activos</v-btn>
+                  <v-btn value="false" class="text-none">Inactivos</v-btn>
+                </v-btn-toggle>
+              </div>
+              <div class="mt-4 d-flex flex-wrap align-center gap-3">
+                <v-text-field
+                  v-model="proveedorSearch"
+                  label="Buscar proveedor"
+                  prepend-inner-icon="mdi-magnify"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  style="min-width: 320px"
+                  @keyup.enter="loadProveedores"
                 />
-              </v-form>
+              </div>
+              <div class="products-table-shell mt-3">
+                <v-data-table
+                  :headers="proveedorHeaders"
+                  :items="proveedoresTable"
+                  :items-per-page="10"
+                  item-key="id"
+                  class="products-table"
+                  density="compact"
+                >
+                  <template v-slot:[`item.isActive`]="{ item }">
+                    <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
+                      {{ item.isActive ? 'Activo' : 'Inactivo' }}
+                    </v-chip>
+                  </template>
+                  <template v-slot:[`item.actions`]="{ item }">
+                    <div class="table-actions">
+                      <v-btn
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        class="text-none"
+                        @click="openEditProveedor(item)"
+                      >
+                        Editar proveedor
+                      </v-btn>
+                      <v-btn
+                        size="small"
+                        icon="mdi-delete-outline"
+                        variant="text"
+                        color="error"
+                        class="delete-row-action"
+                        @click="promptDelete('proveedor', item)"
+                      />
+                    </div>
+                  </template>
+                </v-data-table>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <v-window-item value="listas-precio" class="productos-window-item">
+        <div class="d-flex align-center flex-wrap gap-3 mb-4">
+          <v-btn color="primary" size="large" variant="elevated" class="text-none product-primary-action" prepend-icon="mdi-plus" @click="openCategoriaDialogForCreate">
+            Nueva categoría
+          </v-btn>
+        </div>
+        <v-row dense>
+          <v-col cols="12">
+            <v-card class="pos-card pa-4 productos-list-card">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <div class="text-h6">Categorías</div>
+                <v-spacer />
+                <v-btn-toggle v-model="categoriaActivoFilter" density="comfortable" mandatory>
+                  <v-btn value="all" class="text-none">Todos</v-btn>
+                  <v-btn value="true" class="text-none">Activos</v-btn>
+                  <v-btn value="false" class="text-none">Inactivos</v-btn>
+                </v-btn-toggle>
+              </div>
+              <div class="mt-4 d-flex flex-wrap align-center gap-3">
+                <v-text-field
+                  v-model="categoriaSearch"
+                  label="Buscar categoría"
+                  prepend-inner-icon="mdi-magnify"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  style="min-width: 320px"
+                  @keyup.enter="loadCategorias"
+                />
+              </div>
+              <div class="products-table-shell mt-3">
+                <v-data-table
+                  :headers="categoriaHeaders"
+                  :items="categoriasTable"
+                  :items-per-page="10"
+                  item-key="id"
+                  class="products-table"
+                  density="compact"
+                >
+                  <template v-slot:[`item.margenGananciaPct`]="{ item }">
+                    {{ Number(item.margenGananciaPct || 0).toFixed(2) }}%
+                  </template>
+                  <template v-slot:[`item.isActive`]="{ item }">
+                    <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
+                      {{ item.isActive ? 'Activo' : 'Inactivo' }}
+                    </v-chip>
+                  </template>
+                  <template v-slot:[`item.actions`]="{ item }">
+                    <div class="table-actions">
+                      <v-btn
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        class="text-none"
+                        @click="openEditCategoria(item)"
+                      >
+                        Editar categoría
+                      </v-btn>
+                      <v-btn
+                        size="small"
+                        icon="mdi-delete-outline"
+                        variant="text"
+                        color="error"
+                        class="delete-row-action"
+                        @click="promptDelete('categoria', item)"
+                      />
+                    </div>
+                  </template>
+                </v-data-table>
+              </div>
             </v-card>
           </v-col>
         </v-row>
       </v-window-item>
     </v-window>
+
+    <v-dialog v-model="deleteDialog" persistent width="440">
+      <v-card>
+        <v-card-title>Confirmar eliminación</v-card-title>
+        <v-card-text>
+          {{ deleteDialogText }}
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="deleteLoading" @click="closeDeleteDialog">Cancelar</v-btn>
+          <v-btn color="error" variant="elevated" :loading="deleteLoading" @click="confirmDelete">
+            Eliminar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="dialogDesactivar" width="420">
       <v-card>
@@ -534,6 +269,309 @@
         <v-card-actions class="justify-end">
           <v-btn variant="text" @click="cancelDeactivate">Cancelar</v-btn>
           <v-btn color="error" @click="confirmDeactivate">Desactivar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog :model-value="!!productEditorMode" persistent width="760">
+      <v-card v-if="productEditorMode" class="pa-4">
+        <div>
+          <div>
+            <div class="text-h6">{{ productEditorMode === 'edit' ? 'Editar producto' : 'Nuevo producto' }}</div>
+            <div class="text-caption text-medium-emphasis">{{ productEditorMode === 'edit' ? form.name : '' }}</div>
+          </div>
+        </div>
+
+        <v-form class="mt-3">
+          <v-row dense class="product-price-row">
+            <v-col cols="12" md="7">
+              <v-text-field
+                v-model="form.name"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="errors.name"
+                @blur="validateField('name')"
+                required
+              >
+                <template #label>
+                  Nombre <span class="required-asterisk">*</span>
+                </template>
+              </v-text-field>
+            </v-col>
+            <v-col cols="12" md="5">
+              <v-text-field
+                v-model="form.sku"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="errors.sku"
+                inputmode="numeric"
+                @update:model-value="onSkuInput"
+                @blur="validateField('sku')"
+                required
+              >
+                <template #label>
+                  SKU <span class="required-asterisk">*</span>
+                </template>
+              </v-text-field>
+            </v-col>
+            <v-col cols="12" md="7">
+              <v-autocomplete
+                v-model="form.proveedorId"
+                :items="proveedoresLookup"
+                :loading="proveedorLoading"
+                item-title="name"
+                item-value="id"
+                variant="outlined"
+                density="comfortable"
+                clearable
+                :error-messages="errors.proveedorId"
+                @update:search="searchProveedores"
+                @focus="ensureProveedoresLookup"
+                @blur="validateField('proveedorId')"
+                required
+              >
+                <template #label>
+                  Proveedor <span class="required-asterisk">*</span>
+                </template>
+                <template #no-data>
+                  <v-list-item
+                    prepend-icon="mdi-plus-circle-outline"
+                    title="Nuevo proveedor"
+                    @click="openProveedorDialogFromProduct"
+                  />
+                </template>
+              </v-autocomplete>
+            </v-col>
+          </v-row>
+
+          <div class="text-subtitle-2 product-section-title">Precio</div>
+          <v-row dense>
+            <v-col cols="12" md="4">
+              <MoneyField
+                v-model="form.precioBase"
+                label="Precio base"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="errors.precioBase"
+                :step="100"
+                @blur="validateField('precioBase')"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-select
+                v-model="form.pricingMode"
+                :items="pricingModeItems"
+                label="Modo de precio"
+                variant="outlined"
+                density="comfortable"
+                item-title="title"
+                item-value="value"
+              />
+            </v-col>
+            <v-col v-if="form.pricingMode === 'CATEGORIA'" cols="12" md="4">
+              <v-autocomplete
+                v-model="form.categoriaId"
+                :items="categoriasLookupDisplay"
+                :loading="categoriaLoading"
+                label="Categoría"
+                item-title="displayTitle"
+                item-value="id"
+                variant="outlined"
+                density="comfortable"
+                clearable
+                no-data-text="No hay categorías. Crea una en 'Categorías'."
+                @update:search="searchCategorias"
+                @focus="ensureCategoriasLookup"
+              />
+            </v-col>
+            <v-col v-else-if="form.pricingMode === 'FIJO_PCT'" cols="12" md="4">
+              <v-text-field
+                v-model="form.margenPct"
+                label="% Ganancia fija"
+                variant="outlined"
+                density="comfortable"
+                type="number"
+                min="0"
+                step="0.01"
+                :error-messages="errors.margenPct"
+                @blur="validateField('margenPct')"
+              />
+            </v-col>
+            <v-col v-else-if="form.pricingMode === 'MANUAL'" cols="12" md="4">
+              <MoneyField
+                v-model="form.precioVentaManual"
+                label="Precio venta manual"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="errors.precioVentaManual"
+                :step="100"
+                @blur="validateField('precioVentaManual')"
+              />
+            </v-col>
+            <v-col v-else cols="12" md="4" class="d-flex align-center">
+              <div class="text-caption text-medium-emphasis">
+                Precio de venta calculado: {{ formatMoney(precioVentaCalculado) }}
+              </div>
+            </v-col>
+          </v-row>
+          <div class="product-final-price">
+            <span class="product-final-price__label">Precio final:</span>
+            <span class="product-final-price__value">{{ formatMoney(precioVentaCalculado) }}</span>
+          </div>
+
+          <div class="text-subtitle-2 product-section-title">Stock</div>
+          <v-row dense>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="form.stockInicial"
+                label="Stock inicial"
+                type="number"
+                min="0"
+                step="0.01"
+                variant="outlined"
+                density="comfortable"
+                :disabled="!!form.id"
+                :error-messages="errors.stockInicial"
+                @blur="validateField('stockInicial')"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="stockConfig.stockMinimo"
+                label="Stock minimo"
+                type="number"
+                min="0"
+                step="0.01"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="errors.stockMinimo"
+                @blur="validateField('stockMinimo')"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <div class="product-status-row">
+                <span class="product-status-row__label">Estado:</span>
+                <v-switch
+                  :model-value="form.isActive"
+                  color="primary"
+                  inset
+                  hide-details
+                  @update:model-value="toggleActive"
+                >
+                  <template #label>
+                    {{ form.isActive ? 'Activo' : 'Inactivo' }}
+                  </template>
+                </v-switch>
+              </div>
+            </v-col>
+          </v-row>
+        </v-form>
+        <v-card-actions class="justify-end px-0 pt-5">
+          <v-btn variant="outlined" color="secondary" class="text-none product-dialog-action" @click="closeProductEditor">Cancelar</v-btn>
+          <v-btn color="primary" variant="elevated" class="text-none product-dialog-action" :loading="saving" @click="saveProduct">
+            Guardar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="proveedorDialog" persistent width="560">
+      <v-card>
+        <v-card-title>{{ proveedorDialogMode === 'edit' ? 'Editar proveedor' : 'Nuevo proveedor' }}</v-card-title>
+        <v-card-text class="pt-4">
+          <v-form @submit.prevent="saveProveedor">
+            <v-text-field
+              v-model="proveedorForm.name"
+              label="Nombre"
+              variant="outlined"
+              density="comfortable"
+              :error-messages="proveedorErrors.name"
+              @blur="validateProveedorField('name')"
+              required
+            />
+            <v-text-field
+              v-model="proveedorForm.telefono"
+              label="Telefono"
+              variant="outlined"
+              density="comfortable"
+              :error-messages="proveedorErrors.telefono"
+              @blur="validateProveedorField('telefono')"
+              required
+            />
+            <v-text-field
+              v-model="proveedorForm.cuit"
+              label="CUIT"
+              variant="outlined"
+              density="comfortable"
+            />
+            <v-text-field
+              v-model="proveedorForm.direccion"
+              label="Direccion"
+              variant="outlined"
+              density="comfortable"
+            />
+            <v-switch
+              :model-value="proveedorForm.isActive"
+              label="Activo"
+              color="primary"
+              inset
+              @update:model-value="(value) => (proveedorForm.isActive = value)"
+            />
+            <button type="submit" class="d-none" aria-hidden="true" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeProveedorDialog">Cancelar</v-btn>
+          <v-btn color="primary" :loading="proveedorSaving" @click="saveProveedor">Guardar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="categoriaDialog" persistent width="560">
+      <v-card>
+        <v-card-title>{{ categoriaDialogMode === 'edit' ? 'Editar categoría' : 'Nueva categoría' }}</v-card-title>
+        <v-card-text class="pt-4">
+          <v-form @submit.prevent="saveCategoria">
+            <v-text-field
+              v-model="categoriaForm.name"
+              label="Nombre"
+              variant="outlined"
+              density="comfortable"
+              :error-messages="categoriaErrors.name"
+              @blur="validateCategoriaField('name')"
+              required
+            />
+            <v-text-field
+              v-model="categoriaForm.margenGananciaPct"
+              label="% Ganancia"
+              variant="outlined"
+              density="comfortable"
+              type="number"
+              min="0"
+              step="0.01"
+              :error-messages="categoriaErrors.margenGananciaPct"
+              @blur="validateCategoriaField('margenGananciaPct')"
+              required
+            />
+            <v-checkbox
+              v-model="categoriaForm.aplicarAProductos"
+              label="Aplicar nuevo porcentaje a productos de la categoría"
+              color="primary"
+              hide-details
+            />
+            <v-switch
+              :model-value="categoriaForm.isActive"
+              label="Activo"
+              color="primary"
+              inset
+              @update:model-value="(value) => (categoriaForm.isActive = value)"
+            />
+            <button type="submit" class="d-none" aria-hidden="true" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeCategoriaDialog">Cancelar</v-btn>
+          <v-btn color="primary" :loading="categoriaSaving" @click="saveCategoria">Guardar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -549,9 +587,11 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import MoneyField from '../components/MoneyField.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import { getJson, postJson, requestJson } from '../services/apiClient';
+import { buildApiUrl, getJson, postJson, requestJson } from '../services/apiClient';
+import { formatMoney } from '../utils/currency';
 
 const tab = ref('productos');
 const route = useRoute();
@@ -564,13 +604,22 @@ const saving = ref(false);
 const barcodeLoading = ref(false);
 
 const search = ref('');
-const scanInput = ref('');
 const activoFilter = ref('all');
+let loadProductsDebounceId = null;
+let loadProveedoresDebounceId = null;
+let loadCategoriasDebounceId = null;
 
 const proveedoresLookup = ref([]);
 const proveedorLoading = ref(false);
 const categoriaLoading = ref(false);
 const categoriasLookup = ref([]);
+const proveedorLookupSearch = ref('');
+const productEditorMode = ref('');
+const proveedorDialogMode = ref('');
+const categoriaDialogMode = ref('');
+const deleteDialog = ref(false);
+const deleteLoading = ref(false);
+const deleteTarget = ref(null);
 
 const form = reactive({
   id: '',
@@ -588,9 +637,7 @@ const form = reactive({
 });
 
 const stockConfig = reactive({
-  stockMinimo: '',
-  stockDeseado: '',
-  toleranciaPct: '25'
+  stockMinimo: ''
 });
 
 const errors = reactive({
@@ -601,13 +648,14 @@ const errors = reactive({
   margenPct: '',
   precioVentaManual: '',
   stockInicial: '',
-  stockMinimo: '',
-  stockDeseado: '',
-  toleranciaPct: ''
+  stockMinimo: ''
 });
 
 
 const dialogDesactivar = ref(false);
+const proveedorDialog = ref(false);
+const categoriaDialog = ref(false);
+const seleccionarProveedorDespuesDeGuardar = ref(false);
 const pendingActive = ref(true);
 
 const snackbar = ref({
@@ -617,6 +665,12 @@ const snackbar = ref({
   icon: 'mdi-check-circle'
 });
 
+const deleteEntityLabels = {
+  producto: 'el producto',
+  proveedor: 'el proveedor',
+  categoria: 'la categoría'
+};
+
 const headers = [
   { title: 'Nombre', value: 'name' },
   { title: 'SKU', value: 'sku' },
@@ -624,7 +678,8 @@ const headers = [
   { title: 'Proveedor', value: 'proveedor' },
   { title: 'Precio base', value: 'precioBase' },
   { title: 'Precio venta', value: 'precioVenta' },
-  { title: 'Estado', value: 'isActive' }
+  { title: 'Estado', value: 'isActive' },
+  { title: '', value: 'actions', sortable: false, align: 'end' }
 ];
 
 const pricingModeItems = [
@@ -638,13 +693,15 @@ const proveedorHeaders = [
   { title: 'Telefono', value: 'telefono' },
   { title: 'CUIT', value: 'cuit' },
   { title: 'Direccion', value: 'direccion' },
-  { title: 'Estado', value: 'isActive' }
+  { title: 'Estado', value: 'isActive' },
+  { title: '', value: 'actions', sortable: false, align: 'end' }
 ];
 
 const categoriaHeaders = [
   { title: 'Nombre', value: 'name' },
   { title: '% Ganancia', value: 'margenGananciaPct' },
-  { title: 'Estado', value: 'isActive' }
+  { title: 'Estado', value: 'isActive' },
+  { title: '', value: 'actions', sortable: false, align: 'end' }
 ];
 
 const proveedoresTable = ref([]);
@@ -686,8 +743,10 @@ const categoriaErrors = reactive({
   margenGananciaPct: ''
 });
 
-const formatMoney = (value) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(value || 0);
+const deleteDialogText = computed(() => {
+  if (!deleteTarget.value) return '';
+  return `Vas a eliminar ${deleteEntityLabels[deleteTarget.value.type]} "${deleteTarget.value.name}". Esta acción no se puede deshacer.`;
+});
 
 const categoriasLookupDisplay = computed(() =>
   (categoriasLookup.value || []).map((item) => ({
@@ -724,6 +783,8 @@ const shortId = (value) => {
   return value.length > 8 ? value.slice(0, 8) : value;
 };
 
+const resolveTableRow = (row) => row?.raw ?? row?.item?.raw ?? row?.item ?? row;
+
 const flash = (type, text) => {
   snackbar.value = {
     show: true,
@@ -752,13 +813,19 @@ const clearErrors = () => {
 
 const validateField = (field) => {
   if (field === 'name') {
-    errors.name = form.name.trim() ? '' : 'El nombre es obligatorio.';
+    errors.name = form.name.trim() ? '' : '* El nombre es obligatorio.';
   }
   if (field === 'sku') {
-    errors.sku = form.sku.trim() ? '' : 'El SKU es obligatorio.';
+    if (!form.sku.trim()) {
+      errors.sku = '* El SKU es obligatorio.';
+    } else if (!/^\d+$/.test(form.sku.trim())) {
+      errors.sku = '* El SKU debe contener solo numeros.';
+    } else {
+      errors.sku = '';
+    }
   }
   if (field === 'proveedorId') {
-    errors.proveedorId = form.proveedorId ? '' : 'El proveedor es obligatorio.';
+    errors.proveedorId = form.proveedorId ? '' : '* El proveedor es obligatorio.';
   }
   if (field === 'precioBase') {
     if (form.precioBase === '') {
@@ -800,15 +867,6 @@ const validateField = (field) => {
       errors.stockMinimo = '';
     }
   }
-  if (field === 'stockDeseado') {
-    if (stockConfig.stockDeseado === '') {
-      errors.stockDeseado = '';
-    } else if (Number(stockConfig.stockDeseado) < 0 || Number.isNaN(Number(stockConfig.stockDeseado))) {
-      errors.stockDeseado = 'Stock deseado invalido.';
-    } else {
-      errors.stockDeseado = '';
-    }
-  }
   if (field === 'stockInicial') {
     if (form.stockInicial === '') {
       errors.stockInicial = '';
@@ -816,15 +874,6 @@ const validateField = (field) => {
       errors.stockInicial = 'Stock inicial invalido.';
     } else {
       errors.stockInicial = '';
-    }
-  }
-  if (field === 'toleranciaPct') {
-    if (stockConfig.toleranciaPct === '') {
-      errors.toleranciaPct = '';
-    } else if (Number(stockConfig.toleranciaPct) < 0 || Number.isNaN(Number(stockConfig.toleranciaPct))) {
-      errors.toleranciaPct = 'Tolerancia invalida.';
-    } else {
-      errors.toleranciaPct = '';
     }
   }
 };
@@ -838,8 +887,6 @@ const validateForm = () => {
   validateField('precioVentaManual');
   validateField('stockInicial');
   validateField('stockMinimo');
-  validateField('stockDeseado');
-  validateField('toleranciaPct');
   return (
     !errors.name &&
     !errors.sku &&
@@ -848,9 +895,7 @@ const validateForm = () => {
     !errors.margenPct &&
     !errors.precioVentaManual &&
     !errors.stockInicial &&
-    !errors.stockMinimo &&
-    !errors.stockDeseado &&
-    !errors.toleranciaPct
+    !errors.stockMinimo
   );
 };
 
@@ -875,19 +920,12 @@ const loadProducts = async () => {
   }
 };
 
-const handleScan = () => {
-  const code = scanInput.value.trim();
-  if (!code) return;
-  search.value = code;
-  loadProducts();
-  scanInput.value = '';
-};
-
 const searchProveedores = async (term) => {
+  proveedorLookupSearch.value = term || '';
   proveedorLoading.value = true;
   try {
     const params = new URLSearchParams();
-    if (term && term.trim()) params.set('search', term.trim());
+    if (term && term.trim()) params.set('busqueda', term.trim());
     params.set('activo', 'true');
     const { response, data } = await getJson(`/api/v1/proveedores?${params.toString()}`);
     if (!response.ok) {
@@ -903,6 +941,11 @@ const searchProveedores = async (term) => {
   }
 };
 
+const ensureProveedoresLookup = async () => {
+  if (proveedoresLookup.value.length > 0 || proveedorLoading.value) return;
+  await searchProveedores(proveedorLookupSearch.value);
+};
+
 const applyCategoriaMargin = () => {
   const categoria = categoriasLookup.value.find((item) => item.id === form.categoriaId);
   form.margenCategoriaPct = categoria ? Number(categoria.margenGananciaPct || 0).toString() : '0';
@@ -912,7 +955,7 @@ const searchCategorias = async (term) => {
   categoriaLoading.value = true;
   try {
     const params = new URLSearchParams();
-    if (term && term.trim()) params.set('search', term.trim());
+    if (term && term.trim()) params.set('busqueda', term.trim());
     params.set('activo', 'true');
     const { response, data } = await getJson(`/api/v1/categorias-precio?${params.toString()}`);
     if (!response.ok) {
@@ -934,8 +977,8 @@ const ensureCategoriasLookup = async () => {
   await searchCategorias('');
 };
 
-const selectProduct = async (event, row) => {
-  const product = row?.item?.raw ?? row?.item ?? row;
+const openEditProduct = async (row) => {
+  const product = resolveTableRow(row);
   if (!product?.id) return;
   try {
     const { response, data } = await getJson(`/api/v1/productos/${product.id}`);
@@ -963,16 +1006,13 @@ const selectProduct = async (event, row) => {
     const configResp = await getJson(`/api/v1/productos/${product.id}/stock-config`);
     if (configResp.response.ok) {
       stockConfig.stockMinimo = configResp.data.stockMinimo?.toString?.() ?? '0';
-      stockConfig.stockDeseado = configResp.data.stockDeseado?.toString?.() ?? '0';
-      stockConfig.toleranciaPct = configResp.data.toleranciaPct?.toString?.() ?? '25';
     } else {
       stockConfig.stockMinimo = '0';
-      stockConfig.stockDeseado = '0';
-      stockConfig.toleranciaPct = '25';
     }
 
     clearErrors();
     applyCategoriaMargin();
+    productEditorMode.value = 'edit';
   } catch (err) {
     flash('error', err?.message || 'No se pudo cargar el producto.');
   }
@@ -992,16 +1032,26 @@ const resetForm = () => {
   form.stockInicial = '';
   form.isActive = true;
   stockConfig.stockMinimo = '0';
-  stockConfig.stockDeseado = '0';
-  stockConfig.toleranciaPct = '25';
   clearErrors();
+};
+
+const onSkuInput = (value) => {
+  form.sku = (value || '').replace(/\D+/g, '');
+};
+
+const startNewProduct = () => {
+  resetForm();
+  productEditorMode.value = 'new';
+};
+
+const closeProductEditor = () => {
+  resetForm();
+  productEditorMode.value = '';
 };
 
 const saveStockConfig = async (productId) => {
   const payload = {
-    stockMinimo: stockConfig.stockMinimo === '' ? 0 : Number(stockConfig.stockMinimo),
-    stockDeseado: stockConfig.stockDeseado === '' ? 0 : Number(stockConfig.stockDeseado),
-    toleranciaPct: stockConfig.toleranciaPct === '' ? 25 : Number(stockConfig.toleranciaPct)
+    stockMinimo: stockConfig.stockMinimo === '' ? 0 : Number(stockConfig.stockMinimo)
   };
 
   const { response, data } = await requestJson(`/api/v1/productos/${productId}/stock-config`, {
@@ -1068,11 +1118,12 @@ const saveProduct = async () => {
       if (!response.ok) {
         throw new Error(extractProblemMessage(data));
       }
-      form.id = data.id;
-      await saveStockConfig(form.id);
-      await applyStockInicial(form.id);
+      const productId = data.id;
+      await saveStockConfig(productId);
+      await applyStockInicial(productId);
       flash('success', 'Producto creado');
       await loadProducts();
+      closeProductEditor();
       return;
     }
 
@@ -1099,16 +1150,12 @@ const saveProduct = async () => {
     await saveStockConfig(form.id);
     flash('success', 'Producto actualizado');
     await loadProducts();
+    closeProductEditor();
   } catch (err) {
     flash('error', err?.message || 'No se pudo guardar el producto.');
   } finally {
     saving.value = false;
   }
-};
-
-const saveFromBottom = async () => {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  await saveProduct();
 };
 
 const printBarcodes = async () => {
@@ -1125,8 +1172,7 @@ const printBarcodes = async () => {
 
   barcodeLoading.value = true;
   try {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-    const response = await fetch(`${baseUrl}/api/v1/etiquetas/codigos-barra/pdf`, {
+    const response = await fetch(buildApiUrl('/api/v1/etiquetas/codigos-barra/pdf'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1203,11 +1249,33 @@ const resetProveedorForm = () => {
   proveedorErrors.telefono = '';
 };
 
+const openProveedorDialogFromProduct = () => {
+  seleccionarProveedorDespuesDeGuardar.value = true;
+  resetProveedorForm();
+  proveedorForm.name = proveedorLookupSearch.value.trim();
+  proveedorDialogMode.value = 'new';
+  proveedorDialog.value = true;
+};
+
+const openProveedorDialogFromList = () => {
+  seleccionarProveedorDespuesDeGuardar.value = false;
+  resetProveedorForm();
+  proveedorDialogMode.value = 'new';
+  proveedorDialog.value = true;
+};
+
+const closeProveedorDialog = () => {
+  proveedorDialog.value = false;
+  proveedorDialogMode.value = '';
+  seleccionarProveedorDespuesDeGuardar.value = false;
+  resetProveedorForm();
+};
+
 const loadProveedores = async () => {
   proveedorLoadingTable.value = true;
   try {
     const params = new URLSearchParams();
-    if (proveedorSearch.value.trim()) params.set('search', proveedorSearch.value.trim());
+    if (proveedorSearch.value.trim()) params.set('busqueda', proveedorSearch.value.trim());
     if (proveedorActivoFilter.value !== 'all') params.set('activo', proveedorActivoFilter.value);
     const { response, data } = await getJson(`/api/v1/proveedores?${params.toString()}`);
     if (!response.ok) {
@@ -1223,9 +1291,10 @@ const loadProveedores = async () => {
   }
 };
 
-const selectProveedor = (event, row) => {
-  const proveedor = row?.item?.raw ?? row?.item ?? row;
+const openEditProveedor = (row) => {
+  const proveedor = resolveTableRow(row);
   if (!proveedor?.id) return;
+  seleccionarProveedorDespuesDeGuardar.value = false;
   proveedorForm.id = proveedor.id;
   proveedorForm.name = proveedor.name || '';
   proveedorForm.telefono = proveedor.telefono || '';
@@ -1234,6 +1303,8 @@ const selectProveedor = (event, row) => {
   proveedorForm.isActive = proveedor.isActive ?? true;
   proveedorErrors.name = '';
   proveedorErrors.telefono = '';
+  proveedorDialogMode.value = 'edit';
+  proveedorDialog.value = true;
 };
 
 const saveProveedor = async () => {
@@ -1244,6 +1315,7 @@ const saveProveedor = async () => {
 
   proveedorSaving.value = true;
   try {
+    let savedProveedor = null;
     const payload = {
       name: proveedorForm.name.trim(),
       telefono: proveedorForm.telefono.trim(),
@@ -1257,8 +1329,8 @@ const saveProveedor = async () => {
       if (!response.ok) {
         throw new Error(extractProblemMessage(data));
       }
+      savedProveedor = data;
       flash('success', 'Proveedor creado');
-      resetProveedorForm();
     } else {
       const { response, data } = await requestJson(`/api/v1/proveedores/${proveedorForm.id}`, {
         method: 'PATCH',
@@ -1267,11 +1339,21 @@ const saveProveedor = async () => {
       if (!response.ok) {
         throw new Error(extractProblemMessage(data));
       }
+      savedProveedor = data ?? { id: proveedorForm.id, ...payload };
       flash('success', 'Proveedor actualizado');
     }
 
     await loadProveedores();
     await searchProveedores('');
+
+    if (seleccionarProveedorDespuesDeGuardar.value && savedProveedor?.id) {
+      form.proveedorId = savedProveedor.id;
+      validateField('proveedorId');
+      closeProveedorDialog();
+      return;
+    }
+
+    closeProveedorDialog();
   } catch (err) {
     flash('error', err?.message || 'No se pudo guardar el proveedor.');
   } finally {
@@ -1301,11 +1383,23 @@ const resetCategoriaForm = () => {
   categoriaErrors.margenGananciaPct = '';
 };
 
+const openCategoriaDialogForCreate = () => {
+  resetCategoriaForm();
+  categoriaDialogMode.value = 'new';
+  categoriaDialog.value = true;
+};
+
+const closeCategoriaDialog = () => {
+  categoriaDialog.value = false;
+  categoriaDialogMode.value = '';
+  resetCategoriaForm();
+};
+
 const loadCategorias = async () => {
   categoriaLoadingTable.value = true;
   try {
     const params = new URLSearchParams();
-    if (categoriaSearch.value.trim()) params.set('search', categoriaSearch.value.trim());
+    if (categoriaSearch.value.trim()) params.set('busqueda', categoriaSearch.value.trim());
     if (categoriaActivoFilter.value !== 'all') params.set('activo', categoriaActivoFilter.value);
 
     const { response, data } = await getJson(`/api/v1/categorias-precio?${params.toString()}`);
@@ -1326,8 +1420,8 @@ const loadCategorias = async () => {
   }
 };
 
-const selectCategoria = (event, row) => {
-  const categoria = row?.item?.raw ?? row?.item ?? row;
+const openEditCategoria = (row) => {
+  const categoria = resolveTableRow(row);
   if (!categoria?.id) return;
   categoriaForm.id = categoria.id;
   categoriaForm.name = categoria.name || '';
@@ -1336,6 +1430,8 @@ const selectCategoria = (event, row) => {
   categoriaForm.isActive = categoria.isActive ?? true;
   categoriaErrors.name = '';
   categoriaErrors.margenGananciaPct = '';
+  categoriaDialogMode.value = 'edit';
+  categoriaDialog.value = true;
 };
 
 const saveCategoria = async () => {
@@ -1368,11 +1464,79 @@ const saveCategoria = async () => {
 
     await loadCategorias();
     await loadProducts();
-    resetCategoriaForm();
+    closeCategoriaDialog();
   } catch (err) {
     flash('error', err?.message || 'No se pudo guardar la categoria.');
   } finally {
     categoriaSaving.value = false;
+  }
+};
+
+const promptDelete = (type, row) => {
+  const entity = resolveTableRow(row);
+  if (!entity?.id) return;
+
+  deleteTarget.value = {
+    id: entity.id,
+    type,
+    name: entity.name || 'Sin nombre'
+  };
+  deleteDialog.value = true;
+};
+
+const closeDeleteDialog = () => {
+  deleteDialog.value = false;
+  deleteTarget.value = null;
+};
+
+const confirmDelete = async () => {
+  if (!deleteTarget.value || deleteLoading.value) return;
+
+  const target = deleteTarget.value;
+  const endpointMap = {
+    producto: `/api/v1/productos/${target.id}`,
+    proveedor: `/api/v1/proveedores/${target.id}`,
+    categoria: `/api/v1/categorias-precio/${target.id}`
+  };
+  const successMap = {
+    producto: 'Producto eliminado',
+    proveedor: 'Proveedor eliminado',
+    categoria: 'Categoría eliminada'
+  };
+
+  deleteLoading.value = true;
+  try {
+    const { response, data } = await requestJson(endpointMap[target.type], {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    if (target.type === 'producto') {
+      await loadProducts();
+    } else if (target.type === 'proveedor') {
+      await loadProveedores();
+      await searchProveedores(proveedorLookupSearch.value);
+      if (form.proveedorId === target.id) {
+        form.proveedorId = '';
+        validateField('proveedorId');
+      }
+    } else if (target.type === 'categoria') {
+      await loadCategorias();
+      await searchCategorias('');
+      await loadProducts();
+      if (form.categoriaId === target.id) {
+        form.categoriaId = '';
+      }
+    }
+
+    flash('success', successMap[target.type]);
+    closeDeleteDialog();
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo eliminar el elemento.');
+  } finally {
+    deleteLoading.value = false;
   }
 };
 
@@ -1387,6 +1551,45 @@ const syncTabFromRoute = (value) => {
   }
   tab.value = 'productos';
 };
+
+watch(
+  [() => search.value, () => activoFilter.value],
+  () => {
+    if (tab.value !== 'productos') return;
+    if (loadProductsDebounceId) {
+      clearTimeout(loadProductsDebounceId);
+    }
+    loadProductsDebounceId = setTimeout(() => {
+      loadProducts();
+    }, 250);
+  }
+);
+
+watch(
+  [() => proveedorSearch.value, () => proveedorActivoFilter.value],
+  () => {
+    if (tab.value !== 'proveedores') return;
+    if (loadProveedoresDebounceId) {
+      clearTimeout(loadProveedoresDebounceId);
+    }
+    loadProveedoresDebounceId = setTimeout(() => {
+      loadProveedores();
+    }, 250);
+  }
+);
+
+watch(
+  [() => categoriaSearch.value, () => categoriaActivoFilter.value],
+  () => {
+    if (tab.value !== 'listas-precio') return;
+    if (loadCategoriasDebounceId) {
+      clearTimeout(loadCategoriasDebounceId);
+    }
+    loadCategoriasDebounceId = setTimeout(() => {
+      loadCategorias();
+    }, 250);
+  }
+);
 
 watch(
   () => tab.value,
@@ -1438,6 +1641,125 @@ onMounted(() => {
 <style scoped>
 .productos-page {
   animation: fade-in 0.3s ease;
+}
+
+.productos-window-item {
+  height: 100%;
+}
+
+.productos-list-card {
+  min-height: calc(100vh - 180px);
+  display: flex;
+  flex-direction: column;
+}
+
+.products-table-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.products-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.products-table :deep(.v-table) {
+  height: 100%;
+}
+
+.products-table :deep(.v-table__wrapper) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.products-table :deep(.v-data-table__wrapper) {
+  flex: 1;
+  min-height: 0;
+}
+
+.products-table :deep(.v-data-table-footer) {
+  margin-top: auto;
+}
+
+.product-primary-action {
+  min-width: 180px;
+  min-height: 46px;
+  font-weight: 800;
+  box-shadow: 0 12px 24px rgba(90, 15, 28, 0.2);
+}
+
+.product-print-action {
+  min-height: 46px;
+  padding-inline: 0;
+  font-weight: 700;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.delete-row-action {
+  opacity: 0.9;
+}
+
+.required-asterisk {
+  color: rgb(220, 38, 38);
+  font-weight: 800;
+}
+
+.product-section-title {
+  margin: 16px 0 12px;
+}
+
+.product-final-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 0 0 0;
+  border-radius: 12px;
+  background: rgba(198, 164, 108, 0.14);
+}
+
+.product-price-row {
+  margin-bottom: -6px;
+}
+
+.product-final-price__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(90, 15, 28);
+}
+
+.product-final-price__value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: rgb(59, 10, 18);
+}
+
+.product-status-row {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.product-status-row__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgb(58, 58, 58);
+}
+
+.product-dialog-action {
+  min-width: 132px;
+  min-height: 44px;
+  padding-inline: 20px;
+  font-weight: 700;
 }
 
 </style>

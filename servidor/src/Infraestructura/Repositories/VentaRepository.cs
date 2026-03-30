@@ -37,10 +37,18 @@ public sealed class VentaRepository : IVentaRepository
 
     private async Task<long> GetNextVentaNumeroAsync(CancellationToken cancellationToken)
     {
-        var next = await _dbContext.Database
-            .SqlQuery<long>($"SELECT nextval('venta_numero_seq') AS \"Value\"")
-            .SingleAsync(cancellationToken);
-        return next;
+        if (_dbContext.Database.IsNpgsql())
+        {
+            var next = await _dbContext.Database
+                .SqlQuery<long>($"SELECT nextval('venta_numero_seq') AS \"Value\"")
+                .SingleAsync(cancellationToken);
+            return next;
+        }
+
+        var currentMax = await _dbContext.Ventas
+            .MaxAsync(v => (long?)v.Numero, cancellationToken) ?? 0L;
+
+        return currentMax + 1L;
     }
 
     public async Task<VentaDto?> GetByIdAsync(
@@ -117,11 +125,19 @@ public sealed class VentaRepository : IVentaRepository
                     i.Cantidad * i.PrecioUnitario))
             .ToListAsync(cancellationToken);
 
-        var pagos = await _dbContext.VentaPagos.AsNoTracking()
-            .Where(vp => vp.TenantId == tenantId && vp.VentaId == venta.Id)
+        var pagos = (await _dbContext.VentaPagos.AsNoTracking()
+                .Where(vp => vp.TenantId == tenantId && vp.VentaId == venta.Id)
+                .Select(vp => new
+                {
+                    vp.Id,
+                    vp.MedioPago,
+                    vp.Monto,
+                    vp.CreatedAt
+                })
+                .ToListAsync(cancellationToken))
             .OrderBy(vp => vp.CreatedAt)
             .Select(vp => new VentaPagoDto(vp.Id, vp.MedioPago, vp.Monto))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var ventaDto = new VentaDto(
             venta.Id,
@@ -592,9 +608,11 @@ public sealed class VentaRepository : IVentaRepository
 
         var cajaMovimientos = new List<CajaMovimientoResultDto>();
 
-        var movimientosSum = await _dbContext.CajaMovimientos
+        var movimientosSum = (await _dbContext.CajaMovimientos
             .Where(m => m.TenantId == tenantId && m.CajaSesionId == cajaSesion.Id)
-            .SumAsync(m => (decimal?)m.Monto, cancellationToken) ?? 0m;
+            .Select(m => m.Monto)
+            .ToListAsync(cancellationToken))
+            .Sum();
 
         var saldoActual = cajaSesion.MontoInicial + movimientosSum;
 
@@ -747,9 +765,11 @@ public sealed class VentaRepository : IVentaRepository
 
         _dbContext.StockMovimientoItems.AddRange(movimientoItems);
 
-        var movimientosSum = await _dbContext.CajaMovimientos
+        var movimientosSum = (await _dbContext.CajaMovimientos
             .Where(m => m.TenantId == tenantId && m.CajaSesionId == cajaSesion.Id)
-            .SumAsync(m => (decimal?)m.Monto, cancellationToken) ?? 0m;
+            .Select(m => m.Monto)
+            .ToListAsync(cancellationToken))
+            .Sum();
 
         var saldoActual = cajaSesion.MontoInicial + movimientosSum;
         var cajaMovimientos = new List<CajaMovimientoResultDto>();

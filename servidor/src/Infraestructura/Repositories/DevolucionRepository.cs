@@ -194,9 +194,11 @@ public sealed class DevolucionRepository : IDevolucionRepository
 
         _dbContext.StockMovimientoItems.AddRange(movimientoItems);
 
-        var movimientosSum = await _dbContext.CajaMovimientos
+        var movimientosSum = (await _dbContext.CajaMovimientos
             .Where(m => m.TenantId == tenantId && m.CajaSesionId == cajaSesion.Id)
-            .SumAsync(m => (decimal?)m.Monto, cancellationToken) ?? 0m;
+            .Select(m => m.Monto)
+            .ToListAsync(cancellationToken))
+            .Sum();
 
         var saldoAntes = cajaSesion.MontoInicial + movimientosSum;
         var monto = -total;

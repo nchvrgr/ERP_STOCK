@@ -86,6 +86,16 @@ public sealed class ServicioProductos
                 });
         }
 
+        if (!SkuEsNumerico(request.Sku))
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["sku"] = new[] { "El SKU debe contener solo numeros." }
+                });
+        }
+
         if (request.CategoriaId.HasValue && request.CategoriaId.Value == Guid.Empty)
         {
             throw new ValidationException(
@@ -234,6 +244,16 @@ public sealed class ServicioProductos
                 new Dictionary<string, string[]>
                 {
                     ["sku"] = new[] { "El SKU no puede estar vacio." }
+                });
+        }
+
+        if (request.Sku is not null && !SkuEsNumerico(request.Sku))
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["sku"] = new[] { "El SKU debe contener solo numeros." }
                 });
         }
 
@@ -583,6 +603,19 @@ public sealed class ServicioProductos
         }
 
         return _contextoSolicitud.TenantId;
+    }
+
+    private static bool SkuEsNumerico(string sku)
+    {
+        foreach (var ch in sku.Trim())
+        {
+            if (!char.IsDigit(ch))
+            {
+                return false;
+            }
+        }
+
+        return !string.IsNullOrWhiteSpace(sku);
     }
 }
 

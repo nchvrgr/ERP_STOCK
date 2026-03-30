@@ -1,15 +1,90 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
 :root {
-  --pos-bg: #f5f3ef;
+  color-scheme: light;
+  --pos-bg: #f4efe6;
+  --pos-bg-secondary: #e6d8c3;
   --pos-card: #ffffff;
-  --pos-ink: #0f172a;
-  --pos-ink-muted: #475569;
-  --pos-accent: #0ea5a4;
-  --pos-accent-strong: #0f766e;
-  --pos-warn: #f59e0b;
+  --pos-card-soft: rgba(255, 252, 248, 0.94);
+  --pos-card-top: #ffffff;
+  --pos-card-bottom: #fffcf8;
+  --pos-ink: #3a3a3a;
+  --pos-ink-muted: #7a5a3a;
+  --pos-accent: #7a1e2c;
+  --pos-accent-strong: #5a0f1c;
+  --pos-accent-dark: #3b0a12;
+  --pos-gold: #c6a46c;
+  --pos-wood: #7a5a3a;
+  --pos-wood-dark: #4a2f1b;
+  --pos-wood-soft: #a98a6f;
+  --pos-border: #d6d0c6;
+  --pos-shadow: 0 18px 38px rgba(74, 47, 27, 0.08);
+  --pos-bg-spot-a: rgba(198, 164, 108, 0.18);
+  --pos-bg-spot-b: rgba(122, 90, 58, 0.12);
+  --pos-bg-gradient-end: #efe6d9;
+  --pos-drawer-top: rgba(255, 252, 248, 0.98);
+  --pos-drawer-bottom: rgba(230, 216, 195, 0.92);
+  --pos-drawer-overlay-a: rgba(90, 15, 28, 0.04);
+  --pos-drawer-overlay-b: rgba(122, 90, 58, 0.08);
+  --pos-appbar-bg: rgba(244, 239, 230, 0.9);
+  --pos-hover: rgba(198, 164, 108, 0.08);
+  --pos-tab-active: rgba(90, 15, 28, 0.1);
+  --pos-focus-ring: rgba(198, 164, 108, 0.16);
+  --pos-tonal-border: rgba(198, 164, 108, 0.28);
+  --pos-primary-btn-bg: #3b0a12;
+  --pos-primary-btn-text: #fff8f2;
+  --pos-primary-btn-shadow: 0 12px 24px rgba(90, 15, 28, 0.2);
+  --pos-cancel-btn-bg: #f3ccc7;
+  --pos-cancel-btn-border: #e7bbb5;
+  --pos-cancel-btn-text: #9c3942;
+  --pos-danger-btn-bg: rgba(220, 38, 38, 0.12);
+  --pos-danger-btn-border: rgba(220, 38, 38, 0.18);
+  --pos-danger-btn-text: #991b1b;
+  --pos-warn: #c6a46c;
   --pos-error: #dc2626;
   --pos-success: #16a34a;
+}
+
+:root[data-pos-theme='dark'] {
+  color-scheme: dark;
+  --pos-bg: #171211;
+  --pos-bg-secondary: #271f1d;
+  --pos-card: #241c1a;
+  --pos-card-soft: rgba(42, 32, 30, 0.94);
+  --pos-card-top: #2c2220;
+  --pos-card-bottom: #211917;
+  --pos-ink: #f3e7db;
+  --pos-ink-muted: #cdb39a;
+  --pos-accent: #b97481;
+  --pos-accent-strong: #c58b94;
+  --pos-accent-dark: #f1d7cb;
+  --pos-gold: #c6a46c;
+  --pos-wood: #c7a27f;
+  --pos-wood-dark: #f0dbc3;
+  --pos-wood-soft: #b89a7e;
+  --pos-border: #5a4a43;
+  --pos-shadow: 0 22px 44px rgba(0, 0, 0, 0.34);
+  --pos-bg-spot-a: rgba(197, 139, 148, 0.14);
+  --pos-bg-spot-b: rgba(198, 164, 108, 0.1);
+  --pos-bg-gradient-end: #120e0d;
+  --pos-drawer-top: rgba(34, 26, 25, 0.98);
+  --pos-drawer-bottom: rgba(25, 19, 18, 0.96);
+  --pos-drawer-overlay-a: rgba(197, 139, 148, 0.08);
+  --pos-drawer-overlay-b: rgba(198, 164, 108, 0.06);
+  --pos-appbar-bg: rgba(23, 18, 17, 0.88);
+  --pos-hover: rgba(198, 164, 108, 0.12);
+  --pos-tab-active: rgba(197, 139, 148, 0.18);
+  --pos-focus-ring: rgba(197, 139, 148, 0.18);
+  --pos-tonal-border: rgba(198, 164, 108, 0.18);
+  --pos-primary-btn-bg: #d6b574;
+  --pos-primary-btn-text: #241814;
+  --pos-primary-btn-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
+  --pos-cancel-btn-bg: #5b2c34;
+  --pos-cancel-btn-border: #7f4751;
+  --pos-cancel-btn-text: #ffe0e0;
+  --pos-danger-btn-bg: rgba(248, 113, 113, 0.16);
+  --pos-danger-btn-border: rgba(248, 113, 113, 0.24);
+  --pos-danger-btn-text: #ffd7d7;
 }
 
 * {
@@ -26,7 +101,10 @@ body {
   margin: 0;
   color: var(--pos-ink);
   font-family: "IBM Plex Sans", sans-serif;
-  background: radial-gradient(circle at 20% 20%, #fff7ed, #f5f3ef 45%, #f1efe9 100%);
+  background:
+    radial-gradient(circle at top left, var(--pos-bg-spot-a), transparent 28%),
+    radial-gradient(circle at bottom right, var(--pos-bg-spot-b), transparent 26%),
+    linear-gradient(180deg, var(--pos-bg) 0%, var(--pos-bg-gradient-end) 100%);
   overflow-y: auto;
 }
 
@@ -49,7 +127,9 @@ h3,
 
 .pos-card {
   border-radius: 18px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--pos-border);
+  background: linear-gradient(180deg, var(--pos-card-top) 0%, var(--pos-card-bottom) 100%);
+  box-shadow: var(--pos-shadow);
 }
 
 .scan-input :focus-visible,
@@ -109,7 +189,90 @@ input:focus-visible {
 }
 
 .hotkey {
-  background: rgba(15, 118, 110, 0.08);
+  background: rgba(198, 164, 108, 0.16);
   border-radius: 999px;
   padding: 4px 10px;
+}
+
+.v-application {
+  color: var(--pos-ink);
+}
+
+.v-main {
+  background: transparent !important;
+}
+
+.v-card-title,
+.text-h6,
+.text-h5,
+.text-h4 {
+  color: var(--pos-accent-dark);
+}
+
+.v-btn {
+  letter-spacing: 0.01em;
+}
+
+.v-btn--variant-elevated {
+  box-shadow: 0 12px 26px rgba(90, 15, 28, 0.18) !important;
+}
+
+.v-btn--variant-tonal {
+  border: 1px solid var(--pos-tonal-border);
+}
+
+.v-field {
+  border-radius: 14px !important;
+}
+
+.v-field--focused {
+  box-shadow: 0 0 0 3px var(--pos-focus-ring);
+}
+
+.v-field__outline {
+  --v-field-border-opacity: 1;
+  color: rgba(214, 208, 198, 0.98) !important;
+}
+
+.v-label,
+.v-field input,
+.v-field textarea {
+  color: var(--pos-ink) !important;
+}
+
+.v-list-item--active {
+  background: linear-gradient(90deg, rgba(90, 15, 28, 0.12), var(--pos-hover)) !important;
+  color: var(--pos-accent-dark) !important;
+}
+
+.v-divider {
+  opacity: 1;
+  border-color: var(--pos-border) !important;
+}
+
+.v-chip {
+  font-weight: 700;
+}
+
+.v-tabs {
+  background: transparent;
+}
+
+.v-tab {
+  border-radius: 999px;
+  color: var(--pos-wood-dark);
+}
+
+.v-tab.v-tab--selected {
+  background: var(--pos-tab-active);
+  color: var(--pos-accent-dark);
+}
+
+.v-data-table thead th {
+  color: var(--pos-wood-dark) !important;
+  font-weight: 700 !important;
+}
+
+.v-data-table tbody tr:hover {
+  background: var(--pos-hover);
 }

@@ -21,9 +21,7 @@ public sealed class VentaConfiguration : IEntityTypeConfiguration<Venta>
         builder.Property(x => x.Estado).HasConversion<int>().IsRequired();
         builder.Property(x => x.Numero)
             .HasColumnName("numero")
-            .HasColumnType("bigint")
-            .HasDefaultValueSql("nextval('venta_numero_seq')")
-            .ValueGeneratedOnAdd();
+            .HasColumnType("bigint");
         builder.Property(x => x.TotalNeto).HasColumnType("numeric(18,4)").HasDefaultValue(0m);
         builder.Property(x => x.TotalPagos).HasColumnType("numeric(18,4)").HasDefaultValue(0m);
         builder.Property(x => x.Facturada).HasColumnName("facturada").HasDefaultValue(false);

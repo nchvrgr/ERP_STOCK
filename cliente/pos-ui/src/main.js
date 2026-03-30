@@ -21,7 +21,10 @@ import {
   mdiFileDocumentOutline,
   mdiMagnify,
   mdiMenu,
+  mdiMinus,
   mdiPackageVariant,
+  mdiPlus,
+  mdiPrinterOutline,
   mdiQrcodeScan,
   mdiStorefront,
   mdiWarehouse
@@ -32,6 +35,7 @@ import router from './router';
 import { useAuthStore } from './stores/auth';
 import { setTokenProvider, setUnauthorizedHandler } from './services/apiClient';
 import { registerSW } from 'virtual:pwa-register';
+import { applyColorMode, getStoredColorMode, getThemeName, POS_COLOR_MODE_DARK } from './utils/colorMode';
 
 const toMdiExportName = (iconName) => {
   if (!iconName.startsWith('mdi-')) return null;
@@ -61,7 +65,10 @@ const mdiPaths = {
   mdiFileDocumentOutline,
   mdiMagnify,
   mdiMenu,
+  mdiMinus,
   mdiPackageVariant,
+  mdiPlus,
+  mdiPrinterOutline,
   mdiQrcodeScan,
   mdiStorefront,
   mdiWarehouse
@@ -75,6 +82,8 @@ const mdiSvgSet = {
   }
 };
 
+const initialColorMode = getStoredColorMode();
+
 const vuetify = createVuetify({
   components,
   directives,
@@ -86,25 +95,41 @@ const vuetify = createVuetify({
     }
   },
   theme: {
-    defaultTheme: 'posTheme',
+    defaultTheme: getThemeName(initialColorMode),
     themes: {
       posTheme: {
         dark: false,
         colors: {
-          primary: '#0f766e',
-          secondary: '#ea580c',
-          accent: '#0ea5a4',
-          background: '#f5f3ef',
+          primary: '#3B0A12',
+          secondary: '#7A5A3A',
+          accent: '#C6A46C',
+          background: '#F4EFE6',
           surface: '#ffffff',
-          info: '#0ea5a4',
+          info: '#A98A6F',
           success: '#16a34a',
-          warning: '#f59e0b',
+          warning: '#C6A46C',
           error: '#dc2626'
+        }
+      },
+      posNightTheme: {
+        dark: true,
+        colors: {
+          primary: '#C58B94',
+          secondary: '#C6A46C',
+          accent: '#A7747D',
+          background: '#171211',
+          surface: '#241C1A',
+          info: '#B89A7E',
+          success: '#4ade80',
+          warning: '#D6B574',
+          error: '#f87171'
         }
       }
     }
   }
 });
+
+applyColorMode(initialColorMode === POS_COLOR_MODE_DARK ? POS_COLOR_MODE_DARK : initialColorMode, vuetify.theme);
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -124,8 +149,16 @@ setUnauthorizedHandler(() => {
   }
 });
 
-if (import.meta.env.PROD) {
+const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+
+if (import.meta.env.PROD && !isElectron) {
   registerSW({ immediate: true });
+} else if (isElectron && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister();
+    });
+  });
 }
 
 app.mount('#app');

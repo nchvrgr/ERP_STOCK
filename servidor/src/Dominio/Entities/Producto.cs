@@ -27,6 +27,7 @@ public sealed class Producto : EntityBase
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.", nameof(name));
         if (string.IsNullOrWhiteSpace(sku)) throw new ArgumentException("Sku is required.", nameof(sku));
+        if (!EsSkuNumerico(sku)) throw new ArgumentException("Sku must contain only digits.", nameof(sku));
         if (precioBase < 0) throw new ArgumentException("PrecioBase must be >= 0.", nameof(precioBase));
         if (precioVenta < 0) throw new ArgumentException("PrecioVenta must be >= 0.", nameof(precioVenta));
 
@@ -97,6 +98,7 @@ public sealed class Producto : EntityBase
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.", nameof(name));
         if (string.IsNullOrWhiteSpace(sku)) throw new ArgumentException("Sku is required.", nameof(sku));
+        if (!EsSkuNumerico(sku)) throw new ArgumentException("Sku must contain only digits.", nameof(sku));
         if (precioBase < 0) throw new ArgumentException("PrecioBase must be >= 0.", nameof(precioBase));
         if (precioVenta < 0) throw new ArgumentException("PrecioVenta must be >= 0.", nameof(precioVenta));
 
@@ -117,6 +119,19 @@ public sealed class Producto : EntityBase
     {
         ProveedorId = proveedorId;
         MarkUpdated(updatedAtUtc);
+    }
+
+    private static bool EsSkuNumerico(string sku)
+    {
+        foreach (var ch in sku)
+        {
+            if (!char.IsDigit(ch))
+            {
+                return false;
+            }
+        }
+
+        return sku.Length > 0;
     }
 }
 

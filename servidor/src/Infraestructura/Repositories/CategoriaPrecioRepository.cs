@@ -3,6 +3,7 @@ using Servidor.Aplicacion.Contratos;
 using Servidor.Aplicacion.Dtos.Categorias;
 using Servidor.Dominio.Entities;
 using Servidor.Dominio.Enums;
+using Servidor.Dominio.Exceptions;
 using Servidor.Infraestructura.Persistence;
 
 namespace Servidor.Infraestructura.Repositories;
@@ -33,7 +34,10 @@ public sealed class CategoriaPrecioRepository : ICategoriaPrecioRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(c => EF.Functions.ILike(c.Name, $"%{term}%"));
+            var pattern = $"%{term}%";
+            query = _dbContext.Database.IsNpgsql()
+                ? query.Where(c => EF.Functions.ILike(c.Name, pattern))
+                : query.Where(c => EF.Functions.Like(c.Name, pattern));
         }
 
         return await query
@@ -121,6 +125,32 @@ public sealed class CategoriaPrecioRepository : ICategoriaPrecioRepository
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteAsync(
+        Guid tenantId,
+        Guid categoriaId,
+        CancellationToken cancellationToken = default)
+    {
+        var categoria = await _dbContext.Categorias
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Id == categoriaId, cancellationToken);
+
+        if (categoria is null)
+        {
+            return false;
+        }
+
+        var hasProducts = await _dbContext.Productos.AsNoTracking()
+            .AnyAsync(p => p.TenantId == tenantId && p.CategoriaId == categoriaId, cancellationToken);
+
+        if (hasProducts)
+        {
+            throw new ConflictException("No se puede eliminar la categoria porque tiene productos asociados.");
+        }
+
+        _dbContext.Categorias.Remove(categoria);
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
 

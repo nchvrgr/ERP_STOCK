@@ -166,6 +166,41 @@ public sealed class CategoriaPrecioService
         return despues;
     }
 
+    public async Task EliminarAsync(Guid categoriaId, CancellationToken cancellationToken)
+    {
+        if (categoriaId == Guid.Empty)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["categoriaId"] = new[] { "La categoria es obligatoria." }
+                });
+        }
+
+        var tenantId = AsegurarTenant();
+        var antes = await _repositorioCategoria.GetByIdAsync(tenantId, categoriaId, cancellationToken);
+        if (antes is null)
+        {
+            throw new NotFoundException("Categoria no encontrada.");
+        }
+
+        var eliminada = await _repositorioCategoria.DeleteAsync(tenantId, categoriaId, cancellationToken);
+        if (!eliminada)
+        {
+            throw new NotFoundException("Categoria no encontrada.");
+        }
+
+        await _servicioAuditoria.LogAsync(
+            "Categoria",
+            categoriaId.ToString(),
+            AuditAction.Delete,
+            JsonSerializer.Serialize(antes),
+            null,
+            null,
+            cancellationToken);
+    }
+
     private Guid AsegurarTenant()
     {
         if (_contextoSolicitud.TenantId == Guid.Empty)

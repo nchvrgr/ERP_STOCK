@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Servidor.Aplicacion.Contratos;
 using Servidor.Aplicacion.Dtos.Auditoria;
 using Servidor.Infraestructura.Persistence;
@@ -27,7 +26,15 @@ public sealed class AuditLogQueryRepository : IAuditLogQueryRepository
         if (!string.IsNullOrWhiteSpace(request.Entidad))
         {
             var entidad = request.Entidad.Trim();
-            query = query.Where(a => EF.Functions.ILike(a.EntityName, entidad));
+            if (_dbContext.Database.IsNpgsql())
+            {
+                query = query.Where(a => EF.Functions.ILike(a.EntityName, entidad));
+            }
+            else
+            {
+                var pattern = $"%{entidad}%";
+                query = query.Where(a => EF.Functions.Like(a.EntityName, pattern));
+            }
         }
 
         if (request.UsuarioId.HasValue)

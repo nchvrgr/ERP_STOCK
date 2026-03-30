@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Servidor.Dominio.Enums;
 using Servidor.Dominio.Entities;
 
 namespace Servidor.Infraestructura.Persistence;
@@ -52,7 +53,45 @@ public sealed class PosDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PosDbContext).Assembly);
+        ConfigureProviderSpecificModel(modelBuilder);
+    }
 
+    private void ConfigureProviderSpecificModel(ModelBuilder modelBuilder)
+    {
+        if (!Database.IsSqlite())
+        {
+            modelBuilder.Entity<Venta>()
+                .Property(x => x.Numero)
+                .HasDefaultValueSql("nextval('venta_numero_seq')")
+                .ValueGeneratedOnAdd();
+
+            return;
+        }
+
+        modelBuilder.Entity<Venta>()
+            .Property(x => x.Numero)
+            .HasDefaultValue(0L)
+            .HasDefaultValueSql(null)
+            .ValueGeneratedNever();
+
+        modelBuilder.Entity<Caja>()
+            .HasIndex(x => new { x.TenantId, x.SucursalId, x.Numero })
+            .IsUnique()
+            .HasFilter(null);
+
+        modelBuilder.Entity<CajaSesion>()
+            .Property(x => x.ArqueoJson)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<CajaSesion>()
+            .HasIndex(x => new { x.CajaId, x.Estado })
+            .IsUnique()
+            .HasFilter($"{nameof(CajaSesion.Estado)} = {(int)CajaSesionEstado.Abierta}");
+
+        modelBuilder.Entity<ProductoProveedor>()
+            .HasIndex(x => new { x.TenantId, x.ProductoId })
+            .IsUnique()
+            .HasFilter($"{nameof(ProductoProveedor.EsPrincipal)} = 1");
     }
 }
 

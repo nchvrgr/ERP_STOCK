@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Servidor.Aplicacion.Contratos;
 using Servidor.Aplicacion.Dtos.Stock;
 using Servidor.Dominio.Entities;
@@ -83,9 +82,14 @@ public sealed class StockRepository : IStockRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            productsQuery = productsQuery.Where(p =>
-                EF.Functions.ILike(p.Name, $"%{term}%")
-                || EF.Functions.ILike(p.Sku, $"%{term}%"));
+            var pattern = $"%{term}%";
+            productsQuery = _dbContext.Database.IsNpgsql()
+                ? productsQuery.Where(p =>
+                    EF.Functions.ILike(p.Name, pattern)
+                    || EF.Functions.ILike(p.Sku, pattern))
+                : productsQuery.Where(p =>
+                    EF.Functions.Like(p.Name, pattern)
+                    || EF.Functions.Like(p.Sku, pattern));
         }
 
         var productsBase = await productsQuery

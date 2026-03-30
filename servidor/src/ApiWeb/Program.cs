@@ -1,18 +1,21 @@
 using Servidor.Aplicacion.Contratos;
 using Servidor.Aplicacion.Comun;
 using Servidor.Infraestructura;
+using Servidor.Infraestructura.Persistence;
 using Servidor.ApiWeb.Autenticacion;
 using Servidor.ApiWeb.Contexto;
 using Servidor.ApiWeb.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+var isDesktopMode = string.Equals(
+    builder.Configuration["POS_APP_MODE"] ?? Environment.GetEnvironmentVariable("POS_APP_MODE"),
+    "desktop",
+    StringComparison.OrdinalIgnoreCase);
+
+ConfigureDesktopMode(builder, isDesktopMode);
 
 // Soporte de DATABASE_URL estilo Railway/Heroku
-var configuredConn = builder.Configuration.GetConnectionString("Default");
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? Environment.GetEnvironmentVariable("DATABASE_PUBLIC_URL")
-    ?? builder.Configuration["DATABASE_URL"]
-    ?? builder.Configuration["DATABASE_PUBLIC_URL"];
+var configuredConn = Servidor.Infraestructura.DependencyInjection.ResolveConnectionString(builder.Configuration);
 
 var shouldResolveFromDatabaseUrl = string.IsNullOrWhiteSpace(configuredConn)
     || string.Equals(configuredConn, "DATABASE_URL", StringComparison.OrdinalIgnoreCase)
@@ -29,24 +32,11 @@ if (shouldResolveFromDatabaseUrl && !string.IsNullOrWhiteSpace(configuredConn))
             builder.Configuration["ConnectionStrings:Default"] = mapped;
         }
     }
-    else if (string.Equals(configuredConn, "DATABASE_URL", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(configuredConn, "DATABASE_PUBLIC_URL", StringComparison.OrdinalIgnoreCase))
-    {
-        var mapped = MapDatabaseUrl(databaseUrl);
-        if (!string.IsNullOrWhiteSpace(mapped))
-        {
-            builder.Configuration["ConnectionStrings:Default"] = mapped;
-        }
-    }
 }
 
 if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default")))
 {
-    var mapped = MapDatabaseUrl(databaseUrl);
-    if (!string.IsNullOrWhiteSpace(mapped))
-    {
-        builder.Configuration["ConnectionStrings:Default"] = mapped;
-    }
+    builder.Configuration["ConnectionStrings:Default"] = configuredConn;
 }
 
 builder.Services.AddControllers();
@@ -112,6 +102,12 @@ builder.Services.AddScoped<IRequestContext, RequestContext>();
 
 var app = builder.Build();
 
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<PosDbContext>();
+    await DatabaseBootstrapper.InitializeAsync(dbContext);
+}
+
 app.UseMiddleware<ProblemDetailsExceptionMiddleware>();
 
 app.UseRouting();
@@ -121,9 +117,44 @@ app.UseAuthentication();
 app.UseMiddleware<RequestContextMiddleware>();
 app.UseAuthorization();
 
+if (HasStaticFrontend(app.Environment))
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 app.MapControllers();
 
+if (HasStaticFrontend(app.Environment))
+{
+    app.MapFallbackToFile("index.html");
+}
+
 app.Run();
+
+static void ConfigureDesktopMode(WebApplicationBuilder builder, bool isDesktopMode)
+{
+    if (!isDesktopMode)
+    {
+        return;
+    }
+
+    var dataDirectory = builder.Configuration["POS_DATA_DIR"]
+        ?? Environment.GetEnvironmentVariable("POS_DATA_DIR")
+        ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ERP_STOCK_V2",
+            "data");
+
+    Directory.CreateDirectory(dataDirectory);
+    var databasePath = Path.Combine(dataDirectory, "erp-stock.db");
+    builder.Configuration["ConnectionStrings:Default"] = $"Data Source={databasePath}";
+}
+
+static bool HasStaticFrontend(IWebHostEnvironment environment)
+{
+    return File.Exists(Path.Combine(environment.WebRootPath ?? string.Empty, "index.html"));
+}
 
 static string? MapDatabaseUrl(string? databaseUrl)
 {

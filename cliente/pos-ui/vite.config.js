@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-192.svg', 'pwa-512.svg'],
       manifest: {
-        name: 'POS Frontend',
-        short_name: 'POS',
+        name: 'Viñedos de la Villa',
+        short_name: 'Viñedos',
         theme_color: '#0f766e',
         background_color: '#f5f3ef',
         display: 'standalone',

@@ -98,7 +98,7 @@
                 <polyline
                   :points="ventasLine"
                   fill="none"
-                  stroke="#0f766e"
+                  stroke="#5A0F1C"
                   stroke-width="1.2"
                 />
                 <circle
@@ -107,7 +107,7 @@
                   :cx="point.x"
                   :cy="point.y"
                   r="1.8"
-                  fill="#0ea5a4"
+                  fill="#C6A46C"
                 />
                 <rect
                   v-for="(area, idx) in ventasHitAreas"
@@ -252,6 +252,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { getJson } from '../services/apiClient';
+import { formatMoney } from '../utils/currency';
 
 const auth = useAuthStore();
 const canView = computed(() => auth.hasPermission('PERM_REPORTES_VER'));
@@ -298,9 +299,6 @@ const inmovilizadoHeaders = [
   { title: 'Ultimo mov', value: 'ultimoMovimiento' },
   { title: 'Dias', value: 'diasSinMovimiento', align: 'end' }
 ];
-
-const formatMoney = (value) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(value || 0);
 
 const getVentasTooltip = (idx) => {
   const label = ventasLabels.value[idx] || '-';
@@ -543,7 +541,7 @@ onMounted(() => {
 }
 
 .chart-wrapper {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(214, 208, 198, 0.9);
   border-radius: 12px;
   padding: 12px;
   background: #fff;
@@ -566,7 +564,7 @@ onMounted(() => {
 .chart-tooltip {
   position: absolute;
   z-index: 2;
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(59, 10, 18, 0.92);
   color: #fff;
   font-size: 0.75rem;
   padding: 6px 8px;

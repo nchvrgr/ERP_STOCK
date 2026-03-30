@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import LoginPage from '../pages/LoginPage.vue';
 import MainLayout from '../layouts/MainLayout.vue';
-import PosPage from '../pages/PosPage.vue';
 import ProductosPage from '../pages/ProductosPage.vue';
 import StockPage from '../pages/StockPage.vue';
 import ReportesPage from '../pages/ReportesPage.vue';
@@ -26,13 +25,11 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: '/pos'
+        redirect: '/caja'
       },
       {
         path: 'pos',
-        name: 'pos',
-        component: PosPage,
-        meta: { permission: 'PERM_VENTA_CREAR' }
+        redirect: '/caja'
       },
       {
         path: 'productos',
@@ -74,7 +71,7 @@ const routes = [
         path: 'caja',
         name: 'caja',
         component: CajaPage,
-        meta: { permission: 'PERM_CAJA_MOVIMIENTO' }
+        meta: { permission: 'PERM_VENTA_CREAR' }
       },
       {
         path: 'empresa',
@@ -86,7 +83,7 @@ const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/pos'
+    redirect: '/caja'
   }
 ];
 
@@ -99,7 +96,7 @@ router.beforeEach((to) => {
   const auth = useAuthStore();
   if (to.meta.public) {
     if (auth.isAuthenticated && to.path === '/login') {
-      return '/pos';
+      return '/caja';
     }
     return true;
   }

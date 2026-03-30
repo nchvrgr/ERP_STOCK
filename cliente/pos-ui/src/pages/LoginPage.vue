@@ -4,7 +4,7 @@
       <v-col cols="12" sm="8" md="4">
         <v-card class="pos-card pa-6">
           <div class="text-h5">Ingresar</div>
-          <div class="text-caption text-medium-emphasis">Acceso POS</div>
+          <div class="text-caption text-medium-emphasis">Viñedos de la Villa</div>
 
           <v-alert
             v-if="error"
@@ -110,7 +110,7 @@ const submit = async () => {
     });
 
     const redirect =
-      typeof route.query.redirect === 'string' ? route.query.redirect : '/pos';
+      typeof route.query.redirect === 'string' ? route.query.redirect : '/caja';
     router.replace(redirect);
   } catch (err) {
     error.value = err?.message || 'Error de login.';

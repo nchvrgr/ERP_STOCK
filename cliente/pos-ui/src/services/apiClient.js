@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 let tokenProvider = () => '';
 let onUnauthorized = null;
@@ -29,6 +29,8 @@ const request = async (path, options = {}) => {
 
   return response;
 };
+
+export const buildApiUrl = (path) => `${API_BASE_URL}${path}`;
 
 export const requestJson = async (path, options = {}) => {
   const headers = new Headers(options.headers || {});

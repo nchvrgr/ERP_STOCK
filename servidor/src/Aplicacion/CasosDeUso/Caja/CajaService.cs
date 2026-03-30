@@ -73,6 +73,16 @@ public sealed class CajaService
                 });
         }
 
+        if ((solicitud.DefaultMontoInicial ?? 0m) < 0)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["defaultMontoInicial"] = new[] { "El monto inicial por defecto debe ser mayor o igual a 0." }
+                });
+        }
+
         var tenantId = AsegurarTenant();
         var sucursalId = AsegurarSucursal();
         var now = DateTimeOffset.UtcNow;
@@ -80,7 +90,8 @@ public sealed class CajaService
         var normalizada = solicitud with
         {
             Nombre = solicitud.Nombre.Trim(),
-            Numero = solicitud.Numero.Trim()
+            Numero = solicitud.Numero.Trim(),
+            DefaultMontoInicial = solicitud.DefaultMontoInicial ?? 0m
         };
 
         var creada = await _repositorioCaja.CreateCajaAsync(tenantId, sucursalId, normalizada, now, cancellationToken);

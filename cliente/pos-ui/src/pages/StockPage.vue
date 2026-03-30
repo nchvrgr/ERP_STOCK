@@ -1,23 +1,25 @@
 <template>
   <div class="stock-page">
-    <v-card class="pos-card pa-4 mb-4">
-      <div class="d-flex align-center gap-3">
-        <div>
-          <div class="text-h6">Stock</div>
-          <div class="text-caption text-medium-emphasis">Saldos, movimientos y alertas</div>
-        </div>
-      </div>
-    </v-card>
-
     <v-tabs v-model="tab" color="primary" class="mb-3">
       <v-tab value="saldos">Saldos</v-tab>
       <v-tab value="movimientos">Movimientos</v-tab>
-      <v-tab value="alertas">Alertas</v-tab>
+      <v-tab value="alertas">
+        <span>Alertas</span>
+        <span
+          v-if="showGlobalAlertChip"
+          :class="['stock-alert-dot', `stock-alert-dot--${globalAlertMeta.color}`]"
+          :title="globalAlertMeta.label"
+          :aria-label="globalAlertMeta.label"
+        ></span>
+      </v-tab>
     </v-tabs>
 
     <v-window v-model="tab">
-      <v-window-item value="saldos">
-        <v-card class="pos-card pa-4">
+      <v-window-item value="saldos" class="stock-window-item">
+        <v-card class="pos-card pa-4 stock-list-card">
+          <div class="d-flex flex-wrap align-center gap-3 mb-4">
+            <div class="text-h6">Lista de stock</div>
+          </div>
           <v-row dense class="align-center">
             <v-col cols="12" md="3">
               <v-autocomplete
@@ -28,6 +30,7 @@
                 return-object
                 clearable
                 label="Producto"
+                prepend-inner-icon="mdi-magnify"
                 variant="outlined"
                 density="comfortable"
                 hide-details
@@ -43,6 +46,7 @@
                 return-object
                 clearable
                 label="Proveedor"
+                prepend-inner-icon="mdi-magnify"
                 variant="outlined"
                 density="comfortable"
                 hide-details
@@ -130,23 +134,28 @@
             </v-btn>
           </div>
 
-          <v-data-table
-            class="mt-3"
-            :headers="saldoHeaders"
-            :items="saldos"
-            item-key="productoId"
-            density="compact"
-            height="520"
-          >
-            <template v-slot:[`item.proveedor`]="{ item }">
-              {{ item.proveedor || 'SIN PROVEEDOR' }}
-            </template>
-          </v-data-table>
+          <div class="stock-table-shell mt-3">
+            <v-data-table
+              :headers="saldoHeaders"
+              :items="saldos"
+              :items-per-page="10"
+              item-key="productoId"
+              class="stock-table"
+              density="compact"
+            >
+              <template v-slot:[`item.proveedor`]="{ item }">
+                {{ item.proveedor || 'SIN PROVEEDOR' }}
+              </template>
+            </v-data-table>
+          </div>
         </v-card>
       </v-window-item>
 
-      <v-window-item value="movimientos">
-        <v-card class="pos-card pa-4">
+      <v-window-item value="movimientos" class="stock-window-item">
+        <v-card class="pos-card pa-4 stock-list-card">
+          <div class="d-flex flex-wrap align-center gap-3 mb-4">
+            <div class="text-h6">Movimientos de stock</div>
+          </div>
           <div class="d-flex flex-wrap align-center gap-3">
             <v-text-field
               v-model="movFilters.productoId"
@@ -259,8 +268,17 @@
         </v-card>
       </v-window-item>
 
-      <v-window-item value="alertas">
-        <v-card class="pos-card pa-4">
+      <v-window-item value="alertas" class="stock-window-item">
+        <v-card class="pos-card pa-4 stock-list-card">
+          <div class="d-flex flex-wrap align-center gap-3 mb-4">
+            <div class="text-h6">Alertas de stock</div>
+            <span
+              v-if="showPageAlertChip"
+              :class="['stock-alert-dot', `stock-alert-dot--${pageAlertMeta.color}`]"
+              :title="pageAlertMeta.label"
+              :aria-label="pageAlertMeta.label"
+            ></span>
+          </div>
           <div class="d-flex align-center gap-3">
             <v-autocomplete
               v-model="alertaProveedor"
@@ -392,11 +410,18 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { getJson, postJson } from '../services/apiClient';
+import { buildApiUrl, getJson, postJson } from '../services/apiClient';
+import { formatMoney } from '../utils/currency';
+import {
+  getHighestStockAlertLevel,
+  getStockAlertMeta,
+  useStockAlertsStore
+} from '../stores/stockAlerts';
 
 const auth = useAuthStore();
+const stockAlerts = useStockAlertsStore();
 
 const tab = ref('saldos');
 
@@ -437,6 +462,7 @@ const facturacionOptions = [
 
 const alertas = ref([]);
 const alertasLoading = ref(false);
+const alertasLoaded = ref(false);
 const alertaProveedor = ref(null);
 const proveedoresLookup = ref([]);
 const proveedorLoading = ref(false);
@@ -459,6 +485,15 @@ const saldoHeaders = [
   { title: 'SKU', value: 'sku' },
   { title: 'Cantidad', value: 'cantidadActual', align: 'end' }
 ];
+
+const globalAlertMeta = computed(() => stockAlerts.chipMeta);
+const showGlobalAlertChip = computed(() => stockAlerts.hasAlerts);
+const pageAlertLevel = computed(() =>
+  alertasLoaded.value ? getHighestStockAlertLevel(alertas.value) : stockAlerts.highestLevel
+);
+const pageAlertCount = computed(() => (alertasLoaded.value ? alertas.value.length : stockAlerts.count));
+const pageAlertMeta = computed(() => getStockAlertMeta(pageAlertLevel.value));
+const showPageAlertChip = computed(() => pageAlertCount.value > 0 && !!pageAlertLevel.value);
 
 const flash = (type, text) => {
   snackbar.value = {
@@ -516,13 +551,6 @@ const formatDate = (value) => {
   }
 };
 
-const formatMoney = (value) =>
-  new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    minimumFractionDigits: 0
-  }).format(Number(value || 0));
-
 const formatDateTime = (value) => {
   if (!value) return '-';
   try {
@@ -575,14 +603,42 @@ const printVentaTicket = async (ventaNumero) => {
         <head>
           <title>Ticket venta</title>
           <style>
+            @page { margin: 8mm; }
             body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; }
             h1 { margin: 0 0 6px 0; font-size: 14px; }
             table { width: 100%; border-collapse: collapse; margin-top: 8px; }
             th, td { border-bottom: 1px dashed #ccc; padding: 4px 0; }
             th { text-align: left; font-weight: 600; }
+            .ticket-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+            .ticket-actions button {
+              border: 1px solid #d6d0c6;
+              background: #fff;
+              border-radius: 999px;
+              padding: 6px 12px;
+              cursor: pointer;
+            }
+            @media print {
+              .ticket-actions { display: none; }
+              body { padding: 0; }
+            }
           </style>
+          <script>
+            function openPrintPreview() {
+              const cloned = document.documentElement.cloneNode(true);
+              const actions = cloned.querySelector('.ticket-actions');
+              if (actions) actions.remove();
+              window.opener?.postMessage({
+                type: 'stock-open-ticket-preview',
+                html: '<!DOCTYPE html>' + cloned.outerHTML
+              }, '*');
+            }
+          <\/script>
         </head>
         <body>
+          <div class="ticket-actions">
+            <button type="button" onclick="openPrintPreview()">Imprimir</button>
+            <button type="button" onclick="window.close()">Cerrar</button>
+          </div>
           <h1>Ticket de venta</h1>
           <div>Venta N°: ${ventaData.numero ?? '-'}</div>
           <div>Fecha: ${formatDateTime(ventaData.createdAt)}</div>
@@ -611,13 +667,34 @@ const printVentaTicket = async (ventaNumero) => {
     `);
     win.document.close();
     win.focus();
-    win.print();
-    setTimeout(() => win.close(), 300);
   } catch (err) {
     flash('error', err?.message || 'No se pudo imprimir el ticket.');
   } finally {
     printingVentaTicket.value = false;
   }
+};
+
+const openDesktopTicketPreview = async (html) => {
+  if (!html) return;
+
+  if (typeof window.desktopBridge?.openTicketPreview !== 'function') {
+    flash('error', 'La app de escritorio no tiene habilitada la vista previa de impresion.');
+    return;
+  }
+
+  try {
+    await window.desktopBridge.openTicketPreview({
+      html,
+      title: 'Vista previa de impresion'
+    });
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo abrir la vista previa de impresion.');
+  }
+};
+
+const handleTicketPreviewMessage = (event) => {
+  if (event?.data?.type !== 'stock-open-ticket-preview') return;
+  openDesktopTicketPreview(event.data.html);
 };
 
 const loadSaldos = async () => {
@@ -743,8 +820,12 @@ const aplicarAjuste = async () => {
     flash('success', 'Stock ajustado');
     ajusteMotivo.value = '';
     await loadSaldos();
+    await stockAlerts.refreshSummary();
     if (tab.value === 'movimientos') {
       await loadMovimientos();
+    }
+    if (tab.value === 'alertas') {
+      await loadAlertas();
     }
   } catch (err) {
     flash('error', err?.message || 'No se pudo ajustar el stock.');
@@ -799,6 +880,8 @@ const loadAlertas = async () => {
     alertas.value = (data || [])
       .slice()
       .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+    alertasLoaded.value = true;
+    await stockAlerts.refreshSummary();
   } catch (err) {
     flash('error', err?.message || 'No se pudieron cargar alertas.');
   } finally {
@@ -852,9 +935,8 @@ const generarRemito = async () => {
 
   remitoLoading.value = true;
   try {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
     const proveedorId = alertaProveedor.value?.id || null;
-    const response = await fetch(`${baseUrl}/api/v1/stock/alertas/remito`, {
+    const response = await fetch(buildApiUrl('/api/v1/stock/alertas/remito'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -948,15 +1030,85 @@ watch(ajusteProducto, (value) => {
 });
 
 onMounted(() => {
+  window.addEventListener('message', handleTicketPreviewMessage);
+  stockAlerts.refreshSummary();
   searchProveedores('');
   searchSaldoProductos('');
   loadSaldos();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('message', handleTicketPreviewMessage);
 });
 </script>
 
 <style scoped>
 .stock-page {
   animation: fade-in 0.3s ease;
+}
+
+.stock-window-item {
+  height: 100%;
+}
+
+.stock-list-card {
+  min-height: calc(100vh - 180px);
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-table-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.stock-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.stock-table :deep(.v-table) {
+  height: 100%;
+}
+
+.stock-table :deep(.v-table__wrapper) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.stock-table :deep(.v-data-table-footer) {
+  margin-top: auto;
+}
+
+.stock-alert-dot {
+  width: 12px;
+  height: 12px;
+  margin-left: 8px;
+  border-radius: 999px;
+  display: inline-block;
+  flex: 0 0 12px;
+}
+
+.stock-alert-dot--warning {
+  background: rgba(var(--v-theme-warning), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-warning), 0.42);
+}
+
+.stock-alert-dot--error {
+  background: rgba(var(--v-theme-error), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-error), 0.42);
+}
+
+.stock-alert-dot--secondary {
+  background: rgba(var(--v-theme-secondary), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-secondary), 0.42);
+}
+
+.stock-alert-dot--info {
+  background: rgba(var(--v-theme-info), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-info), 0.42);
 }
 
 </style>

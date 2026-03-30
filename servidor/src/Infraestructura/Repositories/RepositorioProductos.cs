@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Servidor.Aplicacion.Contratos;
 using Servidor.Aplicacion.Dtos.Productos;
 using Servidor.Aplicacion.Dtos.Etiquetas;
@@ -42,9 +41,14 @@ public sealed class RepositorioProductos : IRepositorioProductos
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(p =>
-                EF.Functions.ILike(p.Name, $"%{term}%")
-                || EF.Functions.ILike(p.Sku, $"%{term}%"));
+            var pattern = $"%{term}%";
+            query = _dbContext.Database.IsNpgsql()
+                ? query.Where(p =>
+                    EF.Functions.ILike(p.Name, pattern)
+                    || EF.Functions.ILike(p.Sku, pattern))
+                : query.Where(p =>
+                    EF.Functions.Like(p.Name, pattern)
+                    || EF.Functions.Like(p.Sku, pattern));
         }
 
         var results = await (from p in query

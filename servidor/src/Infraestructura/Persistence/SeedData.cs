@@ -6,6 +6,8 @@ namespace Servidor.Infraestructura.Persistence;
 public static class SeedData
 {
     public static readonly DateTimeOffset SeedTimestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+    public const string AdminPasswordHash = "sha256:8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918";
+    public const string LegacyAdminPasswordHash = "sha256:3eb3fe66b31e3b4d10fa70b5cad49c7112294af6ae4e476a1c405155d45aa121";
 
     public static readonly Guid TenantId = Guid.Parse("1f4f9f1a-2b7f-4d2c-8cf6-56d5b92f1a01");
     public static readonly Guid SucursalId = Guid.Parse("3b58fbc1-33f3-4e7e-9a34-9a0a3cf3c7a1");
@@ -28,7 +30,7 @@ public static class SeedData
         AdminUserId,
         TenantId,
         "admin",
-        "sha256:3eb3fe66b31e3b4d10fa70b5cad49c7112294af6ae4e476a1c405155d45aa121",
+        AdminPasswordHash,
         SeedTimestamp,
         true);
 

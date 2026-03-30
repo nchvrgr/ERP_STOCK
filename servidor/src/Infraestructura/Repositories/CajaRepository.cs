@@ -34,7 +34,7 @@ public sealed class CajaRepository : ICajaRepository
 
         return await query
             .OrderBy(c => c.Name)
-            .Select(c => new CajaDto(c.Id, c.Name, c.Numero, c.IsActive))
+            .Select(c => new CajaDto(c.Id, c.Name, c.Numero, c.DefaultMontoInicial, c.IsActive))
             .ToListAsync(cancellationToken);
     }
 
@@ -59,13 +59,14 @@ public sealed class CajaRepository : ICajaRepository
             sucursalId,
             request.Nombre,
             numero,
+            request.DefaultMontoInicial ?? 0m,
             nowUtc,
             request.IsActive ?? true);
 
         _dbContext.Cajas.Add(caja);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return new CajaDto(caja.Id, caja.Name, caja.Numero, caja.IsActive);
+        return new CajaDto(caja.Id, caja.Name, caja.Numero, caja.DefaultMontoInicial, caja.IsActive);
     }
 
     public Task<bool> CajaExistsAsync(Guid tenantId, Guid sucursalId, Guid cajaId, CancellationToken cancellationToken = default)
@@ -122,9 +123,11 @@ public sealed class CajaRepository : ICajaRepository
             throw new ConflictException("Sesion de caja cerrada.");
         }
 
-        var movimientosSum = await _dbContext.CajaMovimientos
+        var movimientosSum = (await _dbContext.CajaMovimientos
             .Where(m => m.TenantId == tenantId && m.CajaSesionId == cajaSesionId)
-            .SumAsync(m => (decimal?)m.Monto, cancellationToken) ?? 0m;
+            .Select(m => m.Monto)
+            .ToListAsync(cancellationToken))
+            .Sum();
 
         var saldoAntes = session.MontoInicial + movimientosSum;
         var saldoDespues = saldoAntes + montoSigned;
@@ -302,16 +305,6 @@ public sealed class CajaRepository : ICajaRepository
         var totalContado = detalle.Sum(d => d.Contado);
         var diferenciaTotal = totalContado - totalTeorico;
 
-        if (diferenciaTotal != 0m && string.IsNullOrWhiteSpace(request.MotivoDiferencia))
-        {
-            throw new ValidationException(
-                "Validacion fallida.",
-                new Dictionary<string, string[]>
-                {
-                    ["motivoDiferencia"] = new[] { "El motivo es obligatorio si hay diferencia." }
-                });
-        }
-
         var arqueoJson = System.Text.Json.JsonSerializer.Serialize(detalle);
 
         session.Cerrar(totalContado, diferenciaTotal, request.MotivoDiferencia?.Trim(), arqueoJson, nowUtc);
@@ -342,7 +335,6 @@ public sealed class CajaRepository : ICajaRepository
                     where s.TenantId == tenantId
                         && s.SucursalId == sucursalId
                         && s.Estado == CajaSesionEstado.Cerrada
-                    orderby s.CierreAt descending
                     select new
                     {
                         Sesion = s,
@@ -362,7 +354,33 @@ public sealed class CajaRepository : ICajaRepository
                 && (x.Sesion.CierreAt ?? x.Sesion.UpdatedAt) <= toUtc.Value);
         }
 
-        var rows = await query.ToListAsync(cancellationToken);
+        var rows = (await query.ToListAsync(cancellationToken))
+            .OrderByDescending(x => x.Sesion.CierreAt ?? x.Sesion.UpdatedAt)
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            return Array.Empty<CajaHistorialDto>();
+        }
+
+        var aperturaMin = rows.Min(x => x.Sesion.AperturaAt);
+        var cierreMax = rows.Max(x => x.Sesion.CierreAt ?? x.Sesion.UpdatedAt);
+        var ventasConfirmadas = await _dbContext.Ventas.AsNoTracking()
+            .Where(v => v.TenantId == tenantId
+                        && v.SucursalId == sucursalId
+                        && v.Estado == VentaEstado.Confirmada
+                        && v.Numero > 0)
+            .Select(v => new
+            {
+                v.Numero,
+                v.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        ventasConfirmadas = ventasConfirmadas
+            .Where(v => v.UpdatedAt >= aperturaMin && v.UpdatedAt <= cierreMax)
+            .ToList();
+
         var result = new List<CajaHistorialDto>(rows.Count);
 
         foreach (var row in rows)
@@ -372,15 +390,10 @@ public sealed class CajaRepository : ICajaRepository
                 => medios.FirstOrDefault(m => string.Equals(m.Medio, medio, StringComparison.OrdinalIgnoreCase))?.Teorico ?? 0m;
 
             var cierreAt = row.Sesion.CierreAt ?? row.Sesion.UpdatedAt;
-            var numerosVentas = await _dbContext.Ventas.AsNoTracking()
-                .Where(v => v.TenantId == tenantId
-                            && v.SucursalId == sucursalId
-                            && v.Estado == VentaEstado.Confirmada
-                            && v.UpdatedAt >= row.Sesion.AperturaAt
-                            && v.UpdatedAt <= cierreAt)
+            var numerosVentas = ventasConfirmadas
+                .Where(v => v.UpdatedAt >= row.Sesion.AperturaAt && v.UpdatedAt <= cierreAt)
                 .Select(v => v.Numero)
-                .Where(n => n > 0)
-                .ToListAsync(cancellationToken);
+                .ToList();
 
             result.Add(new CajaHistorialDto(
                 row.Sesion.Id,

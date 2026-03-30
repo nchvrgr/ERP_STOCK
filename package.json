@@ -1,0 +1,60 @@
+{
+  "name": "vinedos-de-la-villa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Viñedos de la Villa desktop installer",
+  "author": "Codex",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "desktop:build": "node scripts/build-desktop.mjs",
+    "desktop:pack": "npm run desktop:build && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win dir",
+    "desktop:open": "powershell -ExecutionPolicy Bypass -File scripts/open-desktop.ps1",
+    "desktop:refresh": "npm run desktop:pack && npm run desktop:open",
+    "desktop:dist": "npm run desktop:build && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.erpstock.desktop",
+    "productName": "Viñedos de la Villa",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "build/icons/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "desktop-build/backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "icon": "build/icons/app.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "build/icons/app.ico",
+      "uninstallerIcon": "build/icons/app.ico",
+      "installerHeaderIcon": "build/icons/app.ico",
+      "shortcutName": "Viñedos de la Villa",
+      "include": "build/installer.nsh"
+    }
+  }
+}

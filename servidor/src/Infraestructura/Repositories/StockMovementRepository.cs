@@ -187,9 +187,10 @@ public sealed class StockMovementRepository : IStockMovementRepository
                     && v.Facturada == facturadaValue));
         }
 
-        var movimientos = await movimientosQuery
+        var movimientos = (await movimientosQuery
+            .ToListAsync(cancellationToken))
             .OrderByDescending(m => m.Fecha)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         if (movimientos.Count == 0)
         {
