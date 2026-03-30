@@ -208,7 +208,7 @@
                   size="small"
                   class="status-chip"
                   :color="alerta.nivel === 'CRITICO' ? 'error' : 'warning'"
-                  variant="tonal"
+                  variant="outlined"
                 >
                   {{ alerta.nivel }}
                 </v-chip>

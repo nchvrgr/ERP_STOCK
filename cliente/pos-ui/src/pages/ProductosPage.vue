@@ -59,10 +59,10 @@
                   density="compact"
                 >
                   <template v-slot:[`item.name`]="{ item }">
-                    {{ item.name || '-' }}
+                    <div class="truncate-cell product-name-cell">{{ item.name || '-' }}</div>
                   </template>
                   <template v-slot:[`item.sku`]="{ item }">
-                    {{ item.sku || '-' }}
+                    <div class="truncate-cell product-sku-cell">{{ item.sku || '-' }}</div>
                   </template>
                   <template v-slot:[`item.precioBase`]="{ item }">
                     {{ formatMoney(item.precioBase) }}

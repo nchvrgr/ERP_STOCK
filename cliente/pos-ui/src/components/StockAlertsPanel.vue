@@ -19,7 +19,7 @@
             size="small"
             class="status-chip"
             :color="alert.estado === 'CRITICO' ? 'error' : 'warning'"
-            variant="tonal"
+            variant="outlined"
           >
             {{ alert.estado }}
           </v-chip>
@@ -27,7 +27,7 @@
       </v-list-item>
     </v-list>
 
-    <v-btn class="mt-3 text-none" variant="tonal" color="primary">
+    <v-btn class="mt-3 text-none" variant="outlined" color="primary">
       Ver todas
     </v-btn>
   </v-card>

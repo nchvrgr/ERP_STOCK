@@ -77,7 +77,7 @@ const buildMissingSubscriptionMessage = () => {
 };
 
 const buildSubscriptionConnectivityMessage = () => {
-  return 'No se pudo verificar tu suscripcion. Revisa la conexion e intenta de nuevo.';
+  return '';
 };
 
 const toFirebaseErrorMessage = (error) => {
