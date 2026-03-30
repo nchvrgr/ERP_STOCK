@@ -4,6 +4,7 @@ const http = require('node:http');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
+const { checkForUpdates } = require('./updater');
 
 const APP_PORT = 18450;
 const APP_URL = `http://127.0.0.1:${APP_PORT}`;
@@ -312,6 +313,12 @@ app.whenReady().then(async () => {
     startBackend();
     await waitForBackend();
     await createWindow();
+    setImmediate(() => {
+      checkForUpdates({
+        mainWindow,
+        log: logElectron
+      });
+    });
   } catch (error) {
     logElectron('app.whenReady failed', error);
     dialog.showErrorBox(APP_NAME, error instanceof Error ? error.message : String(error));

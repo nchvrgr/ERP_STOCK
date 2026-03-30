@@ -125,6 +125,74 @@ En modo escritorio, la base local se guarda en:
 
 Eso evita depender de permisos de escritura sobre `Program Files` y mantiene los datos aunque cierres la aplicacion.
 
+### Probar actualizaciones manuales
+
+La app de escritorio consulta por defecto:
+
+```text
+https://api.github.com/repos/nchvrgr/ERP_STOCK/releases/latest
+```
+
+Para que aparezca el dialogo de actualizacion, el `tag_name` del release debe ser mayor que la version local de `package.json`.
+
+#### Flujo real con GitHub Releases
+
+1. Deja la app local en una version base, por ejemplo `1.0.0`.
+2. Genera el instalador:
+
+```powershell
+npm.cmd run desktop:dist
+```
+
+3. Publica un release en GitHub con un tag mayor, por ejemplo `1.0.1`.
+4. Sube como asset el instalador `.exe` generado en `release/`.
+5. Abre la app local `1.0.0`.
+
+Resultado esperado:
+- si el release tiene menos de 7 dias: dialogo con `Actualizar` y `Mas tarde`
+- si el release tiene mas de 7 dias: dialogo obligatorio con `Actualizar ahora`
+
+#### Flujo de prueba local sin depender de GitHub
+
+El updater soporta un modo de prueba por variables de entorno.
+
+Update opcional:
+
+```powershell
+$env:ERP_STOCK_UPDATE_TEST_MODE='optional'
+$env:ERP_STOCK_UPDATE_TEST_ASSET_PATH=(Resolve-Path '.\release\Viñedos de la Villa Setup 1.0.0.exe')
+.\release\win-unpacked\Viñedos de la Villa.exe
+```
+
+Update obligatorio:
+
+```powershell
+$env:ERP_STOCK_UPDATE_TEST_MODE='mandatory'
+$env:ERP_STOCK_UPDATE_TEST_ASSET_PATH=(Resolve-Path '.\release\Viñedos de la Villa Setup 1.0.0.exe')
+.\release\win-unpacked\Viñedos de la Villa.exe
+```
+
+Variables disponibles:
+- `ERP_STOCK_UPDATE_TEST_MODE`: `optional`, `mandatory` u `off`
+- `ERP_STOCK_UPDATE_TEST_VERSION`: version simulada del release. Por defecto usa la siguiente patch version
+- `ERP_STOCK_UPDATE_TEST_PUBLISHED_AT`: fecha ISO manual si quieres controlar exactamente el corte de 7 dias
+- `ERP_STOCK_UPDATE_TEST_ASSET_PATH`: ruta local a un instalador para abrirlo sin descarga
+- `ERP_STOCK_UPDATE_TEST_ASSET_URL`: URL remota del instalador si prefieres probar descarga real
+- `ERP_STOCK_UPDATE_TEST_ASSET_NAME`: nombre del asset simulado
+- `ERP_STOCK_UPDATE_RELEASE_URL`: reemplaza la URL real del endpoint de GitHub
+
+Para limpiar el modo de prueba en la misma terminal:
+
+```powershell
+Remove-Item Env:ERP_STOCK_UPDATE_TEST_MODE -ErrorAction SilentlyContinue
+Remove-Item Env:ERP_STOCK_UPDATE_TEST_ASSET_PATH -ErrorAction SilentlyContinue
+Remove-Item Env:ERP_STOCK_UPDATE_TEST_ASSET_URL -ErrorAction SilentlyContinue
+Remove-Item Env:ERP_STOCK_UPDATE_TEST_VERSION -ErrorAction SilentlyContinue
+Remove-Item Env:ERP_STOCK_UPDATE_TEST_PUBLISHED_AT -ErrorAction SilentlyContinue
+Remove-Item Env:ERP_STOCK_UPDATE_TEST_ASSET_NAME -ErrorAction SilentlyContinue
+Remove-Item Env:ERP_STOCK_UPDATE_RELEASE_URL -ErrorAction SilentlyContinue
+```
+
 ## 4) Flujo diario
 Si ya tenes todo instalado y no queres resetear DB:
 

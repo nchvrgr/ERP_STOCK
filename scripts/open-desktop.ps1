@@ -11,7 +11,10 @@ if (-not $resolvedExePath) {
   throw "No se encontro ningun ejecutable en $releaseDir"
 }
 
-Get-Process -Name 'Viñedos de la Villa' -ErrorAction SilentlyContinue | Stop-Process -Force
+$processName = [System.IO.Path]::GetFileNameWithoutExtension($resolvedExePath)
+
+Get-Process -Name $processName -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name 'vinedos-de-la-villa' -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-Process -Name 'ERP Stock' -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-Process -Name 'ApiWeb' -ErrorAction SilentlyContinue | Stop-Process -Force
 
@@ -23,11 +26,10 @@ $deadline = (Get-Date).AddSeconds(12)
 $visibleWindow = $null
 
 while ((Get-Date) -lt $deadline) {
-  $visibleWindow = Get-Process -Name 'Viñedos de la Villa' -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -or -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle) } |
-    Select-Object -First 1
+  $process.Refresh()
 
-  if ($visibleWindow) {
+  if (-not $process.HasExited -and ($process.MainWindowHandle -ne 0 -or -not [string]::IsNullOrWhiteSpace($process.MainWindowTitle))) {
+    $visibleWindow = $process
     break
   }
 
@@ -39,8 +41,16 @@ while ((Get-Date) -lt $deadline) {
 }
 
 if (-not $visibleWindow) {
-  $alive = Get-Process -Name 'Viñedos de la Villa' -ErrorAction SilentlyContinue |
-    Select-Object ProcessName, Id, MainWindowTitle
+  $alive = $null
+
+  if (-not $process.HasExited) {
+    $process.Refresh()
+    $alive = [pscustomobject]@{
+      ProcessName = $process.ProcessName
+      Id = $process.Id
+      MainWindowTitle = $process.MainWindowTitle
+    }
+  }
 
   if ($alive) {
     throw "La aplicacion quedo iniciada pero no expuso una ventana principal visible."
