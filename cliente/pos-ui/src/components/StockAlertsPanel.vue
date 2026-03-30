@@ -8,8 +8,8 @@
       <v-chip color="warning" variant="tonal">{{ alerts.length }}</v-chip>
     </div>
 
-    <v-list density="compact" class="mt-3">
-      <v-list-item v-for="alert in alerts" :key="alert.id">
+    <v-list density="compact" class="mt-3 stock-list-no-bg">
+      <v-list-item v-for="alert in alerts" :key="alert.id" class="stock-alert-item">
         <v-list-item-title>{{ alert.nombre }}</v-list-item-title>
         <v-list-item-subtitle>
           Stock actual: {{ alert.stock }} / Min: {{ alert.minimo }}
@@ -26,6 +26,16 @@
         </template>
       </v-list-item>
     </v-list>
+
+    <style scoped>
+      :deep(.stock-list-no-bg) {
+        background-color: transparent;
+      }
+
+      :deep(.stock-alert-item) {
+        background-color: transparent;
+      }
+    </style>
 
     <v-btn class="mt-3 text-none" variant="outlined" color="primary">
       Ver todas

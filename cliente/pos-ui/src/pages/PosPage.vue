@@ -102,15 +102,35 @@
               <template v-slot:[`item.precioUnitario`]="{ item }">
                 {{ formatMoney(getRow(item).precioUnitario) }}
               </template>
+              <template v-slot:[`item.descuentoPct`]="{ item }">
+                <v-text-field
+                  v-model.number="descuentoPctEdits[getRow(item).id]"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  suffix="%"
+                  density="compact"
+                  hide-details
+                  variant="outlined"
+                  class="pos-discount-field"
+                  style="max-width: 70px"
+                  :disabled="!canEdit"
+                  @blur="commitDiscount(getRow(item))"
+                  @keyup.enter="commitDiscount(getRow(item))"
+                />
+              </template>
               <template v-slot:[`item.subtotal`]="{ item }">
                 <strong>{{ formatMoney(getRow(item).subtotal) }}</strong>
               </template>
               <template v-slot:[`item.acciones`]="{ item }">
                 <v-btn
                   icon="mdi-delete"
+                  size="x-small"
                   variant="text"
                   color="error"
                   :disabled="!canEdit"
+                  class="delete-btn-compact"
                   @click="removeItem(getRow(item))"
                 />
               </template>
@@ -845,6 +865,7 @@ const dialogCerrarCaja = ref(false);
 const dialogStock = ref(false);
 const dialogStockAjuste = ref(false);
 const qtyEdits = ref({});
+const descuentoPctEdits = ref({});
 const productoSearchLoading = ref(false);
 const productosEncontrados = ref([]);
 const productoSeleccionado = ref(null);
@@ -937,8 +958,9 @@ const headers = [
   { title: 'SKU', value: 'sku' },
   { title: 'Cantidad', value: 'cantidad', align: 'center' },
   { title: 'Precio', value: 'precioUnitario', align: 'center' },
+  { title: 'Descuento %', value: 'descuentoPct', align: 'center' },
   { title: 'Subtotal', value: 'subtotal', align: 'center' },
-  { title: '', value: 'acciones', align: 'end' }
+  { title: '', value: 'acciones', align: 'end', width: '50px' }
 ];
 
 const createSessionMeta = (sessionId = '') => ({
@@ -1505,6 +1527,12 @@ const ensureVenta = async () => {
 const applyItemDto = (dto) => {
   const index = items.value.findIndex((item) => item.id === dto.id);
   const previousItem = index >= 0 ? items.value[index] : null;
+  const descuentoPct = previousItem?.descuentoPct ?? '0';
+  const precioUnitario = dto.precioUnitario;
+  const descuentoMonto = (precioUnitario * Number(descuentoPct)) / 100;
+  const precioConDescuento = Math.max(precioUnitario - descuentoMonto, 0);
+  const subtotal = dto.cantidad * precioConDescuento;
+
   const item = {
     id: dto.id,
     productoId: dto.productoId,
@@ -1512,8 +1540,9 @@ const applyItemDto = (dto) => {
     sku: dto.sku,
     cantidad: dto.cantidad,
     precioUnitario: dto.precioUnitario,
+    descuentoPct: descuentoPct,
     precioLista: previousItem?.precioLista ?? dto.precioUnitario,
-    subtotal: dto.subtotal ?? dto.cantidad * dto.precioUnitario
+    subtotal: subtotal
   };
 
   if (index >= 0) {
@@ -1522,6 +1551,7 @@ const applyItemDto = (dto) => {
     items.value.unshift(item);
   }
   qtyEdits.value[item.id] = item.cantidad;
+  descuentoPctEdits.value[item.id] = item.descuentoPct || '0';
   pricing.value = null;
   persistVentaDraft();
 };
@@ -1758,6 +1788,7 @@ const removeItem = async (item) => {
     }
     items.value = items.value.filter((i) => i.id !== item.id);
     delete qtyEdits.value[item.id];
+    delete descuentoPctEdits.value[item.id];
     if (!items.value.length) {
       discountPct.value = '0';
     }
@@ -1793,6 +1824,7 @@ const clearCarrito = async () => {
 
     items.value = [];
     qtyEdits.value = {};
+    descuentoPctEdits.value = {};
     pricing.value = null;
     discountPct.value = '0';
     persistVentaDraft();
@@ -1834,6 +1866,31 @@ const commitQty = async (item) => {
     qtyEdits.value[item.id] = item.cantidad;
     flash('error', err?.message || 'Error al actualizar item.');
   }
+};
+
+const commitDiscount = (item) => {
+  const descuentoPct = Number(descuentoPctEdits.value[item.id] || 0);
+  if (!canEdit.value) return;
+  if (Number.isNaN(descuentoPct) || descuentoPct < 0 || descuentoPct > 100) {
+    descuentoPctEdits.value[item.id] = item.descuentoPct || '0';
+    flash('error', 'Descuento invalido (0-100%)');
+    return;
+  }
+  if (String(descuentoPct) === String(item.descuentoPct)) return;
+
+  // Recalcular subtotal con descuento
+  const precioUnitario = item.precioUnitario;
+  const descuentoMonto = (precioUnitario * descuentoPct) / 100;
+  const precioConDescuento = Math.max(precioUnitario - descuentoMonto, 0);
+  const nuevoSubtotal = item.cantidad * precioConDescuento;
+
+  // Actualizar item localmente
+  item.descuentoPct = String(descuentoPct);
+  item.subtotal = nuevoSubtotal;
+  descuentoPctEdits.value[item.id] = descuentoPct;
+  pricing.value = null;
+  persistVentaDraft();
+  flash('success', 'Descuento aplicado');
 };
 
 const roundMoneyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
@@ -2824,6 +2881,20 @@ onBeforeUnmount(() => {
 
 .gap-3 {
   gap: 12px;
+}
+
+.pos-discount-field :deep(input) {
+  text-align: center;
+}
+
+.delete-btn-compact {
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+}
+
+.delete-btn-compact :deep(.v-btn__content) {
+  padding: 0 !important;
 }
 </style>
 

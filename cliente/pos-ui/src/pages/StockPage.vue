@@ -925,6 +925,14 @@ onBeforeUnmount(() => {});
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-error), 0.42);
 }
 
+.stock-alert-list :deep(.v-list) {
+  background-color: transparent;
+}
+
+.stock-alert-list :deep(.v-list-item) {
+  background-color: transparent;
+}
+
 .stock-alert-dot--secondary {
   background: rgba(var(--v-theme-secondary), 0.2);
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-secondary), 0.42);
