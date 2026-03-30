@@ -156,6 +156,18 @@ Resultado esperado:
 
 El updater soporta un modo de prueba por variables de entorno.
 
+Atajos directos:
+
+```powershell
+npm.cmd run desktop:test-update:optional
+```
+
+```powershell
+npm.cmd run desktop:test-update:mandatory
+```
+
+Ambos comandos usan la app empaquetada en `release/win-unpacked` y el instalador mas nuevo disponible en `release/`.
+
 Update opcional:
 
 ```powershell

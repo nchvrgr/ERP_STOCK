@@ -220,6 +220,16 @@ function findInstallerAsset(release) {
   );
 }
 
+function hasUsableInstallerSource(asset) {
+  if (!asset) {
+    return false;
+  }
+
+  const localPath = String(asset.local_path || '').trim();
+  const downloadUrl = String(asset.browser_download_url || '').trim();
+  return Boolean(localPath || downloadUrl);
+}
+
 function getMandatoryStatus(publishedAt) {
   const publishedDate = new Date(publishedAt);
 
@@ -267,6 +277,9 @@ async function runInstaller(asset, mainWindow, log) {
     installerPath = tempPath;
     log(`installer downloaded path=${installerPath}`);
   } else {
+    if (!fs.existsSync(installerPath)) {
+      throw new Error(`No se encontro el instalador configurado para pruebas: ${installerPath}`);
+    }
     log(`installer using local path=${installerPath}`);
   }
 
@@ -303,17 +316,22 @@ async function checkForUpdates(options = {}) {
     }
 
     if (!latestVersion || !isNewerVersion(latestVersion, currentVersion)) {
+      log(`update skipped: latest=${latestVersion || 'none'} current=${currentVersion}`);
       return;
     }
 
     const installerAsset = findInstallerAsset(release);
-    if (!installerAsset?.browser_download_url) {
-      log(`update skipped: no installer asset found for platform=${process.platform}`);
+    if (!hasUsableInstallerSource(installerAsset)) {
+      log(`update skipped: no usable installer asset found for platform=${process.platform}`);
       return;
     }
 
     const isMandatory = getMandatoryStatus(release.published_at);
+    log(
+      `update available latest=${latestVersion} current=${currentVersion} mandatory=${isMandatory} localAsset=${Boolean(installerAsset.local_path)}`
+    );
     const accepted = await promptForUpdate(mainWindow, isMandatory, latestVersion);
+    log(`update prompt result accepted=${accepted}`);
 
     if (!accepted) {
       if (isMandatory) {

@@ -9,6 +9,8 @@
     "desktop:build": "node scripts/build-desktop.mjs",
     "desktop:pack": "npm run desktop:build && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win dir",
     "desktop:open": "powershell -ExecutionPolicy Bypass -File scripts/open-desktop.ps1",
+    "desktop:test-update:optional": "powershell -ExecutionPolicy Bypass -File scripts/test-desktop-update.ps1 -Mode optional",
+    "desktop:test-update:mandatory": "powershell -ExecutionPolicy Bypass -File scripts/test-desktop-update.ps1 -Mode mandatory",
     "desktop:refresh": "npm run desktop:pack && npm run desktop:open",
     "desktop:dist": "npm run desktop:build && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win nsis"
   },
