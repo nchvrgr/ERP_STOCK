@@ -59,22 +59,10 @@
                   density="compact"
                 >
                   <template v-slot:[`item.name`]="{ item }">
-                    <v-tooltip :text="item.name || '-'" location="top">
-                      <template #activator="{ props }">
-                        <div class="truncate-cell product-name-cell" v-bind="props">
-                          {{ item.name || '-' }}
-                        </div>
-                      </template>
-                    </v-tooltip>
+                    {{ item.name || '-' }}
                   </template>
                   <template v-slot:[`item.sku`]="{ item }">
-                    <v-tooltip :text="item.sku || '-'" location="top">
-                      <template #activator="{ props }">
-                        <div class="truncate-cell product-sku-cell" v-bind="props">
-                          {{ item.sku || '-' }}
-                        </div>
-                      </template>
-                    </v-tooltip>
+                    {{ item.sku || '-' }}
                   </template>
                   <template v-slot:[`item.precioBase`]="{ item }">
                     {{ formatMoney(item.precioBase) }}

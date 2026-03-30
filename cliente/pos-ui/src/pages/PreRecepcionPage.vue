@@ -22,7 +22,7 @@
     <v-alert
       v-if="missingCount > 0"
       type="warning"
-      variant="tonal"
+      variant="outlined"
       density="compact"
       class="mb-3"
     >

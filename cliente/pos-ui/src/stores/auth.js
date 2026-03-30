@@ -69,11 +69,11 @@ const normalizeErpUsername = (value) => {
 };
 
 const buildInactiveSubscriptionMessage = () => {
-  return 'Tu suscripcion esta inactiva. Debes realizar el pago para ingresar.';
+  return '';
 };
 
 const buildMissingSubscriptionMessage = () => {
-  return 'Tu usuario no tiene una suscripcion configurada. Contacta al administrador.';
+  return '';
 };
 
 const buildSubscriptionConnectivityMessage = () => {

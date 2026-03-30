@@ -10,7 +10,7 @@
         </div>
       </div>
 
-      <v-alert v-if="error" type="error" variant="tonal" class="mt-3" density="compact">
+      <v-alert v-if="error" type="error" variant="outlined" class="mt-3" density="compact">
         {{ error }}
       </v-alert>
 

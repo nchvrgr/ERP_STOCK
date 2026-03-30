@@ -5,14 +5,11 @@
         <v-card class="pos-card pa-6">
           <div class="text-h5">Ingresar</div>
           <div class="text-caption text-medium-emphasis">Vinedos de la Villa</div>
-          <div class="text-caption text-medium-emphasis mt-2">
-            El acceso requiere una suscripcion activa validada en Firebase.
-          </div>
 
           <v-alert
             v-if="displayMessage"
             :type="messageType"
-            variant="tonal"
+            variant="outlined"
             class="mt-4"
             density="compact"
           >
