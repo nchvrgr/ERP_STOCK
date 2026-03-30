@@ -379,10 +379,17 @@
                 variant="outlined"
                 density="comfortable"
                 clearable
-                no-data-text="No hay categorías. Crea una en 'Categorías'."
                 @update:search="searchCategorias"
                 @focus="ensureCategoriasLookup"
-              />
+              >
+                <template #no-data>
+                  <v-list-item
+                    prepend-icon="mdi-plus-circle-outline"
+                    title="Nueva categoría"
+                    @click="openCategoriaDialogFromProduct"
+                  />
+                </template>
+              </v-autocomplete>
             </v-col>
             <v-col v-else-if="form.pricingMode === 'FIJO_PCT'" cols="12" md="4">
               <v-text-field
@@ -394,6 +401,7 @@
                 min="0"
                 step="0.01"
                 :error-messages="errors.margenPct"
+                @focus="clearZeroOnFocus(form, 'margenPct')"
                 @blur="validateField('margenPct')"
               />
             </v-col>
@@ -432,6 +440,7 @@
                 density="comfortable"
                 :disabled="!!form.id"
                 :error-messages="errors.stockInicial"
+                @focus="clearZeroOnFocus(form, 'stockInicial')"
                 @blur="validateField('stockInicial')"
               />
             </v-col>
@@ -445,6 +454,7 @@
                 variant="outlined"
                 density="comfortable"
                 :error-messages="errors.stockMinimo"
+                @focus="clearZeroOnFocus(stockConfig, 'stockMinimo')"
                 @blur="validateField('stockMinimo')"
               />
             </v-col>
@@ -656,6 +666,7 @@ const dialogDesactivar = ref(false);
 const proveedorDialog = ref(false);
 const categoriaDialog = ref(false);
 const seleccionarProveedorDespuesDeGuardar = ref(false);
+const seleccionarCategoriaDespuesDeGuardar = ref(false);
 const pendingActive = ref(true);
 
 const snackbar = ref({
@@ -1039,6 +1050,14 @@ const onSkuInput = (value) => {
   form.sku = (value || '').replace(/\D+/g, '');
 };
 
+const clearZeroOnFocus = (target, field) => {
+  if (!target || !(field in target)) return;
+  const currentValue = String(target[field] ?? '').trim();
+  if (currentValue === '0' || currentValue === '0.00' || currentValue === '0,00') {
+    target[field] = '';
+  }
+};
+
 const startNewProduct = () => {
   resetForm();
   productEditorMode.value = 'new';
@@ -1384,7 +1403,16 @@ const resetCategoriaForm = () => {
 };
 
 const openCategoriaDialogForCreate = () => {
+  seleccionarCategoriaDespuesDeGuardar.value = false;
   resetCategoriaForm();
+  categoriaDialogMode.value = 'new';
+  categoriaDialog.value = true;
+};
+
+const openCategoriaDialogFromProduct = () => {
+  seleccionarCategoriaDespuesDeGuardar.value = true;
+  resetCategoriaForm();
+  categoriaForm.name = categoriaSearch.value.trim();
   categoriaDialogMode.value = 'new';
   categoriaDialog.value = true;
 };
@@ -1392,6 +1420,7 @@ const openCategoriaDialogForCreate = () => {
 const closeCategoriaDialog = () => {
   categoriaDialog.value = false;
   categoriaDialogMode.value = '';
+  seleccionarCategoriaDespuesDeGuardar.value = false;
   resetCategoriaForm();
 };
 
@@ -1442,6 +1471,7 @@ const saveCategoria = async () => {
 
   categoriaSaving.value = true;
   try {
+    let savedCategoria = null;
     const payload = {
       name: categoriaForm.name.trim(),
       margenGananciaPct: Number(categoriaForm.margenGananciaPct),
@@ -1452,6 +1482,7 @@ const saveCategoria = async () => {
     if (!categoriaForm.id) {
       const { response, data } = await postJson('/api/v1/categorias-precio', payload);
       if (!response.ok) throw new Error(extractProblemMessage(data));
+      savedCategoria = data;
       flash('success', 'Categoria creada');
     } else {
       const { response, data } = await requestJson(`/api/v1/categorias-precio/${categoriaForm.id}`, {
@@ -1459,11 +1490,16 @@ const saveCategoria = async () => {
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error(extractProblemMessage(data));
+      savedCategoria = data;
       flash('success', 'Categoria actualizada');
     }
 
     await loadCategorias();
     await loadProducts();
+    if (seleccionarCategoriaDespuesDeGuardar.value && savedCategoria?.id) {
+      form.categoriaId = savedCategoria.id;
+      applyCategoriaMargin();
+    }
     closeCategoriaDialog();
   } catch (err) {
     flash('error', err?.message || 'No se pudo guardar la categoria.');

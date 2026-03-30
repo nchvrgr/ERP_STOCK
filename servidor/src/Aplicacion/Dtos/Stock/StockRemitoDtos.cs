@@ -18,7 +18,10 @@ public sealed record StockRemitoProductoDto(
 
 public sealed record StockRemitoHeaderDto(
     string EmpresaNombre,
-    string SucursalNombre);
+    string SucursalNombre,
+    string? EmpresaCuit,
+    string? EmpresaTelefono,
+    string? EmpresaDireccion);
 
 public sealed record StockRemitoPdfItemDto(
     string Nombre,

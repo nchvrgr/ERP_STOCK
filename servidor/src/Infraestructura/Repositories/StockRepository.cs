@@ -424,7 +424,23 @@ public sealed class StockRepository : IStockRepository
             .Select(s => s.Name)
             .FirstOrDefaultAsync(cancellationToken) ?? "Sucursal";
 
-        return new StockRemitoHeaderDto(tenantName, sucursalName);
+        var empresa = await _dbContext.EmpresaDatos.AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .Select(x => new
+            {
+                x.RazonSocial,
+                x.Cuit,
+                x.Telefono,
+                x.Direccion
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new StockRemitoHeaderDto(
+            empresa?.RazonSocial ?? tenantName,
+            sucursalName,
+            empresa?.Cuit,
+            empresa?.Telefono,
+            empresa?.Direccion);
     }
 }
 

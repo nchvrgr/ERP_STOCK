@@ -199,6 +199,16 @@ public sealed class VentaService
                 });
         }
 
+        if (request.PrecioUnitario.HasValue && request.PrecioUnitario.Value < 0)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["precioUnitario"] = new[] { "El precio unitario no puede ser negativo." }
+                });
+        }
+
         var tenantId = AsegurarTenant();
         var sucursalId = AsegurarSucursal();
 
@@ -230,6 +240,7 @@ public sealed class VentaService
             ventaId,
             itemId,
             request.Cantidad,
+            request.PrecioUnitario,
             DateTimeOffset.UtcNow,
             cancellationToken);
 

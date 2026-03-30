@@ -2,7 +2,6 @@
   <div class="stock-page">
     <v-tabs v-model="tab" color="primary" class="mb-3">
       <v-tab value="saldos">Saldos</v-tab>
-      <v-tab value="movimientos">Movimientos</v-tab>
       <v-tab value="alertas">
         <span>Alertas</span>
         <span
@@ -72,7 +71,7 @@
 
           <div class="text-subtitle-2">Ajuste de stock</div>
           <div class="text-caption text-medium-emphasis">
-            Modific\u00e1 la cantidad y deja registrado el motivo.
+            Modificá la cantidad, guardá el motivo y el sistema dejará el ajuste asentado.
           </div>
 
           <v-row dense class="mt-2">
@@ -151,123 +150,6 @@
         </v-card>
       </v-window-item>
 
-      <v-window-item value="movimientos" class="stock-window-item">
-        <v-card class="pos-card pa-4 stock-list-card">
-          <div class="d-flex flex-wrap align-center gap-3 mb-4">
-            <div class="text-h6">Movimientos de stock</div>
-          </div>
-          <div class="d-flex flex-wrap align-center gap-3">
-            <v-text-field
-              v-model="movFilters.productoId"
-              label="Producto Id"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="min-width: 240px"
-            />
-            <v-text-field
-              v-model="movFilters.ventaNumero"
-              label="N\u00b0 Venta"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="max-width: 160px"
-            />
-            <v-select
-              v-model="movFilters.facturada"
-              :items="facturacionOptions"
-              item-title="label"
-              item-value="value"
-              label="Facturacion"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="max-width: 220px"
-            />
-            <v-text-field
-              v-model="movFilters.desde"
-              label="Desde"
-              type="date"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-            />
-            <v-text-field
-              v-model="movFilters.hasta"
-              label="Hasta"
-              type="date"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-            />
-            <v-btn
-              color="primary"
-              variant="tonal"
-              class="text-none"
-              :loading="movLoading"
-              @click="loadMovimientos"
-            >
-              Buscar
-            </v-btn>
-          </div>
-
-          <v-expansion-panels class="mt-3" variant="accordion">
-            <v-expansion-panel v-for="mov in movimientos" :key="mov.id">
-              <v-expansion-panel-title>
-                <div class="d-flex align-center justify-space-between w-100">
-                  <div>
-                    <div class="text-subtitle-2">{{ mov.tipo }}</div>
-                    <div class="text-caption text-medium-emphasis">{{ mov.motivo }}</div>
-                    <div
-                      v-if="mov.tipo === 'AJUSTE' && mov.motivo"
-                      class="text-caption text-medium-emphasis"
-                    >
-                      Motivo ajuste: {{ mov.motivo }}
-                    </div>
-                    <div v-if="mov.ventaNumero" class="text-caption text-medium-emphasis">
-                      Venta N\u00b0 {{ mov.ventaNumero }}
-                    </div>
-                    <div
-                      v-if="mov.ventaNumero && mov.ventaFacturada !== null && mov.ventaFacturada !== undefined"
-                      class="text-caption text-medium-emphasis"
-                    >
-                      {{ mov.ventaFacturada ? 'Facturada' : 'No facturada' }}
-                    </div>
-                  </div>
-                  <div class="d-flex align-center gap-2">
-                    <v-btn
-                      v-if="mov.ventaNumero"
-                      size="small"
-                      variant="tonal"
-                      color="primary"
-                      class="text-none"
-                      @click.stop="printVentaTicket(mov.ventaNumero)"
-                    >
-                      Imprimir ticket
-                    </v-btn>
-                    <div class="text-caption text-medium-emphasis">{{ formatDate(mov.fecha) }}</div>
-                  </div>
-                </div>
-              </v-expansion-panel-title>
-              <v-expansion-panel-text>
-                <v-list density="compact">
-                  <v-list-item v-for="item in mov.items" :key="item.id">
-                    <v-list-item-title>{{ item.nombre }} ({{ item.sku }})</v-list-item-title>
-                    <v-list-item-subtitle>
-                      Cantidad: {{ item.cantidad }} - {{ item.esIngreso ? 'Ingreso' : 'Egreso' }}
-                    </v-list-item-subtitle>
-                  </v-list-item>
-                </v-list>
-              </v-expansion-panel-text>
-            </v-expansion-panel>
-          </v-expansion-panels>
-
-          <div v-if="!movimientos.length" class="text-caption text-medium-emphasis mt-3">
-            Sin movimientos.
-          </div>
-        </v-card>
-      </v-window-item>
-
       <v-window-item value="alertas" class="stock-window-item">
         <v-card class="pos-card pa-4 stock-list-card">
           <div class="d-flex flex-wrap align-center gap-3 mb-4">
@@ -279,7 +161,7 @@
               :aria-label="pageAlertMeta.label"
             ></span>
           </div>
-          <div class="d-flex align-center gap-3">
+          <div class="d-flex flex-wrap align-center gap-3">
             <v-autocomplete
               v-model="alertaProveedor"
               :items="proveedoresLookup"
@@ -312,7 +194,7 @@
             </v-btn>
           </div>
 
-          <v-list density="compact" class="mt-3">
+          <v-list density="compact" class="mt-3 stock-alert-list">
             <v-list-item v-for="alerta in alertas" :key="alerta.productoId">
               <v-list-item-title>{{ alerta.nombre }}</v-list-item-title>
               <v-list-item-subtitle>
@@ -353,41 +235,39 @@
         <v-card-title>Remito de compra</v-card-title>
         <v-card-text>
           <div class="text-caption text-medium-emphasis mb-2">
-            Ajusta cantidades o elimina productos antes de generar el PDF.
+            Ajustá cantidades o eliminá productos antes de generar el PDF.
           </div>
-          <v-list density="compact">
-            <v-list-item v-for="item in remitoItems" :key="item.productoId">
-              <v-list-item-title>
-                {{ item.nombre }} ({{ item.sku }})
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                Actual: {{ item.cantidadActual }} / Deseado: {{ item.stockDeseado }}
+          <div class="remito-preview-list">
+            <div v-for="item in remitoItems" :key="item.productoId" class="remito-preview-row">
+              <div>
+                <div class="remito-preview-row__title">{{ item.nombre }} ({{ item.sku }})</div>
+                <div class="text-caption text-medium-emphasis">
+                  Actual: {{ item.cantidadActual }} / Deseado: {{ item.stockDeseado }}
+                </div>
                 <div class="text-caption text-medium-emphasis">
                   Proveedor: {{ item.proveedor || 'SIN PROVEEDOR' }}
                 </div>
-              </v-list-item-subtitle>
-              <template #append>
-                <div class="d-flex align-center gap-2">
-                  <v-text-field
-                    v-model.number="item.cantidad"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    density="compact"
-                    variant="outlined"
-                    hide-details
-                    style="max-width: 120px"
-                  />
-                  <v-btn
-                    icon="mdi-delete"
-                    variant="text"
-                    color="error"
-                    @click="removeRemitoItem(item.productoId)"
-                  />
-                </div>
-              </template>
-            </v-list-item>
-          </v-list>
+              </div>
+              <div class="d-flex align-center gap-2">
+                <v-text-field
+                  v-model.number="item.cantidad"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width: 120px"
+                />
+                <v-btn
+                  icon="mdi-delete"
+                  variant="text"
+                  color="error"
+                  @click="removeRemitoItem(item.productoId)"
+                />
+              </div>
+            </div>
+          </div>
           <div v-if="!remitoItems.length" class="text-caption text-medium-emphasis mt-2">
             Sin productos para remito.
           </div>
@@ -445,21 +325,6 @@ const ajusteErrors = reactive({
   motivo: ''
 });
 
-const movimientos = ref([]);
-const movLoading = ref(false);
-const movFilters = reactive({
-  productoId: '',
-  ventaNumero: '',
-  facturada: '',
-  desde: '',
-  hasta: ''
-});
-const facturacionOptions = [
-  { label: 'Todas', value: '' },
-  { label: 'Facturadas', value: 'true' },
-  { label: 'No facturadas', value: 'false' }
-];
-
 const alertas = ref([]);
 const alertasLoading = ref(false);
 const alertasLoaded = ref(false);
@@ -470,7 +335,6 @@ const proveedorLoading = ref(false);
 const remitoDialog = ref(false);
 const remitoItems = ref([]);
 const remitoLoading = ref(false);
-const printingVentaTicket = ref(false);
 
 const snackbar = ref({
   show: false,
@@ -821,9 +685,6 @@ const aplicarAjuste = async () => {
     ajusteMotivo.value = '';
     await loadSaldos();
     await stockAlerts.refreshSummary();
-    if (tab.value === 'movimientos') {
-      await loadMovimientos();
-    }
     if (tab.value === 'alertas') {
       await loadAlertas();
     }
@@ -831,37 +692,6 @@ const aplicarAjuste = async () => {
     flash('error', err?.message || 'No se pudo ajustar el stock.');
   } finally {
     ajusteSaving.value = false;
-  }
-};
-
-const loadMovimientos = async () => {
-  movLoading.value = true;
-  try {
-    const params = new URLSearchParams();
-    if (movFilters.productoId.trim()) params.set('productoId', movFilters.productoId.trim());
-    if (movFilters.ventaNumero && movFilters.ventaNumero.toString().trim()) {
-      params.set('ventaNumero', movFilters.ventaNumero.toString().trim());
-    }
-    if (movFilters.facturada === 'true' || movFilters.facturada === 'false') {
-      params.set('facturada', movFilters.facturada);
-    }
-    if (movFilters.desde) params.set('desde', movFilters.desde);
-    if (movFilters.hasta) params.set('hasta', movFilters.hasta);
-
-    const { response, data } = await getJson(`/api/v1/stock/movimientos?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(extractProblemMessage(data));
-    }
-    movimientos.value = (data || []).map((mov) => ({
-      ...mov,
-      items: (mov.items || [])
-        .slice()
-        .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'))
-    }));
-  } catch (err) {
-    flash('error', err?.message || 'No se pudieron cargar movimientos.');
-  } finally {
-    movLoading.value = false;
   }
 };
 
@@ -996,9 +826,6 @@ watch(tab, (value) => {
   if (value === 'saldos') {
     loadSaldos();
   }
-  if (value === 'movimientos') {
-    loadMovimientos();
-  }
   if (value === 'alertas') {
     loadAlertas();
   }
@@ -1030,16 +857,13 @@ watch(ajusteProducto, (value) => {
 });
 
 onMounted(() => {
-  window.addEventListener('message', handleTicketPreviewMessage);
   stockAlerts.refreshSummary();
   searchProveedores('');
   searchSaldoProductos('');
   loadSaldos();
 });
 
-onBeforeUnmount(() => {
-  window.removeEventListener('message', handleTicketPreviewMessage);
-});
+onBeforeUnmount(() => {});
 </script>
 
 <style scoped>
@@ -1109,6 +933,40 @@ onBeforeUnmount(() => {
 .stock-alert-dot--info {
   background: rgba(var(--v-theme-info), 0.2);
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-info), 0.42);
+}
+
+.stock-alert-list :deep(.v-list-item) {
+  border: 1px solid rgba(122, 90, 58, 0.12);
+  border-radius: 14px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.remito-preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.remito-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(198, 164, 108, 0.1);
+}
+
+.remito-preview-row__title {
+  font-weight: 700;
+  color: #3b0a12;
+}
+
+@media (max-width: 960px) {
+  .remito-preview-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 </style>

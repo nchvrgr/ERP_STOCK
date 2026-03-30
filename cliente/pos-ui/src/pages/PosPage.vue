@@ -133,6 +133,34 @@
               <span>Descuento</span>
               <strong>- {{ formatMoney(totalDescuento) }}</strong>
             </div>
+            <div class="mt-3">
+              <div class="text-caption text-medium-emphasis mb-2">Descuento manual</div>
+              <div class="pos-discount-row">
+                <v-text-field
+                  v-model="discountPct"
+                  label="%"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  :disabled="!canEdit || !items.length || applyingDiscount"
+                  @focus="clearZeroDiscount"
+                />
+                <v-btn
+                  color="secondary"
+                  variant="tonal"
+                  class="text-none"
+                  :loading="applyingDiscount"
+                  :disabled="!canEdit || !items.length"
+                  @click="applyDiscount"
+                >
+                  Aplicar
+                </v-btn>
+              </div>
+            </div>
             <div class="pos-total-net">
               <div class="text-body-2 text-medium-emphasis">Total neto</div>
               <strong>{{ formatMoney(totalNeto) }}</strong>
@@ -728,6 +756,8 @@ const CREATE_NEW_CAJA_OPTION_ID = '__create_new_caja__';
 const venta = ref(null);
 const items = ref([]);
 const pricing = ref(null);
+const discountPct = ref('0');
+const applyingDiscount = ref(false);
 const cajaStatus = ref('CERRADA');
 const cajaSessionId = ref('');
 const scanInput = ref('');
@@ -848,12 +878,12 @@ const ventaNumeroDisplay = computed(() => (cajaAbierta.value ? displayVentaNumer
 
 const totalBruto = computed(() => {
   if (pricing.value?.totalBruto != null) return pricing.value.totalBruto;
-  return items.value.reduce((acc, item) => acc + item.subtotal, 0);
+  return items.value.reduce((acc, item) => acc + ((item.precioLista ?? item.precioUnitario) * item.cantidad), 0);
 });
 
 const totalDescuento = computed(() => {
   if (pricing.value?.totalDescuento != null) return pricing.value.totalDescuento;
-  return 0;
+  return Math.max(totalBruto.value - totalNeto.value, 0);
 });
 
 const totalNeto = computed(() => {
@@ -1052,6 +1082,7 @@ const resetVentaWorkspace = () => {
   venta.value = null;
   items.value = [];
   pricing.value = null;
+  discountPct.value = '0';
   qtyEdits.value = {};
   pagos.value = [];
   facturacionSeleccion.value = true;
@@ -1222,6 +1253,7 @@ const ensureVenta = async () => {
 
 const applyItemDto = (dto) => {
   const index = items.value.findIndex((item) => item.id === dto.id);
+  const previousItem = index >= 0 ? items.value[index] : null;
   const item = {
     id: dto.id,
     productoId: dto.productoId,
@@ -1229,6 +1261,7 @@ const applyItemDto = (dto) => {
     sku: dto.sku,
     cantidad: dto.cantidad,
     precioUnitario: dto.precioUnitario,
+    precioLista: previousItem?.precioLista ?? dto.precioUnitario,
     subtotal: dto.subtotal ?? dto.cantidad * dto.precioUnitario
   };
 
@@ -1263,6 +1296,7 @@ const createVenta = async () => {
     saveVentaId(venta.value?.id);
     items.value = data.items?.map((item) => ({
       ...item,
+      precioLista: item.precioUnitario,
       subtotal: item.subtotal ?? item.cantidad * item.precioUnitario
     })) || [];
     qtyEdits.value = {};
@@ -1270,6 +1304,7 @@ const createVenta = async () => {
       qtyEdits.value[item.id] = item.cantidad;
     });
     pricing.value = null;
+    discountPct.value = '0';
     pagos.value = [];
     facturacionSeleccion.value = true;
     imprimirRecibo.value = false;
@@ -1299,6 +1334,7 @@ const restoreVenta = async () => {
     venta.value = data;
     items.value = data.items?.map((item) => ({
       ...item,
+      precioLista: item.precioUnitario,
       subtotal: item.subtotal ?? item.cantidad * item.precioUnitario
     })) || [];
     qtyEdits.value = {};
@@ -1306,6 +1342,7 @@ const restoreVenta = async () => {
       qtyEdits.value[item.id] = item.cantidad;
     });
     pricing.value = null;
+    discountPct.value = '0';
     pagos.value = [];
     refreshDisplayVentaNumero();
   } catch {
@@ -1516,6 +1553,52 @@ const commitQty = async (item) => {
   } catch (err) {
     qtyEdits.value[item.id] = item.cantidad;
     flash('error', err?.message || 'Error al actualizar item.');
+  }
+};
+
+const roundMoneyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+const clearZeroDiscount = () => {
+  if (String(discountPct.value).trim() === '0') {
+    discountPct.value = '';
+  }
+};
+
+const applyDiscount = async () => {
+  const pct = Number(discountPct.value);
+  if (!canEdit.value || !ventaId.value || !items.value.length || applyingDiscount.value) return;
+  if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+    flash('error', 'El descuento debe estar entre 0 y 100.');
+    return;
+  }
+
+  applyingDiscount.value = true;
+  try {
+    for (const item of items.value) {
+      const precioLista = Number(item.precioLista ?? item.precioUnitario ?? 0);
+      const nuevoPrecio = roundMoneyValue(precioLista * (1 - pct / 100));
+      const { response, data } = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          cantidad: item.cantidad,
+          precioUnitario: nuevoPrecio
+        })
+      });
+      if (!response.ok) {
+        throw new Error(extractProblemMessage(data));
+      }
+      applyItemDto(data);
+    }
+
+    if (pct === 0) {
+      flash('success', 'Descuento quitado.');
+    } else {
+      flash('success', `Descuento del ${pct}% aplicado.`);
+    }
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo aplicar el descuento.');
+  } finally {
+    applyingDiscount.value = false;
   }
 };
 
@@ -1818,6 +1901,7 @@ const confirmarVenta = async () => {
     items.value = [];
     qtyEdits.value = {};
     pricing.value = null;
+    discountPct.value = '0';
     cajaStatus.value = 'ABIERTA';
     dialogPagos.value = false;
     pagos.value = [];
@@ -2296,6 +2380,13 @@ onBeforeUnmount(() => {
 
 .pos-total-row {
   font-size: 15px;
+}
+
+.pos-discount-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .pos-total-net {

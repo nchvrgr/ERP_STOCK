@@ -135,6 +135,11 @@ public sealed class RemitoPdfGenerator : IRemitoPdfGenerator
 
         var sb = new StringBuilder();
         sb.AppendLine("0.8 w");
+        sb.AppendLine("0.95 0.95 0.95 rg");
+        sb.AppendLine($"{leftBoxX} {topBoxY} {leftBoxWidth} {topBoxHeight} re f");
+        sb.AppendLine($"{rightBoxX} {topBoxY} {rightBoxWidth} {topBoxHeight} re f");
+        sb.AppendLine($"{tableX} {providerBoxY} {tableWidth} {providerBoxHeight} re f");
+        sb.AppendLine("0 0 0 rg");
 
         // Cajas
         sb.AppendLine($"{leftBoxX} {topBoxY} {leftBoxWidth} {topBoxHeight} re S");
@@ -147,13 +152,13 @@ public sealed class RemitoPdfGenerator : IRemitoPdfGenerator
         WriteText(sb, leftBoxX + 10, topBoxY + 70, 9, "Sucursal", true);
         WriteText(sb, leftBoxX + 120, topBoxY + 70, 9, data.Header.SucursalNombre);
         WriteText(sb, leftBoxX + 10, topBoxY + 54, 9, "CUIT", true);
-        WriteText(sb, leftBoxX + 120, topBoxY + 54, 9, "-");
+        WriteText(sb, leftBoxX + 120, topBoxY + 54, 9, data.Header.EmpresaCuit ?? "-");
         WriteText(sb, leftBoxX + 10, topBoxY + 38, 9, "Direccion", true);
-        WriteText(sb, leftBoxX + 120, topBoxY + 38, 9, "-");
+        WriteText(sb, leftBoxX + 120, topBoxY + 38, 9, Truncate(data.Header.EmpresaDireccion ?? "-", 34));
         WriteText(sb, leftBoxX + 10, topBoxY + 22, 9, "Localidad", true);
         WriteText(sb, leftBoxX + 120, topBoxY + 22, 9, data.Header.SucursalNombre);
         WriteText(sb, leftBoxX + 10, topBoxY + 6, 9, "Telefono", true);
-        WriteText(sb, leftBoxX + 120, topBoxY + 6, 9, "-");
+        WriteText(sb, leftBoxX + 120, topBoxY + 6, 9, data.Header.EmpresaTelefono ?? "-");
 
         WriteText(sb, rightBoxX + 10, topBoxY + 80, 14, "REMITO", true);
         var numeroRemito = totalPages > 1 || proveedorIndex > 1
@@ -189,7 +194,7 @@ public sealed class RemitoPdfGenerator : IRemitoPdfGenerator
         WriteText(sb, tableX + 380, providerBoxY + 28, 9, "-");
 
         // Fondo del encabezado de tabla
-        sb.AppendLine("0.05 0.6 0.5 rg");
+        sb.AppendLine("0.23 0.04 0.07 rg");
         sb.AppendLine($"{tableX} {headerY} {tableWidth} {headerHeight} re f");
         sb.AppendLine("1 1 1 rg");
         sb.AppendLine($"{tableX} {headerY} {tableWidth} {headerHeight} re S");

@@ -53,5 +53,13 @@ public sealed class VentaItem : EntityBase
         Cantidad = cantidad;
         MarkUpdated(updatedAtUtc);
     }
+
+    public void ActualizarPrecioUnitario(decimal precioUnitario, DateTimeOffset updatedAtUtc)
+    {
+        if (precioUnitario < 0) throw new ArgumentException("PrecioUnitario must be >= 0.", nameof(precioUnitario));
+
+        PrecioUnitario = precioUnitario;
+        MarkUpdated(updatedAtUtc);
+    }
 }
 

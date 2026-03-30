@@ -130,7 +130,7 @@
                 {{ ventasTooltipState.text }}
               </div>
               <div class="chart-labels">
-                <span v-for="label in ventasLabels" :key="label">{{ label }}</span>
+                <span v-for="(label, index) in ventasAxisLabels" :key="`${label}-${index}`">{{ label }}</span>
               </div>
             </div>
           </v-card>
@@ -179,7 +179,7 @@
                 {{ mediosTooltipState.text }}
               </div>
               <div class="chart-labels">
-                <span v-for="label in mediosLabels" :key="label">{{ label }}</span>
+                <span v-for="(label, index) in mediosAxisLabels" :key="`${label}-${index}`">{{ label }}</span>
               </div>
             </div>
           </v-card>
@@ -320,9 +320,10 @@ const mediosWrapperRef = ref(null);
 const tooltipPosition = (event, wrapperRef) => {
   const rect = wrapperRef?.value?.getBoundingClientRect?.();
   if (!rect) return { x: 12, y: 12 };
-  const tooltipWidth = 220;
-  const x = Math.max(8, Math.min(event.clientX - rect.left + 12, rect.width - tooltipWidth));
-  const y = Math.max(8, Math.min(event.clientY - rect.top - 10, rect.height - 28));
+  const tooltipWidth = Math.min(220, Math.max(140, rect.width - 16));
+  const tooltipHeight = 44;
+  const x = Math.max(8, Math.min(event.clientX - rect.left + 12, rect.width - tooltipWidth - 8));
+  const y = Math.max(8, Math.min(event.clientY - rect.top - 10, rect.height - tooltipHeight - 8));
   return { x, y };
 };
 
@@ -398,6 +399,16 @@ const ventasLabels = computed(() => ventasChart.value?.labels || []);
 const ventasSeries = computed(() => ventasChart.value?.series?.[0]?.data || []);
 const mediosLabels = computed(() => mediosChart.value?.labels || []);
 const mediosSeries = computed(() => mediosChart.value?.series?.[0]?.data || []);
+const buildAxisLabels = (labels, maxVisible = 6) => {
+  if (!labels.length) return [];
+  if (labels.length <= maxVisible) return labels;
+  const step = Math.ceil(labels.length / maxVisible);
+  return labels.map((label, index) =>
+    index === 0 || index === labels.length - 1 || index % step === 0 ? label : ''
+  );
+};
+const ventasAxisLabels = computed(() => buildAxisLabels(ventasLabels.value, 7));
+const mediosAxisLabels = computed(() => buildAxisLabels(mediosLabels.value, 6));
 
 const buildLinePoints = (values) => {
   if (!values.length) return [];
@@ -559,6 +570,16 @@ onMounted(() => {
   font-size: 0.75rem;
   color: #475569;
   margin-top: 6px;
+  gap: 8px;
+}
+
+.chart-labels span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chart-tooltip {
@@ -570,6 +591,8 @@ onMounted(() => {
   padding: 6px 8px;
   border-radius: 6px;
   pointer-events: none;
-  white-space: nowrap;
+  max-width: min(220px, calc(100% - 16px));
+  white-space: normal;
+  box-shadow: 0 10px 22px rgba(59, 10, 18, 0.18);
 }
 </style>

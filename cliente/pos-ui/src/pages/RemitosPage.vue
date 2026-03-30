@@ -27,7 +27,15 @@
             clearable
             :loading="loadingProveedores"
             @update:model-value="onProveedorChanged"
-          />
+          >
+            <template #no-data>
+              <v-list-item
+                prepend-icon="mdi-plus-circle-outline"
+                title="Crear proveedor"
+                @click="openCreateProveedorDialog('')"
+              />
+            </template>
+          </v-autocomplete>
         </v-col>
       </v-row>
 
@@ -124,12 +132,6 @@
               color="primary"
               @click="incrementCantidad(getTableItemData(item).productoId)"
             />
-            <span class="recent-quantity-dot-slot">
-              <span
-                v-if="recentlyIncrementedProductId === getTableItemData(item).productoId"
-                class="recent-product-dot"
-              />
-            </span>
           </div>
         </template>
         <template v-slot:[`item.actions`]="{ item }">
@@ -218,6 +220,13 @@
                   <template #label>
                     Proveedor <span class="required-asterisk">*</span>
                   </template>
+                  <template #no-data>
+                    <v-list-item
+                      prepend-icon="mdi-plus-circle-outline"
+                      title="Crear proveedor"
+                      @click="openCreateProveedorDialog('')"
+                    />
+                  </template>
                 </v-autocomplete>
               </v-col>
             </v-row>
@@ -271,6 +280,7 @@
                   min="0"
                   step="0.01"
                   :error-messages="createErrors.margenPct"
+                  @focus="clearZeroOnFocus(createForm, 'margenPct')"
                   @blur="validateCreateField('margenPct')"
                 />
               </v-col>
@@ -308,6 +318,7 @@
                   variant="outlined"
                   density="comfortable"
                   :error-messages="createErrors.stockInicial"
+                  @focus="clearZeroOnFocus(createForm, 'stockInicial')"
                   @blur="validateCreateField('stockInicial')"
                 />
               </v-col>
@@ -321,6 +332,7 @@
                   variant="outlined"
                   density="comfortable"
                   :error-messages="createErrors.stockMinimo"
+                  @focus="clearZeroOnFocus(createStockConfig, 'stockMinimo')"
                   @blur="validateCreateField('stockMinimo')"
                 />
               </v-col>
@@ -349,6 +361,32 @@
           <v-btn color="primary" variant="elevated" class="text-none product-dialog-action" :loading="creatingProduct" @click="createProductFromIngreso">
             Guardar
           </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="proveedorDialog" persistent width="520">
+      <v-card>
+        <v-card-title>Nuevo proveedor</v-card-title>
+        <v-card-text class="pt-4">
+          <v-text-field
+            v-model="proveedorForm.name"
+            label="Nombre"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="proveedorErrors.name"
+          />
+          <v-text-field
+            v-model="proveedorForm.telefono"
+            label="Teléfono"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="proveedorErrors.telefono"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="creatingProveedor" @click="closeProveedorDialog">Cancelar</v-btn>
+          <v-btn color="primary" :loading="creatingProveedor" @click="saveProveedor">Guardar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -383,8 +421,9 @@ const remitoDraftStorageKey = 'vinedos-remito-ingreso-draft';
 const createDialog = ref(false);
 const creatingProduct = ref(false);
 const recentlyAddedProductId = ref('');
-const recentlyIncrementedProductId = ref('');
 const recentAddMessage = ref('');
+const proveedorDialog = ref(false);
+const creatingProveedor = ref(false);
 const createForm = reactive({
   sku: '',
   name: '',
@@ -410,6 +449,14 @@ const createErrors = reactive({
   precioVentaManual: '',
   stockInicial: '',
   stockMinimo: ''
+});
+const proveedorForm = reactive({
+  name: '',
+  telefono: ''
+});
+const proveedorErrors = reactive({
+  name: '',
+  telefono: ''
 });
 
 const snackbar = ref({
@@ -581,8 +628,15 @@ const onProductSearch = async (value) => {
 
 const clearRecentAddFeedback = () => {
   recentlyAddedProductId.value = '';
-  recentlyIncrementedProductId.value = '';
   recentAddMessage.value = '';
+};
+
+const clearZeroOnFocus = (target, field) => {
+  if (!target || !(field in target)) return;
+  const currentValue = String(target[field] ?? '').trim();
+  if (currentValue === '0' || currentValue === '0.00' || currentValue === '0,00') {
+    target[field] = '';
+  }
 };
 
 const resetProductInput = async () => {
@@ -611,7 +665,6 @@ const addProducto = async (producto, qty = 1) => {
     const existing = items.value.find((i) => i.productoId === producto.id);
     if (existing) {
       existing.cantidad = Math.max(1, Number.parseInt(existing.cantidad, 10) || 1) + normalizedQty;
-      recentlyIncrementedProductId.value = producto.id;
     } else {
       items.value.push({
         productoId: producto.id,
@@ -620,7 +673,6 @@ const addProducto = async (producto, qty = 1) => {
         sku: producto.sku,
         cantidad: normalizedQty
       });
-      recentlyIncrementedProductId.value = '';
     }
 
     recentlyAddedProductId.value = producto.id;
@@ -653,7 +705,6 @@ const incrementCantidad = (productId) => {
   const item = items.value.find((i) => i.productoId === productId);
   if (!item) return;
   item.cantidad = Math.max(1, Number.parseInt(item.cantidad, 10) || 1) + 1;
-  recentlyIncrementedProductId.value = productId;
 };
 
 const decrementCantidad = (productId) => {
@@ -676,9 +727,6 @@ const updateCantidad = (productId, value) => {
     return;
   }
   item.cantidad = qty;
-  if (qty > previousQty) {
-    recentlyIncrementedProductId.value = productId;
-  }
 };
 
 const clearForm = () => {
@@ -707,6 +755,54 @@ const resetCreateForm = () => {
   Object.keys(createErrors).forEach((key) => {
     createErrors[key] = '';
   });
+};
+
+const resetProveedorForm = () => {
+  proveedorForm.name = '';
+  proveedorForm.telefono = '';
+  proveedorErrors.name = '';
+  proveedorErrors.telefono = '';
+};
+
+const openCreateProveedorDialog = (initialName = '') => {
+  resetProveedorForm();
+  proveedorForm.name = (initialName || '').trim();
+  proveedorDialog.value = true;
+};
+
+const closeProveedorDialog = () => {
+  proveedorDialog.value = false;
+  resetProveedorForm();
+};
+
+const saveProveedor = async () => {
+  proveedorErrors.name = proveedorForm.name.trim() ? '' : 'El nombre es obligatorio.';
+  proveedorErrors.telefono = proveedorForm.telefono.trim() ? '' : 'El teléfono es obligatorio.';
+  if (proveedorErrors.name || proveedorErrors.telefono || creatingProveedor.value) return;
+
+  creatingProveedor.value = true;
+  try {
+    const { response, data } = await postJson('/api/v1/proveedores', {
+      name: proveedorForm.name.trim(),
+      telefono: proveedorForm.telefono.trim() || null,
+      isActive: true
+    });
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    await loadProveedores();
+    createForm.proveedorId = data.id;
+    if (!selectedProveedorId.value) {
+      selectedProveedorId.value = data.id;
+    }
+    closeProveedorDialog();
+    flash('success', 'Proveedor creado');
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo crear el proveedor.');
+  } finally {
+    creatingProveedor.value = false;
+  }
 };
 
 const validateCreateField = (field) => {

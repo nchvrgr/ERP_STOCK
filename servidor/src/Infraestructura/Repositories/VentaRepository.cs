@@ -392,6 +392,7 @@ public sealed class VentaRepository : IVentaRepository
         Guid ventaId,
         Guid itemId,
         decimal cantidad,
+        decimal? precioUnitario,
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default)
     {
@@ -420,6 +421,10 @@ public sealed class VentaRepository : IVentaRepository
 
         var cantidadAntes = item.Cantidad;
         item.ActualizarCantidad(cantidad, nowUtc);
+        if (precioUnitario.HasValue)
+        {
+            item.ActualizarPrecioUnitario(precioUnitario.Value, nowUtc);
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

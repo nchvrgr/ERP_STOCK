@@ -55,6 +55,7 @@ public interface IVentaRepository
         Guid ventaId,
         Guid itemId,
         decimal cantidad,
+        decimal? precioUnitario,
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default);
 

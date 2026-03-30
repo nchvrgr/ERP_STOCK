@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const https = require('node:https');
+const { spawn } = require('node:child_process');
 
 const { app, dialog, shell } = require('electron/main');
 
@@ -199,6 +200,18 @@ function downloadFile(url, destinationPath) {
   });
 }
 
+function ensureUniqueTempInstallerPath(assetName) {
+  const fallbackName = process.platform === 'win32'
+    ? `erp-stock-update-${Date.now()}.exe`
+    : `erp-stock-update-${Date.now()}`;
+  const safeName = String(assetName || fallbackName)
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/\s+/g, '.')
+    .replace(/\.{2,}/g, '.');
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vinedos-update-'));
+  return path.join(tempDir, safeName);
+}
+
 function getSupportedExtensions() {
   switch (process.platform) {
     case 'win32':
@@ -318,7 +331,7 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
   let installerPath = String(asset.local_path || '').trim();
 
   if (!installerPath) {
-    const tempPath = path.join(os.tmpdir(), asset.name || `erp-stock-update-${Date.now()}`);
+    const tempPath = ensureUniqueTempInstallerPath(asset.name);
     await downloadFile(asset.browser_download_url, tempPath);
     installerPath = tempPath;
     log(`installer downloaded path=${installerPath}`);
@@ -329,9 +342,27 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     log(`installer using local path=${installerPath}`);
   }
 
-  const openResult = await shell.openPath(installerPath);
-  if (openResult) {
-    throw new Error(openResult);
+  if (!fs.existsSync(installerPath)) {
+    throw new Error(`No se encontró el instalador descargado: ${installerPath}`);
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      const installerProcess = spawn(installerPath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false
+      });
+      installerProcess.unref();
+      log(`installer spawned path=${installerPath} pid=${installerProcess.pid ?? 'unknown'}`);
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : String(error));
+    }
+  } else {
+    const openResult = await shell.openPath(installerPath);
+    if (openResult) {
+      throw new Error(openResult);
+    }
   }
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();

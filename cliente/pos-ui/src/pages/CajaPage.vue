@@ -2,12 +2,17 @@
   <div class="caja-page">
     <v-tabs v-if="availableTabs.length > 1" v-model="tab" color="primary" class="mb-4">
       <v-tab v-if="canUsePos" value="ventas">Ventas</v-tab>
+      <v-tab v-if="canUseCaja" value="movimientos">Movimientos stock</v-tab>
       <v-tab v-if="canUseCaja" value="historial">Historial caja</v-tab>
     </v-tabs>
 
     <v-window v-model="tab">
       <v-window-item v-if="canUsePos" value="ventas" class="caja-window-item">
         <PosPage />
+      </v-window-item>
+
+      <v-window-item v-if="canUseCaja" value="movimientos" class="caja-window-item">
+        <StockMovimientosPanel />
       </v-window-item>
 
       <v-window-item v-if="canUseCaja" value="historial" class="caja-window-item">
@@ -79,6 +84,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PosPage from './PosPage.vue';
+import StockMovimientosPanel from '../components/StockMovimientosPanel.vue';
 import { useAuthStore } from '../stores/auth';
 import { getJson } from '../services/apiClient';
 import { formatMoney } from '../utils/currency';
@@ -97,6 +103,7 @@ const canUseCaja = computed(
 const availableTabs = computed(() => {
   const tabs = [];
   if (canUsePos.value) tabs.push('ventas');
+  if (canUseCaja.value) tabs.push('movimientos');
   if (canUseCaja.value) tabs.push('historial');
   return tabs;
 });
@@ -145,6 +152,12 @@ const flash = (type, text) => {
     color: type === 'success' ? 'success' : 'error',
     icon: type === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle'
   };
+};
+
+const handleAppSnackbar = (event) => {
+  const detail = event?.detail;
+  if (!detail?.text) return;
+  flash(detail.type === 'success' ? 'success' : 'error', detail.text);
 };
 
 const extractProblemMessage = (data) => {
@@ -236,10 +249,12 @@ const handleCajaSessionChanged = async () => {
 onMounted(() => {
   loadHistorial();
   window.addEventListener('pos-caja-session-changed', handleCajaSessionChanged);
+  window.addEventListener('app-snackbar', handleAppSnackbar);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('pos-caja-session-changed', handleCajaSessionChanged);
+  window.removeEventListener('app-snackbar', handleAppSnackbar);
 });
 </script>
 
