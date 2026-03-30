@@ -226,11 +226,32 @@ function getSupportedExtensions() {
 function findInstallerAsset(release) {
   const supportedExtensions = getSupportedExtensions();
   const assets = Array.isArray(release?.assets) ? release.assets : [];
-
-  return (
-    assets.find((asset) => supportedExtensions.some((extension) => asset.name?.toLowerCase().endsWith(extension.toLowerCase()))) ||
-    null
+  const installers = assets.filter((asset) =>
+    supportedExtensions.some((extension) => asset.name?.toLowerCase().endsWith(extension.toLowerCase()))
   );
+
+  if (installers.length === 0) {
+    return null;
+  }
+
+  installers.sort((left, right) => {
+    const leftDate = Date.parse(left.updated_at || left.created_at || 0);
+    const rightDate = Date.parse(right.updated_at || right.created_at || 0);
+
+    if (rightDate !== leftDate) {
+      return rightDate - leftDate;
+    }
+
+    const leftSetup = /setup/i.test(left.name || '');
+    const rightSetup = /setup/i.test(right.name || '');
+    if (leftSetup !== rightSetup) {
+      return rightSetup ? 1 : -1;
+    }
+
+    return String(right.name || '').localeCompare(String(left.name || ''));
+  });
+
+  return installers[0];
 }
 
 function hasUsableInstallerSource(asset) {
