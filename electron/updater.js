@@ -390,21 +390,9 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
 
   log(`installer opened path=${installerPath}`);
 
-  await dialog.showMessageBox(mainWindow || null, {
-    type: 'info',
-    buttons: ['Cerrar aplicacion'],
-    defaultId: 0,
-    noLink: true,
-    title: 'Instalador iniciado',
-    message: 'Se abrio el instalador de actualizacion.',
-    detail: 'Si Windows muestra un aviso de seguridad, aceptalo para continuar con la instalacion.'
-  });
-
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();
   }
-
-  app.quit();
 }
 
 async function checkForUpdates(options = {}) {
