@@ -49,11 +49,6 @@
             />
           </v-list>
         </div>
-        <v-divider />
-        <div class="pa-4 text-caption text-medium-emphasis">
-          <div>Tenant: {{ shortId(auth.tenantId) }}</div>
-          <div>Sucursal: {{ shortId(auth.sucursalId) }}</div>
-        </div>
       </div>
     </v-navigation-drawer>
 
@@ -189,11 +184,6 @@ const isDarkMode = computed({
     applyColorMode(value ? POS_COLOR_MODE_DARK : POS_COLOR_MODE_LIGHT, theme);
   }
 });
-
-const shortId = (value) => {
-  if (!value) return 'n/a';
-  return value.length > 8 ? value.slice(0, 8) : value;
-};
 
 const isStockMenuItem = (item) => (item?.path || item?.to) === '/stock';
 
