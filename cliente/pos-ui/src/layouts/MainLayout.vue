@@ -62,6 +62,9 @@
           >
             Actualizar app
           </v-btn>
+          <div class="mt-2 text-caption text-medium-emphasis update-version-label">
+            V: {{ appVersion }}
+          </div>
         </div>
       </div>
     </v-navigation-drawer>
@@ -131,6 +134,7 @@ const updateSnackbar = ref({
   text: '',
   color: 'primary'
 });
+const appVersion = ref('1.0.2');
 const { mdAndUp } = useDisplay();
 const theme = useTheme();
 const desktopBridge = window.desktopBridge || null;
@@ -271,6 +275,9 @@ watch(
 );
 
 onMounted(() => {
+  if (typeof desktopBridge?.getAppVersion === 'function') {
+    appVersion.value = desktopBridge.getAppVersion() || appVersion.value;
+  }
   window.addEventListener('focus', refreshStockAlerts);
   refreshStockAlerts();
 });
@@ -374,6 +381,10 @@ const logout = () => {
 .stock-alert-dot--info {
   background: rgba(var(--v-theme-info), 0.2);
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-info), 0.42);
+}
+
+.update-version-label {
+  text-align: center;
 }
 </style>
 
