@@ -16,12 +16,18 @@ public sealed class RepositorioAutenticacion : IRepositorioAutenticacion
     }
 
     public async Task<UsuarioLoginDto?> GetLoginUserAsync(
-        string username,
+        string firebaseEmail,
         Guid? tenantId,
         Guid? sucursalId,
         CancellationToken cancellationToken = default)
     {
-        var userQuery = _dbContext.Usuarios.AsNoTracking().Where(u => u.Username == username);
+        var normalizedEmail = firebaseEmail.Trim();
+        var atIndex = normalizedEmail.IndexOf('@');
+        var usernameAlias = atIndex > 0 ? normalizedEmail[..atIndex].Trim() : normalizedEmail;
+
+        var userQuery = _dbContext.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Username == normalizedEmail || u.Username == usernameAlias);
         if (tenantId.HasValue)
         {
             userQuery = userQuery.Where(u => u.TenantId == tenantId.Value);
@@ -85,7 +91,6 @@ public sealed class RepositorioAutenticacion : IRepositorioAutenticacion
             user.TenantId,
             resolvedSucursalId.Value,
             user.Id,
-            user.PasswordHash,
             roles,
             permissions,
             user.IsActive);

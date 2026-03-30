@@ -7,20 +7,17 @@ namespace Servidor.Aplicacion.CasosDeUso.Autenticacion;
 public sealed class ServicioAutenticacion
 {
     private readonly IRepositorioAutenticacion _repositorioAutenticacion;
-    private readonly IPasswordHasher _hasheadorContrasena;
     private readonly IGeneradorTokenJwt _generadorToken;
     private readonly IRequestContext _contextoSolicitud;
     private readonly IAuditLogService _servicioAuditoria;
 
     public ServicioAutenticacion(
         IRepositorioAutenticacion repositorioAutenticacion,
-        IPasswordHasher passwordHasher,
         IGeneradorTokenJwt tokenGenerator,
         IRequestContext requestContext,
         IAuditLogService auditLogService)
     {
         _repositorioAutenticacion = repositorioAutenticacion;
-        _hasheadorContrasena = passwordHasher;
         _generadorToken = tokenGenerator;
         _contextoSolicitud = requestContext;
         _servicioAuditoria = auditLogService;
@@ -28,38 +25,23 @@ public sealed class ServicioAutenticacion
 
     public async Task<RespuestaLoginDto> IniciarSesionAsync(SolicitudLoginDto request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Username))
+        if (string.IsNullOrWhiteSpace(request.FirebaseEmail))
         {
             throw new ValidationException(
                 "Validacion fallida.",
                 new Dictionary<string, string[]>
                 {
-                    ["username"] = new[] { "El usuario es obligatorio." }
-                });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password))
-        {
-            throw new ValidationException(
-                "Validacion fallida.",
-                new Dictionary<string, string[]>
-                {
-                    ["password"] = new[] { "La contrasena es obligatoria." }
+                    ["firebaseEmail"] = new[] { "El usuario es obligatorio." }
                 });
         }
 
         var usuarioLogin = await _repositorioAutenticacion.GetLoginUserAsync(
-            request.Username.Trim(),
+            request.FirebaseEmail.Trim(),
             request.TenantId,
             request.SucursalId,
             cancellationToken);
 
         if (usuarioLogin is null || !usuarioLogin.IsActive)
-        {
-            throw new UnauthorizedException("Credenciales invalidas.");
-        }
-
-        if (!_hasheadorContrasena.Verify(request.Password, usuarioLogin.PasswordHash))
         {
             throw new UnauthorizedException("Credenciales invalidas.");
         }

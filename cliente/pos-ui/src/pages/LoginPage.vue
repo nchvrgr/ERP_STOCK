@@ -21,8 +21,9 @@
 
           <v-form class="mt-4" @submit.prevent="submit">
             <v-text-field
+              ref="usernameRef"
               v-model="email"
-              label="Email de suscripcion"
+              label="Usuario"
               type="email"
               variant="outlined"
               density="comfortable"
@@ -31,25 +32,7 @@
             />
             <v-text-field
               v-model="firebasePassword"
-              label="Contrasena de suscripcion"
-              type="password"
-              variant="outlined"
-              density="comfortable"
-              autocomplete="current-password"
-              required
-            />
-            <v-text-field
-              ref="usernameRef"
-              v-model="username"
-              label="Usuario ERP"
-              variant="outlined"
-              density="comfortable"
-              autocomplete="username"
-              required
-            />
-            <v-text-field
-              v-model="erpPassword"
-              label="Contrasena ERP"
+              label="Contrasena"
               type="password"
               variant="outlined"
               density="comfortable"
@@ -57,26 +40,6 @@
               required
               @keyup.enter="submit"
             />
-
-            <v-expansion-panels variant="accordion" class="mt-2">
-              <v-expansion-panel>
-                <v-expansion-panel-title>Avanzado</v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-text-field
-                    v-model="tenantId"
-                    label="Tenant Id (opcional)"
-                    variant="outlined"
-                    density="comfortable"
-                  />
-                  <v-text-field
-                    v-model="sucursalId"
-                    label="Sucursal Id (opcional)"
-                    variant="outlined"
-                    density="comfortable"
-                  />
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
 
             <v-btn
               type="submit"
@@ -106,10 +69,6 @@ const route = useRoute();
 
 const email = ref('');
 const firebasePassword = ref('');
-const username = ref('');
-const erpPassword = ref('');
-const tenantId = ref('');
-const sucursalId = ref('');
 const error = ref('');
 const loading = ref(false);
 const usernameRef = ref(null);
@@ -129,11 +88,7 @@ const submit = async () => {
   try {
     await auth.login({
       email: email.value,
-      firebasePassword: firebasePassword.value,
-      username: username.value,
-      password: erpPassword.value,
-      tenantId: tenantId.value.trim() || null,
-      sucursalId: sucursalId.value.trim() || null
+      firebasePassword: firebasePassword.value
     });
 
     const redirect =
@@ -150,9 +105,7 @@ const submit = async () => {
 onMounted(() => {
   auth.loadLoginHints();
   email.value = auth.firebaseEmail || '';
-  username.value = auth.erpUsernameHint || '';
   firebasePassword.value = '';
-  erpPassword.value = '';
   focusUsername();
 });
 </script>

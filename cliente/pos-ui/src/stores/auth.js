@@ -107,7 +107,6 @@ export const useAuthStore = defineStore('auth', {
     userId: '',
     firebaseUid: '',
     firebaseEmail: '',
-    erpUsernameHint: '',
     subscriptionStatus: '',
     subscriptionChecked: false,
     accessMessage: '',
@@ -145,7 +144,6 @@ export const useAuthStore = defineStore('auth', {
         this.userId = data.userId || '';
         this.firebaseUid = data.firebaseUid || '';
         this.firebaseEmail = data.firebaseEmail || '';
-        this.erpUsernameHint = data.erpUsernameHint || '';
         this.subscriptionStatus = data.subscriptionStatus || '';
         this.subscriptionChecked = Boolean(data.subscriptionChecked);
         this.accessMessage = data.accessMessage || '';
@@ -167,7 +165,6 @@ export const useAuthStore = defineStore('auth', {
         userId: this.userId,
         firebaseUid: this.firebaseUid,
         firebaseEmail: this.firebaseEmail,
-        erpUsernameHint: this.erpUsernameHint,
         subscriptionStatus: this.subscriptionStatus,
         subscriptionChecked: this.subscriptionChecked,
         accessMessage: this.accessMessage,
@@ -189,7 +186,6 @@ export const useAuthStore = defineStore('auth', {
     clearSubscriptionState() {
       this.firebaseUid = '';
       this.firebaseEmail = '';
-      this.erpUsernameHint = '';
       this.subscriptionStatus = '';
       this.subscriptionChecked = false;
       this.accessMessage = '';
@@ -207,7 +203,6 @@ export const useAuthStore = defineStore('auth', {
       this.userId = '';
       this.firebaseUid = '';
       this.firebaseEmail = '';
-      this.erpUsernameHint = '';
       this.subscriptionStatus = '';
       this.subscriptionChecked = false;
       this.accessMessage = '';
@@ -229,25 +224,19 @@ export const useAuthStore = defineStore('auth', {
       try {
         const data = JSON.parse(raw);
         this.firebaseEmail = data.firebaseEmail || this.firebaseEmail;
-        this.erpUsernameHint = data.erpUsernameHint || this.erpUsernameHint;
       } catch {
         localStorage.removeItem(LOGIN_HINTS_KEY);
       }
     },
-    saveLoginHints({ firebaseEmail, erpUsernameHint }) {
+    saveLoginHints({ firebaseEmail }) {
       if (firebaseEmail) {
         this.firebaseEmail = firebaseEmail.trim();
-      }
-
-      if (typeof erpUsernameHint === 'string' && erpUsernameHint.trim()) {
-        this.erpUsernameHint = erpUsernameHint.trim();
       }
 
       localStorage.setItem(
         LOGIN_HINTS_KEY,
         JSON.stringify({
-          firebaseEmail: this.firebaseEmail,
-          erpUsernameHint: this.erpUsernameHint
+          firebaseEmail: this.firebaseEmail
         })
       );
       this.saveToStorage();
@@ -274,13 +263,9 @@ export const useAuthStore = defineStore('auth', {
 
       const data = snapshot.data() || {};
       const status = normalizeSubscriptionStatus(data.subscriptionStatus);
-      const erpUsernameHint = typeof data.erpUsername === 'string' ? data.erpUsername.trim() : '';
       const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
 
-      this.saveLoginHints({
-        firebaseEmail: this.firebaseEmail,
-        erpUsernameHint
-      });
+      this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
 
       this.applySubscriptionStatus(status, message);
       return status;
@@ -300,13 +285,9 @@ export const useAuthStore = defineStore('auth', {
 
           const data = snapshot.data() || {};
           const status = normalizeSubscriptionStatus(data.subscriptionStatus);
-          const erpUsernameHint = typeof data.erpUsername === 'string' ? data.erpUsername.trim() : '';
           const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
 
-          this.saveLoginHints({
-            firebaseEmail: this.firebaseEmail,
-            erpUsernameHint
-          });
+          this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
 
           this.applySubscriptionStatus(status, message);
         },
@@ -322,10 +303,7 @@ export const useAuthStore = defineStore('auth', {
 
         this.firebaseUid = credential.user.uid;
         this.firebaseEmail = credential.user.email || email.trim();
-        this.saveLoginHints({
-          firebaseEmail: this.firebaseEmail,
-          erpUsernameHint: this.erpUsernameHint
-        });
+        this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
 
         const status = await this.refreshSubscriptionStatus(credential.user.uid);
         this.startSubscriptionListener(credential.user.uid);
@@ -392,19 +370,15 @@ export const useAuthStore = defineStore('auth', {
 
       this.saveToStorage();
     },
-    async login({ email, firebasePassword, username, password, tenantId, sucursalId }) {
+    async login({ email, firebasePassword }) {
       this.setAccessMessage('');
-      this.saveLoginHints({
-        firebaseEmail: email || '',
-        erpUsernameHint: username || ''
-      });
+      this.saveLoginHints({ firebaseEmail: email || '' });
       await this.signInWithFirebase(email || '', firebasePassword || '');
 
       const request = {
-        username: (username || '').trim(),
-        password: password || '',
-        tenantId: tenantId || null,
-        sucursalId: sucursalId || null
+        firebaseEmail: (this.firebaseEmail || email || '').trim(),
+        tenantId: null,
+        sucursalId: null
       };
 
       const { response, data } = await postJson('/api/v1/auth/login', request);

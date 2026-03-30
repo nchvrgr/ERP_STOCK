@@ -5,7 +5,7 @@ namespace Servidor.Aplicacion.Contratos;
 public interface IRepositorioAutenticacion
 {
     Task<UsuarioLoginDto?> GetLoginUserAsync(
-        string username,
+        string firebaseEmail,
         Guid? tenantId,
         Guid? sucursalId,
         CancellationToken cancellationToken = default);
