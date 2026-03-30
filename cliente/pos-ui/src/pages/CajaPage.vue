@@ -133,7 +133,7 @@ const historialHeaders = [
 const formatDate = (value) => {
   if (!value) return '-';
   try {
-    return new Date(value).toLocaleString('es-AR');
+    return new Date(value).toLocaleString('es-AR', { hour12: false });
   } catch {
     return value;
   }

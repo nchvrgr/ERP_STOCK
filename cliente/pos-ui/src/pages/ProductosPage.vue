@@ -58,6 +58,24 @@
                   class="products-table"
                   density="compact"
                 >
+                  <template v-slot:[`item.name`]="{ item }">
+                    <v-tooltip :text="item.name || '-'" location="top">
+                      <template #activator="{ props }">
+                        <div class="truncate-cell product-name-cell" v-bind="props">
+                          {{ item.name || '-' }}
+                        </div>
+                      </template>
+                    </v-tooltip>
+                  </template>
+                  <template v-slot:[`item.sku`]="{ item }">
+                    <v-tooltip :text="item.sku || '-'" location="top">
+                      <template #activator="{ props }">
+                        <div class="truncate-cell product-sku-cell" v-bind="props">
+                          {{ item.sku || '-' }}
+                        </div>
+                      </template>
+                    </v-tooltip>
+                  </template>
                   <template v-slot:[`item.precioBase`]="{ item }">
                     {{ formatMoney(item.precioBase) }}
                   </template>
@@ -1737,6 +1755,20 @@ onMounted(() => {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.truncate-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-name-cell {
+  max-width: 280px;
+}
+
+.product-sku-cell {
+  max-width: 150px;
 }
 
 .delete-row-action {

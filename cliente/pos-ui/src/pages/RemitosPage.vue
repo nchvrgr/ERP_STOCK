@@ -383,6 +383,20 @@
             density="comfortable"
             :error-messages="proveedorErrors.telefono"
           />
+          <v-text-field
+            v-model="proveedorForm.cuit"
+            label="CUIT"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="proveedorErrors.cuit"
+          />
+          <v-text-field
+            v-model="proveedorForm.direccion"
+            label="Direccion"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="proveedorErrors.direccion"
+          />
         </v-card-text>
         <v-card-actions class="justify-end">
           <v-btn variant="text" :disabled="creatingProveedor" @click="closeProveedorDialog">Cancelar</v-btn>
@@ -452,11 +466,15 @@ const createErrors = reactive({
 });
 const proveedorForm = reactive({
   name: '',
-  telefono: ''
+  telefono: '',
+  cuit: '',
+  direccion: ''
 });
 const proveedorErrors = reactive({
   name: '',
-  telefono: ''
+  telefono: '',
+  cuit: '',
+  direccion: ''
 });
 
 const snackbar = ref({
@@ -760,8 +778,12 @@ const resetCreateForm = () => {
 const resetProveedorForm = () => {
   proveedorForm.name = '';
   proveedorForm.telefono = '';
+  proveedorForm.cuit = '';
+  proveedorForm.direccion = '';
   proveedorErrors.name = '';
   proveedorErrors.telefono = '';
+  proveedorErrors.cuit = '';
+  proveedorErrors.direccion = '';
 };
 
 const openCreateProveedorDialog = (initialName = '') => {
@@ -778,13 +800,17 @@ const closeProveedorDialog = () => {
 const saveProveedor = async () => {
   proveedorErrors.name = proveedorForm.name.trim() ? '' : 'El nombre es obligatorio.';
   proveedorErrors.telefono = proveedorForm.telefono.trim() ? '' : 'El teléfono es obligatorio.';
-  if (proveedorErrors.name || proveedorErrors.telefono || creatingProveedor.value) return;
+  proveedorErrors.cuit = proveedorForm.cuit.trim() ? '' : 'El CUIT es obligatorio.';
+  proveedorErrors.direccion = proveedorForm.direccion.trim() ? '' : 'La direccion es obligatoria.';
+  if (proveedorErrors.name || proveedorErrors.telefono || proveedorErrors.cuit || proveedorErrors.direccion || creatingProveedor.value) return;
 
   creatingProveedor.value = true;
   try {
     const { response, data } = await postJson('/api/v1/proveedores', {
       name: proveedorForm.name.trim(),
       telefono: proveedorForm.telefono.trim() || null,
+      cuit: proveedorForm.cuit.trim() || null,
+      direccion: proveedorForm.direccion.trim() || null,
       isActive: true
     });
     if (!response.ok) {

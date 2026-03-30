@@ -501,7 +501,15 @@ public sealed class RepositorioProductos : IRepositorioProductos
 
         var hasUsage =
             await _dbContext.VentaItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
-            || await _dbContext.StockMovimientoItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
+                        || await (from item in _dbContext.StockMovimientoItems.AsNoTracking()
+                                            join movimiento in _dbContext.StockMovimientos.AsNoTracking()
+                                                on item.MovimientoId equals movimiento.Id
+                                            where item.TenantId == tenantId
+                                                && item.ProductoId == productId
+                                                && movimiento.TenantId == tenantId
+                                                && !(movimiento.Tipo == StockMovimientoTipo.Ajuste
+                                                         && EF.Functions.ILike(movimiento.Motivo, "%stock inicial%"))
+                                            select item.Id).AnyAsync(cancellationToken)
             || await _dbContext.RecepcionItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
             || await _dbContext.DevolucionItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
             || await _dbContext.OrdenCompraItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
@@ -527,12 +535,31 @@ public sealed class RepositorioProductos : IRepositorioProductos
         var listaPrecioItems = await _dbContext.ListaPrecioItems
             .Where(i => i.TenantId == tenantId && i.ProductoId == productId)
             .ToListAsync(cancellationToken);
+                var stockMovimientoItemsAjusteInicial = await (from item in _dbContext.StockMovimientoItems
+                                                                                                             join movimiento in _dbContext.StockMovimientos
+                                                                                                                 on item.MovimientoId equals movimiento.Id
+                                                                                                             where item.TenantId == tenantId
+                                                                                                                 && item.ProductoId == productId
+                                                                                                                 && movimiento.TenantId == tenantId
+                                                                                                                 && movimiento.Tipo == StockMovimientoTipo.Ajuste
+                                                                                                                 && EF.Functions.ILike(movimiento.Motivo, "%stock inicial%")
+                                                                                                             select item)
+                        .ToListAsync(cancellationToken);
+                var movimientosAjusteInicialIds = stockMovimientoItemsAjusteInicial
+                        .Select(i => i.MovimientoId)
+                        .Distinct()
+                        .ToList();
+                var movimientosAjusteInicial = await _dbContext.StockMovimientos
+                        .Where(m => m.TenantId == tenantId && movimientosAjusteInicialIds.Contains(m.Id))
+                        .ToListAsync(cancellationToken);
 
         _dbContext.ProductoCodigos.RemoveRange(codigos);
         _dbContext.ProductoProveedores.RemoveRange(relacionesProveedor);
         _dbContext.ProductoStockConfigs.RemoveRange(configuracionesStock);
         _dbContext.StockSaldos.RemoveRange(saldosStock);
         _dbContext.ListaPrecioItems.RemoveRange(listaPrecioItems);
+        _dbContext.StockMovimientoItems.RemoveRange(stockMovimientoItemsAjusteInicial);
+        _dbContext.StockMovimientos.RemoveRange(movimientosAjusteInicial);
         _dbContext.Productos.Remove(product);
 
         await _dbContext.SaveChangesAsync(cancellationToken);

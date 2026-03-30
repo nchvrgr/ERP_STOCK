@@ -214,6 +214,15 @@ public sealed class VentaRepository : IVentaRepository
         var item = await _dbContext.VentaItems
             .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.VentaId == ventaId && i.ProductoId == product.Id, cancellationToken);
 
+        var cantidadSolicitada = (item?.Cantidad ?? 0m) + 1m;
+        await EnsureStockDisponibleParaAgregarAsync(
+            tenantId,
+            sucursalId,
+            product.Id,
+            product.Name,
+            cantidadSolicitada,
+            cancellationToken);
+
         var creado = false;
         var cantidadAntes = 0m;
         var precioUnitario = 0m;
@@ -297,6 +306,15 @@ public sealed class VentaRepository : IVentaRepository
 
         var item = await _dbContext.VentaItems
             .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.VentaId == ventaId && i.ProductoId == product.Id, cancellationToken);
+
+        var cantidadSolicitada = (item?.Cantidad ?? 0m) + 1m;
+        await EnsureStockDisponibleParaAgregarAsync(
+            tenantId,
+            sucursalId,
+            product.Id,
+            product.Name,
+            cantidadSolicitada,
+            cancellationToken);
 
         var creado = false;
         var cantidadAntes = 0m;
@@ -886,6 +904,29 @@ public sealed class VentaRepository : IVentaRepository
         }
 
         return precioVenta > 0 ? precioVenta : precioBase;
+    }
+
+    private async Task EnsureStockDisponibleParaAgregarAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid productoId,
+        string nombreProducto,
+        decimal cantidadSolicitada,
+        CancellationToken cancellationToken)
+    {
+        var disponible = await _dbContext.StockSaldos.AsNoTracking()
+            .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && s.ProductoId == productoId)
+            .Select(s => s.CantidadActual)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (cantidadSolicitada <= disponible)
+        {
+            return;
+        }
+
+        var faltante = cantidadSolicitada - disponible;
+        throw new ConflictException(
+            $"Stock insuficiente para {nombreProducto}. Disponible: {disponible}. Solicitado: {cantidadSolicitada}. Faltante: {faltante}.");
     }
 }
 

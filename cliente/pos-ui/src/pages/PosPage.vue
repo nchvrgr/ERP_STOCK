@@ -733,6 +733,76 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="dialogStockAjuste" width="560">
+      <v-card>
+        <v-card-title>Ajuste de stock requerido</v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-2">
+            No hay stock suficiente para continuar con la venta. Podes registrar un ajuste y volver a intentar.
+          </div>
+          <v-text-field
+            :model-value="stockAjuste.nombre"
+            label="Producto"
+            variant="outlined"
+            density="comfortable"
+            readonly
+            class="mb-2"
+          />
+          <v-row dense>
+            <v-col cols="12" md="4">
+              <v-text-field
+                :model-value="stockAjuste.disponible"
+                label="Disponible"
+                variant="outlined"
+                density="comfortable"
+                readonly
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                :model-value="stockAjuste.solicitado"
+                label="Solicitado"
+                variant="outlined"
+                density="comfortable"
+                readonly
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-text-field
+                :model-value="stockAjuste.faltante"
+                label="Faltante"
+                variant="outlined"
+                density="comfortable"
+                readonly
+              />
+            </v-col>
+          </v-row>
+          <MoneyField
+            v-model="stockAjuste.cantidadAjuste"
+            label="Cantidad a ajustar (ingreso)"
+            variant="outlined"
+            density="comfortable"
+            :step="1"
+            numeric
+            clear-zero-on-focus
+            class="mb-2"
+          />
+          <v-text-field
+            v-model="stockAjuste.motivo"
+            label="Motivo del ajuste"
+            variant="outlined"
+            density="comfortable"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="stockAjusteLoading" @click="dialogStockAjuste = false">Cancelar</v-btn>
+          <v-btn color="primary" :loading="stockAjusteLoading" @click="registrarAjusteYAgregarProducto">
+            Ajustar y agregar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top end" timeout="1600">
       <div class="d-flex align-center gap-2">
         <v-icon>{{ snackbar.icon }}</v-icon>
@@ -743,7 +813,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import MoneyField from '../components/MoneyField.vue';
 import { useAuthStore } from '../stores/auth';
 import { getJson, postJson, requestJson } from '../services/apiClient';
@@ -773,6 +843,7 @@ const dialogAbrirCaja = ref(false);
 const dialogNuevaCaja = ref(false);
 const dialogCerrarCaja = ref(false);
 const dialogStock = ref(false);
+const dialogStockAjuste = ref(false);
 const qtyEdits = ref({});
 const productoSearchLoading = ref(false);
 const productosEncontrados = ref([]);
@@ -849,6 +920,17 @@ const mediosCierre = ref(createMediosCierre());
 const motivoDiferencia = ref('');
 const movimientoCaja = ref(createMovimientoCaja());
 const movimientoCajaLoading = ref(false);
+const stockAjusteLoading = ref(false);
+const stockAjuste = reactive({
+  productoId: '',
+  nombre: '',
+  sku: '',
+  disponible: 0,
+  solicitado: 0,
+  faltante: 1,
+  cantidadAjuste: 1,
+  motivo: 'Ajuste por faltante detectado en venta'
+});
 
 const headers = [
   { title: 'Producto', value: 'nombre' },
@@ -940,6 +1022,7 @@ const canSaveCerrarCaja = computed(() => {
   if (!cierreResumen.value) return false;
   return true;
 });
+const canAjustarStock = computed(() => auth.hasPermission('PERM_STOCK_AJUSTAR'));
 const cajaAperturaOptions = computed(() => [
   ...cajasDisponibles.value,
   {
@@ -1246,6 +1329,115 @@ const extractProblemMessage = (data) => {
   return data.detail || data.title || 'Error inesperado.';
 };
 
+const parseNumberFromStockMessage = (label, message) => {
+  const pattern = new RegExp(`${label}\\s*:\\s*([0-9]+(?:[.,][0-9]+)?)`, 'i');
+  const match = String(message || '').match(pattern);
+  if (!match) return null;
+  const parsed = Number(match[1].replace(',', '.'));
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const resolveProductoByCode = async (code) => {
+  const normalized = String(code || '').trim();
+  if (!normalized) return null;
+
+  const params = new URLSearchParams();
+  params.set('activo', 'true');
+  params.set('search', normalized);
+  const { response, data } = await getJson(`/api/v1/productos?${params.toString()}`);
+  if (!response.ok || !Array.isArray(data)) {
+    return null;
+  }
+
+  return data.find((p) => String(p.sku || '').trim() === normalized) || data[0] || null;
+};
+
+const openStockAjusteDialog = ({ producto, message }) => {
+  if (!producto?.id) {
+    flash('error', message || 'Stock insuficiente.');
+    return;
+  }
+
+  const enCarrito = items.value.find((item) => item.productoId === producto.id);
+  const solicitadoFallback = (enCarrito?.cantidad || 0) + 1;
+  const disponible = parseNumberFromStockMessage('Disponible', message) ?? 0;
+  const solicitado = parseNumberFromStockMessage('Solicitado', message) ?? solicitadoFallback;
+  const faltante = Math.max(parseNumberFromStockMessage('Faltante', message) ?? (solicitado - disponible), 1);
+
+  stockAjuste.productoId = producto.id;
+  stockAjuste.nombre = producto.name || producto.nombre || 'Producto';
+  stockAjuste.sku = producto.sku || '';
+  stockAjuste.disponible = disponible;
+  stockAjuste.solicitado = solicitado;
+  stockAjuste.faltante = faltante;
+  stockAjuste.cantidadAjuste = faltante;
+  stockAjuste.motivo = 'Ajuste por faltante detectado en venta';
+  dialogStockAjuste.value = true;
+};
+
+const handleStockInsuficiente = async ({ producto, code, message }) => {
+  if (!canAjustarStock.value) {
+    flash('error', message || 'Stock insuficiente.');
+    return;
+  }
+
+  let productoResolvido = producto || null;
+  if (!productoResolvido && code) {
+    productoResolvido = await resolveProductoByCode(code);
+  }
+
+  if (!productoResolvido?.id) {
+    flash('error', message || 'Stock insuficiente.');
+    return;
+  }
+
+  openStockAjusteDialog({ producto: productoResolvido, message });
+};
+
+const registrarAjusteYAgregarProducto = async () => {
+  if (stockAjusteLoading.value) return;
+
+  const cantidad = Number(stockAjuste.cantidadAjuste || 0);
+  if (!stockAjuste.productoId || Number.isNaN(cantidad) || cantidad <= 0) {
+    flash('error', 'La cantidad a ajustar debe ser mayor a 0.');
+    return;
+  }
+  if (!String(stockAjuste.motivo || '').trim()) {
+    flash('error', 'El motivo del ajuste es obligatorio.');
+    return;
+  }
+
+  stockAjusteLoading.value = true;
+  try {
+    const { response, data } = await postJson('/api/v1/stock/ajustes', {
+      tipo: 'AJUSTE',
+      motivo: stockAjuste.motivo.trim(),
+      items: [
+        {
+          productoId: stockAjuste.productoId,
+          cantidad,
+          esIngreso: true
+        }
+      ]
+    });
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    dialogStockAjuste.value = false;
+    flash('success', 'Ajuste de stock registrado.');
+    await onProductoSeleccionado({
+      id: stockAjuste.productoId,
+      name: stockAjuste.nombre,
+      sku: stockAjuste.sku
+    });
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo registrar el ajuste de stock.');
+  } finally {
+    stockAjusteLoading.value = false;
+  }
+};
+
 const mapCajas = (items) =>
   (items || []).map((item) => {
     const numero = item.numero || shortId(item.id);
@@ -1447,6 +1639,10 @@ const handleScan = async () => {
     const { response, data } = await postJson(`/api/v1/ventas/${id}/items/scan`, { code });
     if (!response.ok) {
       const message = extractProblemMessage(data);
+      if ((message || '').toLowerCase().includes('stock insuficiente')) {
+        await handleStockInsuficiente({ code, message });
+        return;
+      }
       if (response.status === 404) {
         flash('error', 'SKU no encontrado');
       } else {
@@ -1519,6 +1715,10 @@ const onProductoSeleccionado = async (producto) => {
     });
     if (!response.ok) {
       const message = extractProblemMessage(data);
+      if ((message || '').toLowerCase().includes('stock insuficiente')) {
+        await handleStockInsuficiente({ producto, message });
+        return;
+      }
       flash('error', message);
       return;
     }
@@ -2030,7 +2230,7 @@ const guardarCierreCaja = async () => {
 const formatDateTime = (value) => {
   if (!value) return '-';
   try {
-    return new Date(value).toLocaleString('es-AR');
+    return new Date(value).toLocaleString('es-AR', { hour12: false });
   } catch {
     return value;
   }
