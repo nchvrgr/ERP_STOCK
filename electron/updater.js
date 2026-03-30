@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const https = require('node:https');
+const { spawn } = require('node:child_process');
 const { app, dialog, shell } = require('electron/main');
 
 const packageJson = require('../package.json');
@@ -365,9 +366,26 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     throw new Error(`No se encontró el instalador descargado: ${installerPath}`);
   }
 
-  const openResult = await shell.openPath(installerPath);
-  if (openResult) {
-    throw new Error(openResult);
+  let installerStarted = false;
+  if (process.platform === 'win32') {
+    try {
+      const child = spawn(installerPath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false
+      });
+      child.unref();
+      installerStarted = true;
+    } catch (error) {
+      log('installer spawn failed, falling back to shell.openPath', error);
+    }
+  }
+
+  if (!installerStarted) {
+    const openResult = await shell.openPath(installerPath);
+    if (openResult) {
+      throw new Error(openResult);
+    }
   }
 
   log(`installer opened path=${installerPath}`);
