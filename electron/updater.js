@@ -2,8 +2,6 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const https = require('node:https');
-const { spawn } = require('node:child_process');
-
 const { app, dialog, shell } = require('electron/main');
 
 const packageJson = require('../package.json');
@@ -367,27 +365,27 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     throw new Error(`No se encontró el instalador descargado: ${installerPath}`);
   }
 
-  if (process.platform === 'win32') {
-    try {
-      const installerProcess = spawn(installerPath, [], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: false
-      });
-      installerProcess.unref();
-      log(`installer spawned path=${installerPath} pid=${installerProcess.pid ?? 'unknown'}`);
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : String(error));
-    }
-  } else {
-    const openResult = await shell.openPath(installerPath);
-    if (openResult) {
-      throw new Error(openResult);
-    }
+  const openResult = await shell.openPath(installerPath);
+  if (openResult) {
+    throw new Error(openResult);
   }
+
+  log(`installer opened path=${installerPath}`);
+
+  await dialog.showMessageBox(mainWindow || null, {
+    type: 'info',
+    buttons: ['Cerrar aplicacion'],
+    defaultId: 0,
+    noLink: true,
+    title: 'Instalador iniciado',
+    message: 'Se abrio el instalador de actualizacion.',
+    detail: 'Si Windows muestra un aviso de seguridad, aceptalo para continuar con la instalacion.'
+  });
+
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();
   }
+
   app.quit();
 }
 
@@ -416,6 +414,10 @@ async function checkForUpdates(options = {}) {
     });
   } catch (error) {
     log('update check failed', error);
+    dialog.showErrorBox(
+      'Error de actualizacion',
+      `No se pudo iniciar el instalador. ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
