@@ -39,8 +39,8 @@ public sealed class AuditLog : EntityBase
     public Guid SucursalId { get; private set; }
     public Guid? UserId { get; private set; }
     public AuditAction Action { get; private set; }
-    public string EntityName { get; private set; }
-    public string EntityId { get; private set; }
+    public string EntityName { get; private set; } = string.Empty;
+    public string EntityId { get; private set; } = string.Empty;
     public DateTimeOffset OccurredAt { get; private set; }
     public string? BeforeJson { get; private set; }
     public string? AfterJson { get; private set; }

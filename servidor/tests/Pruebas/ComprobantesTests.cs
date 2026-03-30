@@ -85,6 +85,7 @@ public sealed class ComprobantesTests : IClassFixture<WebApiFactory>
             SeedData.SucursalId,
             $"Caja {Guid.NewGuid():N}",
             Random.Shared.Next(1000, 999999).ToString(),
+            0m,
             DateTimeOffset.UtcNow);
         db.Cajas.Add(caja);
         await db.SaveChangesAsync();

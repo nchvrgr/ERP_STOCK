@@ -33,6 +33,7 @@ public static class TestData
         var createResponse = await client.PostAsJsonAsync("/api/v1/caja", new CajaCreateDto(
             numero,
             $"Caja {numero}",
+            0m,
             true));
         createResponse.EnsureSuccessStatusCode();
 

@@ -14,7 +14,7 @@ public sealed class RemitoPdfGeneratorTests
         var data = new StockRemitoPdfDataDto(
             DateTimeOffset.UtcNow,
             "R-TEST",
-            new StockRemitoHeaderDto("Empresa Demo", "Sucursal Central"),
+            new StockRemitoHeaderDto("Empresa Demo", "Sucursal Central", null, null, null),
             new List<StockRemitoPdfProveedorDto>
             {
                 new(
