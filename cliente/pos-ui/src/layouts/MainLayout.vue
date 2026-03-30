@@ -134,7 +134,7 @@ const updateSnackbar = ref({
   text: '',
   color: 'primary'
 });
-const appVersion = ref('1.0.3');
+const appVersion = ref('N/D');
 const { mdAndUp } = useDisplay();
 const theme = useTheme();
 const desktopBridge = window.desktopBridge || null;
