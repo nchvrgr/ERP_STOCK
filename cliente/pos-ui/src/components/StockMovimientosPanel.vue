@@ -80,60 +80,69 @@
     </div>
 
     <div class="movement-list mt-4">
-      <v-card
-        v-for="mov in movimientos"
-        :key="mov.id"
-        class="movement-card"
-        variant="outlined"
-      >
-        <div class="movement-card__header">
-          <div>
-            <div class="d-flex flex-wrap align-center gap-2">
-              <v-chip size="small" color="primary" variant="tonal">{{ mov.tipo }}</v-chip>
-              <v-chip
-                v-if="mov.ventaNumero && mov.ventaFacturada !== null && mov.ventaFacturada !== undefined"
-                size="small"
-                :color="mov.ventaFacturada ? 'success' : 'warning'"
-                variant="tonal"
-              >
-                {{ mov.ventaFacturada ? 'Facturada' : 'No facturada' }}
-              </v-chip>
+      <v-expansion-panels v-if="movimientos.length" variant="accordion" class="movement-panels">
+        <v-expansion-panel
+          v-for="mov in movimientos"
+          :key="mov.id"
+          class="movement-panel"
+        >
+          <v-expansion-panel-title class="movement-panel__title">
+            <div class="movement-summary">
+              <div class="movement-summary__top">
+                <v-chip size="x-small" color="primary" variant="tonal">{{ mov.tipo }}</v-chip>
+                <v-chip
+                  v-if="mov.ventaNumero && mov.ventaFacturada !== null && mov.ventaFacturada !== undefined"
+                  size="x-small"
+                  :color="mov.ventaFacturada ? 'success' : 'warning'"
+                  variant="tonal"
+                >
+                  {{ mov.ventaFacturada ? 'Facturada' : 'No facturada' }}
+                </v-chip>
+              </div>
+              <div class="movement-summary__main">{{ mov.motivo || 'Sin motivo' }}</div>
+              <div class="movement-summary__meta">
+                <span>{{ formatDate(mov.fecha) }}</span>
+                <span>•</span>
+                <span>{{ mov.items?.length || 0 }} item(s)</span>
+                <template v-if="mov.ventaNumero">
+                  <span>•</span>
+                  <span>Venta N° {{ mov.ventaNumero }}</span>
+                </template>
+              </div>
             </div>
-            <div class="movement-card__title mt-2">{{ mov.motivo || 'Sin motivo' }}</div>
-            <div class="text-caption text-medium-emphasis mt-1">
-              {{ formatDate(mov.fecha) }}
-            </div>
-            <div v-if="mov.ventaNumero" class="text-caption text-medium-emphasis">
-              Venta N° {{ mov.ventaNumero }}
-            </div>
-          </div>
-          <v-btn
-            v-if="mov.ventaNumero"
-            size="small"
-            variant="tonal"
-            color="primary"
-            class="text-none"
-            @click="printVentaTicket(mov.ventaNumero)"
-          >
-            Imprimir ticket
-          </v-btn>
-        </div>
+          </v-expansion-panel-title>
 
-        <v-divider class="my-3" />
+          <v-expansion-panel-text>
+            <div class="movement-panel__details">
+              <div class="movement-panel__actions">
+                <v-btn
+                  v-if="mov.ventaNumero"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  class="text-none"
+                  @click="printVentaTicket(mov.ventaNumero)"
+                >
+                  Imprimir ticket
+                </v-btn>
+              </div>
 
-        <div class="movement-items">
-          <div v-for="item in mov.items" :key="item.id" class="movement-item-row">
-            <div>
-              <div class="movement-item-row__name">{{ item.nombre }}</div>
-              <div class="text-caption text-medium-emphasis">SKU {{ item.sku || '-' }}</div>
+              <div class="movement-items">
+                <div v-for="item in mov.items" :key="item.id" class="movement-item-row">
+                  <div>
+                    <div class="movement-item-row__name">{{ item.nombre }}</div>
+                    <div class="text-caption movement-item-row__sku">SKU {{ item.sku || '-' }}</div>
+                  </div>
+                  <div class="movement-item-row__meta">
+                    <span>{{ item.esIngreso ? 'Ingreso' : 'Egreso' }}</span>
+                    <strong>{{ formatQuantity(item.cantidad) }}</strong>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="movement-item-row__meta">
-              <span>{{ item.esIngreso ? 'Ingreso' : 'Egreso' }}</span>
-              <strong>{{ formatQuantity(item.cantidad) }}</strong>
-            </div>
-          </div>
-        </div>
-      </v-card>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
     </div>
 
     <div v-if="!movLoading && !movimientos.length" class="text-caption text-medium-emphasis mt-4">
@@ -392,58 +401,102 @@ onBeforeUnmount(() => {
 }
 
 .movement-list {
+  display: block;
+}
+
+.movement-panels {
+  background: transparent;
+}
+
+.movement-panel {
+  border-radius: 14px !important;
+  border: 1px solid var(--pos-border);
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--pos-card-top) 0%, var(--pos-card-bottom) 100%);
+}
+
+.movement-panel__title {
+  padding: 8px 12px;
+}
+
+.movement-summary {
   display: grid;
-  gap: 14px;
+  gap: 4px;
+  width: 100%;
 }
 
-.movement-card {
-  padding: 16px;
-  border-radius: 18px;
-  border-color: rgba(122, 90, 58, 0.18);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 247, 242, 0.96) 100%);
-}
-
-.movement-card__header {
+.movement-summary__top {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 6px;
 }
 
-.movement-card__title {
-  font-size: 1rem;
+.movement-summary__main {
+  font-size: 0.95rem;
   font-weight: 700;
-  color: #3b0a12;
+  line-height: 1.2;
+  color: var(--pos-accent-dark);
+}
+
+.movement-summary__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--pos-ink-muted);
+}
+
+.movement-panel__details {
+  display: grid;
+  gap: 10px;
+}
+
+.movement-panel__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .movement-items {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .movement-item-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(198, 164, 108, 0.1);
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--pos-accent-strong) 16%, var(--pos-border));
+  background: color-mix(in srgb, var(--pos-accent-strong) 7%, var(--pos-card));
 }
 
 .movement-item-row__name {
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.movement-item-row__sku {
+  color: var(--pos-ink-muted);
 }
 
 .movement-item-row__meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   white-space: nowrap;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 960px) {
-  .movement-card__header,
+  .movement-panel__actions {
+    justify-content: flex-start;
+  }
+
   .movement-item-row {
     flex-direction: column;
     align-items: flex-start;

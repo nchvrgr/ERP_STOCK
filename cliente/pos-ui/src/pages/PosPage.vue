@@ -778,6 +778,7 @@ const productoSearchLoading = ref(false);
 const productosEncontrados = ref([]);
 const productoSeleccionado = ref(null);
 const POS_VENTA_KEY = 'pos-venta-id';
+const POS_VENTA_DRAFT_KEY = 'pos-venta-draft';
 const POS_SESSION_META_KEY = 'pos-session-meta';
 const displayVentaNumero = ref(null);
 const cajaNumero = ref('');
@@ -1004,8 +1005,66 @@ const saveVentaId = (id) => {
   localStorage.setItem(POS_VENTA_KEY, id);
 };
 
+const normalizeDiscountPct = (value) => {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric) || numeric <= 0) return '0';
+  const clamped = Math.min(100, Math.max(0, numeric));
+  return Number.isInteger(clamped) ? String(clamped) : clamped.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+};
+
+const inferDiscountPctFromItems = (saleItems) => {
+  for (const item of saleItems || []) {
+    const precioLista = Number(item.precioLista ?? 0);
+    const precioUnitario = Number(item.precioUnitario ?? 0);
+    if (!precioLista || Number.isNaN(precioLista) || Number.isNaN(precioUnitario)) {
+      continue;
+    }
+
+    const pct = ((precioLista - precioUnitario) / precioLista) * 100;
+    if (pct > 0.01) {
+      return normalizeDiscountPct(pct);
+    }
+  }
+
+  return '0';
+};
+
+const readVentaDraft = (id) => {
+  if (!id) return null;
+  try {
+    const raw = localStorage.getItem(POS_VENTA_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.ventaId !== id) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const persistVentaDraft = () => {
+  if (!ventaId.value) return;
+
+  const itemPriceMap = items.value.reduce((acc, item) => {
+    if (!item?.id) return acc;
+    acc[String(item.id)] = Number(item.precioLista ?? item.precioUnitario ?? 0);
+    return acc;
+  }, {});
+
+  localStorage.setItem(POS_VENTA_DRAFT_KEY, JSON.stringify({
+    ventaId: ventaId.value,
+    discountPct: normalizeDiscountPct(discountPct.value),
+    itemPriceMap
+  }));
+};
+
+const clearVentaDraft = () => {
+  localStorage.removeItem(POS_VENTA_DRAFT_KEY);
+};
+
 const clearVentaId = () => {
   localStorage.removeItem(POS_VENTA_KEY);
+  clearVentaDraft();
 };
 
 const persistSessionMeta = () => {
@@ -1272,6 +1331,7 @@ const applyItemDto = (dto) => {
   }
   qtyEdits.value[item.id] = item.cantidad;
   pricing.value = null;
+  persistVentaDraft();
 };
 
 const resetProductInput = () => {
@@ -1296,7 +1356,7 @@ const createVenta = async () => {
     saveVentaId(venta.value?.id);
     items.value = data.items?.map((item) => ({
       ...item,
-      precioLista: item.precioUnitario,
+      precioLista: item.precioLista ?? item.precioUnitario,
       subtotal: item.subtotal ?? item.cantidad * item.precioUnitario
     })) || [];
     qtyEdits.value = {};
@@ -1308,6 +1368,7 @@ const createVenta = async () => {
     pagos.value = [];
     facturacionSeleccion.value = true;
     imprimirRecibo.value = false;
+    persistVentaDraft();
     flash('success', 'Venta creada');
   } catch (err) {
     flash('error', err?.message || 'No se pudo crear la venta.');
@@ -1332,18 +1393,31 @@ const restoreVenta = async () => {
       return;
     }
     venta.value = data;
-    items.value = data.items?.map((item) => ({
+    const restoredItems = data.items?.map((item) => ({
       ...item,
-      precioLista: item.precioUnitario,
+      precioLista: item.precioLista ?? item.precioUnitario,
       subtotal: item.subtotal ?? item.cantidad * item.precioUnitario
     })) || [];
+    const draft = readVentaDraft(data.id || savedId);
+
+    if (draft?.itemPriceMap && typeof draft.itemPriceMap === 'object') {
+      restoredItems.forEach((item) => {
+        const draftPrecioLista = Number(draft.itemPriceMap[String(item.id)]);
+        if (!Number.isNaN(draftPrecioLista) && draftPrecioLista > 0) {
+          item.precioLista = draftPrecioLista;
+        }
+      });
+    }
+
+    items.value = restoredItems;
     qtyEdits.value = {};
     items.value.forEach((item) => {
       qtyEdits.value[item.id] = item.cantidad;
     });
     pricing.value = null;
-    discountPct.value = '0';
+    discountPct.value = draft?.discountPct ? normalizeDiscountPct(draft.discountPct) : inferDiscountPctFromItems(items.value);
     pagos.value = [];
+    persistVentaDraft();
     refreshDisplayVentaNumero();
   } catch {
     clearVentaId();
@@ -1484,6 +1558,10 @@ const removeItem = async (item) => {
     }
     items.value = items.value.filter((i) => i.id !== item.id);
     delete qtyEdits.value[item.id];
+    if (!items.value.length) {
+      discountPct.value = '0';
+    }
+    persistVentaDraft();
     flash('success', 'Item eliminado');
   } catch (err) {
     flash('error', err?.message || 'No se pudo eliminar el item.');
@@ -1516,6 +1594,8 @@ const clearCarrito = async () => {
     items.value = [];
     qtyEdits.value = {};
     pricing.value = null;
+    discountPct.value = '0';
+    persistVentaDraft();
     flash('success', 'Carrito vaciado');
     focusScan();
   } catch (err) {
