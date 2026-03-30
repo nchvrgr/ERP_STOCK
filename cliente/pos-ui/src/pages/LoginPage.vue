@@ -4,31 +4,52 @@
       <v-col cols="12" sm="8" md="4">
         <v-card class="pos-card pa-6">
           <div class="text-h5">Ingresar</div>
-          <div class="text-caption text-medium-emphasis">Viñedos de la Villa</div>
+          <div class="text-caption text-medium-emphasis">Vinedos de la Villa</div>
+          <div class="text-caption text-medium-emphasis mt-2">
+            El acceso requiere una suscripcion activa validada en Firebase.
+          </div>
 
           <v-alert
-            v-if="error"
-            type="error"
+            v-if="displayMessage"
+            :type="messageType"
             variant="tonal"
             class="mt-4"
             density="compact"
           >
-            {{ error }}
+            {{ displayMessage }}
           </v-alert>
 
           <v-form class="mt-4" @submit.prevent="submit">
             <v-text-field
+              v-model="email"
+              label="Email de suscripcion"
+              type="email"
+              variant="outlined"
+              density="comfortable"
+              autocomplete="email"
+              required
+            />
+            <v-text-field
+              v-model="firebasePassword"
+              label="Contrasena de suscripcion"
+              type="password"
+              variant="outlined"
+              density="comfortable"
+              autocomplete="current-password"
+              required
+            />
+            <v-text-field
               ref="usernameRef"
               v-model="username"
-              label="Usuario"
+              label="Usuario ERP"
               variant="outlined"
               density="comfortable"
               autocomplete="username"
               required
             />
             <v-text-field
-              v-model="password"
-              label="Contrasena"
+              v-model="erpPassword"
+              label="Contrasena ERP"
               type="password"
               variant="outlined"
               density="comfortable"
@@ -75,7 +96,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
@@ -83,13 +104,17 @@ const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
+const email = ref('');
+const firebasePassword = ref('');
 const username = ref('');
-const password = ref('');
+const erpPassword = ref('');
 const tenantId = ref('');
 const sucursalId = ref('');
 const error = ref('');
 const loading = ref(false);
 const usernameRef = ref(null);
+const displayMessage = computed(() => error.value || auth.accessMessage);
+const messageType = computed(() => (error.value ? 'error' : 'warning'));
 
 const focusUsername = () => {
   const input = usernameRef.value?.$el?.querySelector('input');
@@ -103,8 +128,10 @@ const submit = async () => {
 
   try {
     await auth.login({
+      email: email.value,
+      firebasePassword: firebasePassword.value,
       username: username.value,
-      password: password.value,
+      password: erpPassword.value,
       tenantId: tenantId.value.trim() || null,
       sucursalId: sucursalId.value.trim() || null
     });
@@ -121,6 +148,11 @@ const submit = async () => {
 };
 
 onMounted(() => {
+  auth.loadLoginHints();
+  email.value = auth.firebaseEmail || '';
+  username.value = auth.erpUsernameHint || '';
+  firebasePassword.value = '';
+  erpPassword.value = '';
   focusUsername();
 });
 </script>

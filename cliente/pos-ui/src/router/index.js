@@ -92,16 +92,18 @@ const router = createRouter({
   routes
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
+  await auth.initializeFirebaseSession();
+
   if (to.meta.public) {
-    if (auth.isAuthenticated && to.path === '/login') {
+    if (auth.hasAppAccess && to.path === '/login') {
       return '/caja';
     }
     return true;
   }
 
-  if (!auth.isAuthenticated) {
+  if (!auth.hasAppAccess) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
 

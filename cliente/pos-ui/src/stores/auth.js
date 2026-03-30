@@ -1,7 +1,24 @@
 import { defineStore } from 'pinia';
 import { postJson } from '../services/apiClient';
+import {
+  doc,
+  ensureFirebasePersistence,
+  firebaseAuth,
+  firestore,
+  getDoc,
+  onAuthStateChanged,
+  onSnapshot,
+  signInWithEmailAndPassword,
+  signOut
+} from '../services/firebase';
 
 const STORAGE_KEY = 'pos-auth';
+const LOGIN_HINTS_KEY = 'pos-login-hints';
+const ACTIVE_SUBSCRIPTION_STATUS = 'active';
+
+let firebaseBootstrapPromise = null;
+let stopFirebaseAuthListener = null;
+let stopSubscriptionListener = null;
 
 const normalizeArray = (value) => {
   if (!value) return [];
@@ -41,6 +58,46 @@ const readExpiry = (token, fallback) => {
   return '';
 };
 
+const normalizeSubscriptionStatus = (value) => {
+  return typeof value === 'string' && value.trim().toLowerCase() === ACTIVE_SUBSCRIPTION_STATUS
+    ? ACTIVE_SUBSCRIPTION_STATUS
+    : 'inactive';
+};
+
+const buildInactiveSubscriptionMessage = () => {
+  return 'Tu suscripcion esta inactiva. Debes realizar el pago para ingresar.';
+};
+
+const buildMissingSubscriptionMessage = () => {
+  return 'Tu usuario no tiene una suscripcion configurada. Contacta al administrador.';
+};
+
+const buildSubscriptionConnectivityMessage = () => {
+  return 'No se pudo verificar tu suscripcion. Revisa la conexion e intenta de nuevo.';
+};
+
+const toFirebaseErrorMessage = (error) => {
+  const code = error?.code || '';
+
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+    return 'Email o contrasena de suscripcion invalidos.';
+  }
+
+  if (code === 'auth/user-not-found') {
+    return 'No existe un usuario de suscripcion con ese email.';
+  }
+
+  if (code === 'auth/invalid-email') {
+    return 'El email de suscripcion no es valido.';
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return 'Demasiados intentos fallidos. Espera un momento e intenta de nuevo.';
+  }
+
+  return 'No se pudo validar la suscripcion en Firebase.';
+};
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: '',
@@ -48,6 +105,12 @@ export const useAuthStore = defineStore('auth', {
     tenantId: '',
     sucursalId: '',
     userId: '',
+    firebaseUid: '',
+    firebaseEmail: '',
+    erpUsernameHint: '',
+    subscriptionStatus: '',
+    subscriptionChecked: false,
+    accessMessage: '',
     roles: [],
     permissions: []
   }),
@@ -56,6 +119,10 @@ export const useAuthStore = defineStore('auth', {
       if (!state.token) return false;
       if (!state.expiresAt) return true;
       return new Date(state.expiresAt).getTime() > Date.now();
+    },
+    hasActiveSubscription: (state) => state.subscriptionStatus === ACTIVE_SUBSCRIPTION_STATUS,
+    hasAppAccess() {
+      return this.isAuthenticated && this.hasActiveSubscription;
     }
   },
   actions: {
@@ -76,10 +143,16 @@ export const useAuthStore = defineStore('auth', {
         this.tenantId = data.tenantId || '';
         this.sucursalId = data.sucursalId || '';
         this.userId = data.userId || '';
+        this.firebaseUid = data.firebaseUid || '';
+        this.firebaseEmail = data.firebaseEmail || '';
+        this.erpUsernameHint = data.erpUsernameHint || '';
+        this.subscriptionStatus = data.subscriptionStatus || '';
+        this.subscriptionChecked = Boolean(data.subscriptionChecked);
+        this.accessMessage = data.accessMessage || '';
         this.roles = Array.isArray(data.roles) ? data.roles : [];
         this.permissions = Array.isArray(data.permissions) ? data.permissions : [];
         if (this.expiresAt && new Date(this.expiresAt).getTime() <= Date.now()) {
-          this.clearSession();
+          this.clearBackendSession();
         }
       } catch {
         this.clearSession();
@@ -92,12 +165,18 @@ export const useAuthStore = defineStore('auth', {
         tenantId: this.tenantId,
         sucursalId: this.sucursalId,
         userId: this.userId,
+        firebaseUid: this.firebaseUid,
+        firebaseEmail: this.firebaseEmail,
+        erpUsernameHint: this.erpUsernameHint,
+        subscriptionStatus: this.subscriptionStatus,
+        subscriptionChecked: this.subscriptionChecked,
+        accessMessage: this.accessMessage,
         roles: this.roles,
         permissions: this.permissions
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     },
-    clearSession() {
+    clearBackendSession() {
       this.token = '';
       this.expiresAt = '';
       this.tenantId = '';
@@ -105,7 +184,200 @@ export const useAuthStore = defineStore('auth', {
       this.userId = '';
       this.roles = [];
       this.permissions = [];
+      this.saveToStorage();
+    },
+    clearSubscriptionState() {
+      this.firebaseUid = '';
+      this.firebaseEmail = '';
+      this.erpUsernameHint = '';
+      this.subscriptionStatus = '';
+      this.subscriptionChecked = false;
+      this.accessMessage = '';
+      if (stopSubscriptionListener) {
+        stopSubscriptionListener();
+        stopSubscriptionListener = null;
+      }
+      this.saveToStorage();
+    },
+    clearSession() {
+      this.token = '';
+      this.expiresAt = '';
+      this.tenantId = '';
+      this.sucursalId = '';
+      this.userId = '';
+      this.firebaseUid = '';
+      this.firebaseEmail = '';
+      this.erpUsernameHint = '';
+      this.subscriptionStatus = '';
+      this.subscriptionChecked = false;
+      this.accessMessage = '';
+      this.roles = [];
+      this.permissions = [];
+      if (stopSubscriptionListener) {
+        stopSubscriptionListener();
+        stopSubscriptionListener = null;
+      }
       localStorage.removeItem(STORAGE_KEY);
+    },
+    setAccessMessage(message) {
+      this.accessMessage = message || '';
+      this.saveToStorage();
+    },
+    loadLoginHints() {
+      const raw = localStorage.getItem(LOGIN_HINTS_KEY);
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        this.firebaseEmail = data.firebaseEmail || this.firebaseEmail;
+        this.erpUsernameHint = data.erpUsernameHint || this.erpUsernameHint;
+      } catch {
+        localStorage.removeItem(LOGIN_HINTS_KEY);
+      }
+    },
+    saveLoginHints({ firebaseEmail, erpUsernameHint }) {
+      if (firebaseEmail) {
+        this.firebaseEmail = firebaseEmail.trim();
+      }
+
+      if (typeof erpUsernameHint === 'string' && erpUsernameHint.trim()) {
+        this.erpUsernameHint = erpUsernameHint.trim();
+      }
+
+      localStorage.setItem(
+        LOGIN_HINTS_KEY,
+        JSON.stringify({
+          firebaseEmail: this.firebaseEmail,
+          erpUsernameHint: this.erpUsernameHint
+        })
+      );
+      this.saveToStorage();
+    },
+    applySubscriptionStatus(status, message = '') {
+      this.subscriptionStatus = normalizeSubscriptionStatus(status);
+      this.subscriptionChecked = true;
+      this.accessMessage = this.subscriptionStatus === ACTIVE_SUBSCRIPTION_STATUS ? '' : message;
+
+      if (this.subscriptionStatus !== ACTIVE_SUBSCRIPTION_STATUS) {
+        this.clearBackendSession();
+      } else {
+        this.saveToStorage();
+      }
+    },
+    async refreshSubscriptionStatus(uid) {
+      const subscriptionRef = doc(firestore, 'users', uid);
+      const snapshot = await getDoc(subscriptionRef);
+
+      if (!snapshot.exists()) {
+        this.applySubscriptionStatus('inactive', buildMissingSubscriptionMessage());
+        return this.subscriptionStatus;
+      }
+
+      const data = snapshot.data() || {};
+      const status = normalizeSubscriptionStatus(data.subscriptionStatus);
+      const erpUsernameHint = typeof data.erpUsername === 'string' ? data.erpUsername.trim() : '';
+      const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
+
+      this.saveLoginHints({
+        firebaseEmail: this.firebaseEmail,
+        erpUsernameHint
+      });
+
+      this.applySubscriptionStatus(status, message);
+      return status;
+    },
+    startSubscriptionListener(uid) {
+      if (stopSubscriptionListener) {
+        stopSubscriptionListener();
+      }
+
+      stopSubscriptionListener = onSnapshot(
+        doc(firestore, 'users', uid),
+        (snapshot) => {
+          if (!snapshot.exists()) {
+            this.applySubscriptionStatus('inactive', buildMissingSubscriptionMessage());
+            return;
+          }
+
+          const data = snapshot.data() || {};
+          const status = normalizeSubscriptionStatus(data.subscriptionStatus);
+          const erpUsernameHint = typeof data.erpUsername === 'string' ? data.erpUsername.trim() : '';
+          const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
+
+          this.saveLoginHints({
+            firebaseEmail: this.firebaseEmail,
+            erpUsernameHint
+          });
+
+          this.applySubscriptionStatus(status, message);
+        },
+        () => {
+          this.applySubscriptionStatus('inactive', buildSubscriptionConnectivityMessage());
+        }
+      );
+    },
+    async signInWithFirebase(email, password) {
+      try {
+        await ensureFirebasePersistence();
+        const credential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+
+        this.firebaseUid = credential.user.uid;
+        this.firebaseEmail = credential.user.email || email.trim();
+        this.saveLoginHints({
+          firebaseEmail: this.firebaseEmail,
+          erpUsernameHint: this.erpUsernameHint
+        });
+
+        const status = await this.refreshSubscriptionStatus(credential.user.uid);
+        this.startSubscriptionListener(credential.user.uid);
+        this.saveToStorage();
+
+        if (status !== ACTIVE_SUBSCRIPTION_STATUS) {
+          throw new Error(this.accessMessage || buildInactiveSubscriptionMessage());
+        }
+      } catch (error) {
+        if (!this.accessMessage) {
+          this.setAccessMessage(toFirebaseErrorMessage(error));
+        }
+        throw new Error(this.accessMessage);
+      }
+    },
+    async initializeFirebaseSession() {
+      if (!firebaseBootstrapPromise) {
+        firebaseBootstrapPromise = (async () => {
+          await ensureFirebasePersistence();
+
+          if (!stopFirebaseAuthListener) {
+            stopFirebaseAuthListener = onAuthStateChanged(firebaseAuth, async (user) => {
+              if (!user) {
+                this.clearSubscriptionState();
+                this.clearBackendSession();
+                return;
+              }
+
+              this.firebaseUid = user.uid;
+              this.firebaseEmail = user.email || '';
+
+              try {
+                await this.refreshSubscriptionStatus(user.uid);
+                this.startSubscriptionListener(user.uid);
+              } catch {
+                this.applySubscriptionStatus('inactive', buildSubscriptionConnectivityMessage());
+              }
+
+              this.saveToStorage();
+            });
+          }
+
+          await new Promise((resolve) => {
+            const unsubscribe = onAuthStateChanged(firebaseAuth, () => {
+              unsubscribe();
+              resolve();
+            });
+          });
+        })();
+      }
+
+      return firebaseBootstrapPromise;
     },
     setSession(token, expiresAt) {
       this.token = token;
@@ -120,7 +392,14 @@ export const useAuthStore = defineStore('auth', {
 
       this.saveToStorage();
     },
-    async login({ username, password, tenantId, sucursalId }) {
+    async login({ email, firebasePassword, username, password, tenantId, sucursalId }) {
+      this.setAccessMessage('');
+      this.saveLoginHints({
+        firebaseEmail: email || '',
+        erpUsernameHint: username || ''
+      });
+      await this.signInWithFirebase(email || '', firebasePassword || '');
+
       const request = {
         username: (username || '').trim(),
         password: password || '',
@@ -132,19 +411,33 @@ export const useAuthStore = defineStore('auth', {
 
       if (!response.ok) {
         if (response.status === 401) {
+          await this.logout();
           throw new Error('Credenciales invalidas.');
         }
+        await this.logout();
         const message = data?.detail || data?.title || 'Error de login.';
         throw new Error(message);
       }
 
       if (!data || !data.token) {
+        await this.logout();
         throw new Error('Respuesta de login invalida.');
       }
 
       this.setSession(data.token, data.expiresAt || '');
     },
-    logout() {
+    async logout() {
+      if (stopSubscriptionListener) {
+        stopSubscriptionListener();
+        stopSubscriptionListener = null;
+      }
+
+      try {
+        await signOut(firebaseAuth);
+      } catch {
+        // No bloquea el logout local.
+      }
+
       this.clearSession();
     }
   }

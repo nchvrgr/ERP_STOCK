@@ -5,7 +5,7 @@ import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
-import { h } from 'vue';
+import { h, watch } from 'vue';
 import {
   mdiAccount,
   mdiAlertCircle,
@@ -149,6 +149,15 @@ setUnauthorizedHandler(() => {
   }
 });
 
+watch(
+  () => auth.hasAppAccess,
+  (hasAccess) => {
+    if (!hasAccess && router.currentRoute.value.path !== '/login') {
+      router.replace('/login');
+    }
+  }
+);
+
 const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
 
 if (import.meta.env.PROD && !isElectron) {
@@ -161,4 +170,6 @@ if (import.meta.env.PROD && !isElectron) {
   });
 }
 
-app.mount('#app');
+auth.initializeFirebaseSession().finally(() => {
+  app.mount('#app');
+});
