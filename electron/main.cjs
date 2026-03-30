@@ -24,6 +24,7 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron/main');
 let mainWindow = null;
 let backendProcess = null;
 let isQuitting = false;
+let isInstallingUpdate = false;
 let backendLogStream = null;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -52,6 +53,15 @@ function logElectron(message, error) {
     ? ` ${error instanceof Error ? error.stack || error.message : String(error)}`
     : '';
   fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${message}${suffix}\n`);
+}
+
+function prepareForInstallUpdate() {
+  isInstallingUpdate = true;
+  isQuitting = true;
+  logElectron('prepareForInstallUpdate');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  }
 }
 
 function getBackendExecutable() {
@@ -137,7 +147,7 @@ function startBackend() {
     backendLogStream?.end();
     backendLogStream = null;
     backendProcess = null;
-    if (!isQuitting) {
+    if (!isQuitting && !isInstallingUpdate) {
       dialog.showErrorBox(
         APP_NAME,
         `El servicio interno se cerro inesperadamente. Codigo de salida: ${code ?? 'desconocido'}.`
@@ -316,7 +326,8 @@ app.whenReady().then(async () => {
     setImmediate(() => {
       checkForUpdates({
         mainWindow,
-        log: logElectron
+        log: logElectron,
+        onInstallStarted: prepareForInstallUpdate
       });
     });
   } catch (error) {
@@ -338,7 +349,8 @@ ipcMain.handle('ticket-preview:open', async (_, payload) => {
 ipcMain.handle('app:update:check', async () => {
   return checkForUpdatesOnDemand({
     mainWindow,
-    log: logElectron
+    log: logElectron,
+    onInstallStarted: prepareForInstallUpdate
   });
 });
 

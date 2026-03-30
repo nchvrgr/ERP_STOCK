@@ -314,7 +314,7 @@ async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
   return result.response === 0;
 }
 
-async function runInstaller(asset, mainWindow, log) {
+async function runInstaller(asset, mainWindow, log, options = {}) {
   let installerPath = String(asset.local_path || '').trim();
 
   if (!installerPath) {
@@ -333,17 +333,9 @@ async function runInstaller(asset, mainWindow, log) {
   if (openResult) {
     throw new Error(openResult);
   }
-
-  await dialog.showMessageBox(mainWindow || null, {
-    type: 'info',
-    buttons: ['Cerrar aplicacion'],
-    defaultId: 0,
-    noLink: true,
-    title: 'Instalador iniciado',
-    message: 'El instalador se abrio correctamente.',
-    detail: 'La aplicacion se cerrara para completar la actualizacion.'
-  });
-
+  if (typeof options.onInstallStarted === 'function') {
+    await options.onInstallStarted();
+  }
   app.quit();
 }
 
@@ -367,7 +359,9 @@ async function checkForUpdates(options = {}) {
       return;
     }
 
-    await runInstaller(updateState.installerAsset, mainWindow, log);
+    await runInstaller(updateState.installerAsset, mainWindow, log, {
+      onInstallStarted: options.onInstallStarted
+    });
   } catch (error) {
     log('update check failed', error);
   }
@@ -398,7 +392,9 @@ async function checkForUpdatesOnDemand(options = {}) {
       };
     }
 
-    await runInstaller(updateState.installerAsset, mainWindow, log);
+    await runInstaller(updateState.installerAsset, mainWindow, log, {
+      onInstallStarted: options.onInstallStarted
+    });
     return {
       status: 'installing',
       currentVersion: updateState.currentVersion,
