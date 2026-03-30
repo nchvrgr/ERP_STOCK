@@ -276,7 +276,18 @@ watch(
 
 onMounted(() => {
   if (typeof desktopBridge?.getAppVersion === 'function') {
-    appVersion.value = desktopBridge.getAppVersion() || appVersion.value;
+    const versionResult = desktopBridge.getAppVersion();
+    if (versionResult && typeof versionResult.then === 'function') {
+      versionResult
+        .then((version) => {
+          appVersion.value = version || appVersion.value;
+        })
+        .catch(() => {
+          // Keep fallback value when desktop bridge version lookup fails.
+        });
+    } else {
+      appVersion.value = versionResult || appVersion.value;
+    }
   }
   window.addEventListener('focus', refreshStockAlerts);
   refreshStockAlerts();

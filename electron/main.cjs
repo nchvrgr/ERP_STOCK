@@ -354,6 +354,10 @@ ipcMain.handle('app:update:check', async () => {
   });
 });
 
+ipcMain.handle('app:get-version', async () => {
+  return app.getVersion();
+});
+
 app.on('before-quit', () => {
   logElectron('before-quit');
   isQuitting = true;
