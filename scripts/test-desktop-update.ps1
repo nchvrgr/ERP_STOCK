@@ -30,6 +30,7 @@ if (-not $InstallerPath) {
 
 $resolvedInstallerPath = (Resolve-Path $InstallerPath).Path
 $processName = [System.IO.Path]::GetFileNameWithoutExtension($appExe)
+$installerProcessName = [System.IO.Path]::GetFileNameWithoutExtension($resolvedInstallerPath)
 
 Get-Process -Name $processName -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-Process -Name 'ApiWeb' -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -52,6 +53,12 @@ $visibleWindow = $null
 
 while ((Get-Date) -lt $deadline) {
   $process = Get-Process -Name $processName -ErrorAction SilentlyContinue | Select-Object -First 1
+  $installerProcess = Get-Process -Name $installerProcessName -ErrorAction SilentlyContinue | Select-Object -First 1
+
+  if ($installerProcess) {
+    $visibleWindow = $installerProcess
+    break
+  }
 
   if (-not $process) {
     Start-Sleep -Milliseconds 500
@@ -68,6 +75,19 @@ while ((Get-Date) -lt $deadline) {
 
 if (-not $visibleWindow) {
   $latestProcess = Get-Process -Name $processName -ErrorAction SilentlyContinue | Select-Object -First 1
+  $latestInstallerProcess = Get-Process -Name $installerProcessName -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($latestInstallerProcess) {
+    $visibleWindow = $latestInstallerProcess
+  }
+
+  if ($visibleWindow) {
+    Write-Host "El instalador ya quedo iniciado por el flujo de update."
+    Write-Host "Mode: $Mode"
+    Write-Host "App: $appExe"
+    Write-Host "Installer: $resolvedInstallerPath"
+    return
+  }
+
   if ($latestProcess) {
     throw "La app quedo iniciada pero no expuso una ventana principal visible."
   }
