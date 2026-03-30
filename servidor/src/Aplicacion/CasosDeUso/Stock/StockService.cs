@@ -208,7 +208,7 @@ public sealed class StockService
         return await _repositorioStock.GetSugeridoCompraAsync(tenantId, sucursalId, cancellationToken);
     }
 
-    public async Task<byte[]> GenerarRemitoAlertasAsync(
+    public async Task<StockRemitoPdfResultDto> GenerarRemitoAlertasAsync(
         StockRemitoRequestDto request,
         CancellationToken cancellationToken)
     {
@@ -304,9 +304,12 @@ public sealed class StockService
         }).OrderBy(p => p.Nombre).ToList();
 
         var header = await _repositorioStock.GetRemitoHeaderAsync(tenantId, sucursalId, cancellationToken);
-        var remitoNumero = $"R-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
-        var data = new StockRemitoPdfDataDto(DateTimeOffset.UtcNow, remitoNumero, header, proveedores);
-        return _generadorPdfRemito.Generate(data);
+        var now = DateTimeOffset.UtcNow;
+        var remitoId = (await _repositorioStock.GetNextRemitoSequenceAsync(tenantId, cancellationToken)).ToString();
+        var remitoNumero = $"R-{now:dd-MM-yyyy}-{remitoId}";
+        var data = new StockRemitoPdfDataDto(now, remitoNumero, header, proveedores, remitoId);
+        var pdf = _generadorPdfRemito.Generate(data);
+        return new StockRemitoPdfResultDto(pdf, remitoId, remitoNumero);
     }
 
     public async Task<StockMovimientoDto> RegistrarMovimientoAsync(

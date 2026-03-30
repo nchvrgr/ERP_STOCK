@@ -50,6 +50,10 @@ public interface IStockRepository
         Guid tenantId,
         Guid sucursalId,
         CancellationToken cancellationToken = default);
+
+    Task<int> GetNextRemitoSequenceAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
 }
 
 

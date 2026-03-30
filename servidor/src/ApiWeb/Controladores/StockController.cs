@@ -87,10 +87,10 @@ public sealed class StockController : ControllerBase
         [FromBody] StockRemitoRequestDto solicitud,
         CancellationToken cancellationToken)
     {
-        var pdf = await _servicioStock.GenerarRemitoAlertasAsync(solicitud, cancellationToken);
+        var result = await _servicioStock.GenerarRemitoAlertasAsync(solicitud, cancellationToken);
         Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
         Response.Headers["Pragma"] = "no-cache";
-        return File(pdf, "application/pdf", "remito-alertas.pdf");
+        return File(result.Pdf, "application/pdf", $"Remito_{result.RemitoId}.pdf");
     }
 }
 

@@ -404,6 +404,34 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="cantidadModalDialog" persistent width="400">
+      <v-card>
+        <v-card-title>Agregar producto</v-card-title>
+        <v-card-text>
+          <div v-if="cantidadModalProducto" class="py-3">
+            <div class="text-h6">{{ cantidadModalProducto.name }}</div>
+            <div class="text-caption text-medium-emphasis">SKU: {{ cantidadModalProducto.sku }}</div>
+            <v-divider class="my-3" />
+            <v-text-field
+              v-model.number="cantidadModalQuantity"
+              label="Cantidad a ingresar"
+              type="number"
+              min="1"
+              step="1"
+              variant="outlined"
+              density="comfortable"
+              autofocus
+              @keyup.enter="confirmarAgregarProducto"
+            />
+          </div>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="cantidadModalDialog = false">Cancelar</v-btn>
+          <v-btn color="primary" @click="confirmarAgregarProducto">Agregar producto</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -430,6 +458,9 @@ const productSearch = ref('');
 const productoInputKey = ref(0);
 const suppressNextSearchClear = ref(false);
 const ignoreAutocompleteSearchEvents = ref(false);
+const cantidadModalDialog = ref(false);
+const cantidadModalProducto = ref(null);
+const cantidadModalQuantity = ref(1);
 const items = ref([]);
 const remitoDraftStorageKey = 'vinedos-remito-ingreso-draft';
 const createDialog = ref(false);
@@ -710,7 +741,21 @@ const onProductoSeleccionado = async (productId) => {
     return;
   }
 
-  await addProducto(producto);
+  cantidadModalProducto.value = producto;
+  cantidadModalQuantity.value = 1;
+  cantidadModalDialog.value = true;
+};
+
+const confirmarAgregarProducto = async () => {
+  if (!cantidadModalProducto.value) return;
+  const cantidad = Number(cantidadModalQuantity.value);
+  if (Number.isNaN(cantidad) || cantidad <= 0) {
+    flash('error', 'La cantidad debe ser mayor a 0.');
+    return;
+  }
+  cantidadModalDialog.value = false;
+  await addProducto(cantidadModalProducto.value, cantidad);
+  cantidadModalProducto.value = null;
 };
 
 const removeItem = (productId) => {

@@ -84,41 +84,43 @@
               height="420"
             >
               <template v-slot:[`item.cantidad`]="{ item }">
-                <v-text-field
-                  v-model.number="qtyEdits[getRow(item).id]"
-                  type="number"
-                  min="1"
-                  step="1"
-                  density="compact"
-                  hide-details
-                  variant="outlined"
-                  class="pos-qty-field"
-                  style="max-width: 90px"
-                  :disabled="!canEdit"
-                  @blur="commitQty(getRow(item))"
-                  @keyup.enter="commitQty(getRow(item))"
-                />
+                <div class="pos-input-cell">
+                  <v-text-field
+                    v-model.number="qtyEdits[getRow(item).id]"
+                    type="number"
+                    min="1"
+                    step="1"
+                    density="compact"
+                    hide-details
+                    variant="outlined"
+                    class="pos-qty-field"
+                    style="max-width: 90px"
+                    :disabled="!canEdit"
+                    @blur="commitQty(getRow(item))"
+                    @keyup.enter="commitQty(getRow(item))"
+                  />
+                </div>
               </template>
               <template v-slot:[`item.precioUnitario`]="{ item }">
                 {{ formatMoney(getRow(item).precioUnitario) }}
               </template>
               <template v-slot:[`item.descuentoPct`]="{ item }">
-                <v-text-field
-                  v-model.number="descuentoPctEdits[getRow(item).id]"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  suffix="%"
-                  density="compact"
-                  hide-details
-                  variant="outlined"
-                  class="pos-discount-field"
-                  style="max-width: 70px"
-                  :disabled="!canEdit"
-                  @blur="commitDiscount(getRow(item))"
-                  @keyup.enter="commitDiscount(getRow(item))"
-                />
+                <div class="pos-input-cell">
+                  <v-text-field
+                    v-model="descuentoPctEdits[getRow(item).id]"
+                    type="text"
+                    inputmode="numeric"
+                    density="compact"
+                    hide-details
+                    variant="outlined"
+                    class="pos-discount-field"
+                    style="max-width: 60px"
+                    :disabled="!canEdit"
+                    @focus="clearDiscountZero(getRow(item))"
+                    @blur="commitDiscount(getRow(item))"
+                    @keyup.enter="commitDiscount(getRow(item))"
+                  />
+                </div>
               </template>
               <template v-slot:[`item.subtotal`]="{ item }">
                 <strong>{{ formatMoney(getRow(item).subtotal) }}</strong>
@@ -419,7 +421,7 @@
             />
             <v-select
               v-model="movimientoCaja.medioPago"
-              :items="mediosPago"
+              :items="mediosPagoValues"
               label="Medio"
               variant="outlined"
               density="comfortable"
@@ -890,14 +892,48 @@ const pagos = ref([]);
 const facturacionSeleccion = ref(true);
 const imprimirRecibo = ref(false);
 const MAX_MEDIOS_PAGO = 2;
-const mediosPago = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'APLICATIVO', 'OTRO'];
-const mediosPagoOptions = [
-  { title: 'Efectivo', value: 'EFECTIVO' },
-  { title: 'Tarjeta', value: 'TARJETA' },
-  { title: 'Transferencia', value: 'TRANSFERENCIA' },
-  { title: 'Aplicación', value: 'APLICATIVO' },
-  { title: 'Otro', value: 'OTRO' }
-];
+const empresaMediosPago = ref(['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'APLICATIVO', 'OTRO']);
+const empresaMedioPagoHabitual = ref('EFECTIVO');
+const knownMediosPagoLabels = {
+  EFECTIVO: 'Efectivo',
+  TARJETA: 'Tarjeta',
+  TRANSFERENCIA: 'Transferencia',
+  APLICATIVO: 'Aplicativo',
+  OTRO: 'Otro'
+};
+
+const normalizeMedioPago = (value) => (value || '')
+  .trim()
+  .toUpperCase()
+  .replace(/\s+/g, '_');
+
+const normalizeMediosPago = (values) => {
+  const normalized = (values || [])
+    .map((value) => normalizeMedioPago(value))
+    .filter(Boolean)
+    .filter((value, index, arr) => arr.indexOf(value) === index)
+    .slice(0, 20);
+
+  if (!normalized.includes('EFECTIVO')) {
+    normalized.unshift('EFECTIVO');
+  }
+
+  return normalized;
+};
+
+const medioPagoHabitualValue = computed(() => {
+  const habitual = normalizeMedioPago(empresaMedioPagoHabitual.value || 'EFECTIVO');
+  return empresaMediosPago.value.includes(habitual) ? habitual : 'EFECTIVO';
+});
+
+const mediosPagoOptions = computed(() =>
+  empresaMediosPago.value.map((value) => ({
+    title: knownMediosPagoLabels[value] || value,
+    value
+  }))
+);
+
+const mediosPagoValues = computed(() => mediosPagoOptions.value.map((option) => option.value));
 const tiposMovimientoCaja = ['Retiro', 'Gasto', 'Ajuste'];
 const turnos = [
   { title: 'MAÑANA', value: 'MANANA' },
@@ -906,7 +942,7 @@ const turnos = [
 ];
 const createMovimientoCaja = () => ({
   tipo: 'Retiro',
-  medioPago: 'EFECTIVO',
+  medioPago: medioPagoHabitualValue.value,
   motivo: '',
   monto: 0
 });
@@ -925,12 +961,11 @@ const crearCajaErrors = ref({
   nombre: '',
   defaultMontoInicial: ''
 });
-const createMediosCierre = () => ([
-  { medio: 'TARJETA', contado: 0 },
-  { medio: 'TRANSFERENCIA', contado: 0 },
-  { medio: 'APLICATIVO', contado: 0 },
-  { medio: 'OTRO', contado: 0 }
-]);
+const createMediosCierre = () => (
+  empresaMediosPago.value
+    .filter((medio) => medio !== 'EFECTIVO')
+    .map((medio) => ({ medio, contado: 0 }))
+);
 const cierreResumen = ref(null);
 const cierreResumenLoading = ref(false);
 const closeCajaLoading = ref(false);
@@ -1349,6 +1384,29 @@ const extractProblemMessage = (data) => {
     }
   }
   return data.detail || data.title || 'Error inesperado.';
+};
+
+const loadEmpresaPagoConfig = async () => {
+  try {
+    const { response, data } = await getJson('/api/v1/empresa/datos');
+    if (!response.ok) {
+      return;
+    }
+
+    empresaMediosPago.value = normalizeMediosPago(data?.mediosPago || []);
+    empresaMedioPagoHabitual.value = normalizeMedioPago(data?.medioPagoHabitual || 'EFECTIVO');
+
+    if (!empresaMediosPago.value.includes(empresaMedioPagoHabitual.value)) {
+      empresaMedioPagoHabitual.value = 'EFECTIVO';
+    }
+
+    mediosCierre.value = createMediosCierre();
+    if (!movimientoCaja.value.medioPago || !empresaMediosPago.value.includes(movimientoCaja.value.medioPago)) {
+      movimientoCaja.value.medioPago = medioPagoHabitualValue.value;
+    }
+  } catch {
+    // No bloquea la operacion de caja si la configuracion de empresa no esta disponible.
+  }
 };
 
 const parseNumberFromStockMessage = (label, message) => {
@@ -1893,6 +1951,15 @@ const commitDiscount = (item) => {
   flash('success', 'Descuento aplicado');
 };
 
+const clearDiscountZero = (item) => {
+  const itemId = item?.id;
+  if (!itemId) return;
+  const value = String(descuentoPctEdits.value[itemId] ?? '').trim();
+  if (value === '0' || value === '0.0' || value === '0.00') {
+    descuentoPctEdits.value[itemId] = '';
+  }
+};
+
 const roundMoneyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
 
 const clearZeroDiscount = () => {
@@ -1939,7 +2006,7 @@ const applyDiscount = async () => {
   }
 };
 
-const createPagoLine = (medioPago = 'EFECTIVO') => ({
+const createPagoLine = (medioPago = medioPagoHabitualValue.value) => ({
   id: `${Date.now()}-${Math.random()}`,
   medioPago,
   monto: 0,
@@ -1948,8 +2015,8 @@ const createPagoLine = (medioPago = 'EFECTIVO') => ({
 });
 
 const nextAvailableMedioPago = () => (
-  mediosPagoOptions.find((option) => !pagos.value.some((line) => line.medioPago === option.value))?.value
-  || mediosPagoOptions[0].value
+  mediosPagoOptions.value.find((option) => !pagos.value.some((line) => line.medioPago === option.value))?.value
+  || medioPagoHabitualValue.value
 );
 
 const availableMediosPagoOptions = (index) => {
@@ -1960,15 +2027,15 @@ const availableMediosPagoOptions = (index) => {
       .map((line) => line.medioPago)
   );
 
-  return mediosPagoOptions.filter((option) => option.value === actual || !usados.has(option.value));
+  return mediosPagoOptions.value.filter((option) => option.value === actual || !usados.has(option.value));
 };
 
 const ensurePagoBase = () => {
   if (!pagos.value.length) {
-    const created = createPagoLine('EFECTIVO');
+    const created = createPagoLine(medioPagoHabitualValue.value);
     created.base = true;
     created.monto = totalNeto.value;
-    created.recibido = totalNeto.value;
+    created.recibido = created.medioPago === 'EFECTIVO' ? totalNeto.value : 0;
     pagos.value = [created];
     return created;
   }
@@ -2367,7 +2434,7 @@ const printTicket = (ventaData, pagosData) => {
           <button type="button" onclick="window.close()">Cerrar</button>
         </div>
         <h1>Ticket de venta</h1>
-        <div>Venta Nï¿½: ${ventaData.numero ?? ventaData.Numero ?? '-'}</div>
+        <div>Venta Nro: ${ventaData.numero ?? ventaData.Numero ?? '-'}</div>
         <div>Fecha: ${formatDateTime(ventaData.createdAt)}</div>
         <div>Facturacion: ${esFacturada ? 'FACTURADA' : 'NO FACTURADA'}</div>
         <table>
@@ -2495,7 +2562,8 @@ const handleCajaSessionChanged = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await loadEmpresaPagoConfig();
   loadCajaSession();
   restoreVenta();
   focusScan();
@@ -2883,8 +2951,24 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.pos-input-cell {
+  display: flex;
+  justify-content: center;
+}
+
 .pos-discount-field :deep(input) {
   text-align: center;
+}
+
+/* Hide number input spinners */
+.pos-discount-field :deep(input::-webkit-outer-spin-button),
+.pos-discount-field :deep(input::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pos-discount-field :deep(input[type="number"]) {
+  -moz-appearance: textfield;
 }
 
 .delete-btn-compact {

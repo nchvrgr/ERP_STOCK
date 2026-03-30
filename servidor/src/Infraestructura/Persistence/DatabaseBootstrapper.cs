@@ -20,6 +20,7 @@ public static class DatabaseBootstrapper
         }
 
         await EnsureCajaSchemaAsync(dbContext, cancellationToken);
+        await EnsureEmpresaDatosSchemaAsync(dbContext, cancellationToken);
 
         await SeedCoreDataAsync(dbContext, cancellationToken);
     }
@@ -42,6 +43,57 @@ public static class DatabaseBootstrapper
         await dbContext.Database.ExecuteSqlRawAsync(
             "ALTER TABLE cajas ADD COLUMN \"DefaultMontoInicial\" numeric(18,2) NOT NULL DEFAULT 0;",
             cancellationToken);
+    }
+
+    private static async Task EnsureEmpresaDatosSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(dbContext, "empresa_datos", "MedioPagoHabitual", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE empresa_datos ADD COLUMN MedioPagoHabitual TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE empresa_datos ADD COLUMN \"MedioPagoHabitual\" character varying(100) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "empresa_datos", "MediosPagoJson", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE empresa_datos ADD COLUMN MediosPagoJson TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE empresa_datos ADD COLUMN \"MediosPagoJson\" character varying(4000) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "empresa_datos", "RemitoSecuencia", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE empresa_datos ADD COLUMN RemitoSecuencia INTEGER NOT NULL DEFAULT 0;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE empresa_datos ADD COLUMN \"RemitoSecuencia\" integer NOT NULL DEFAULT 0;",
+                    cancellationToken);
+            }
+        }
     }
 
     private static async Task<bool> ColumnExistsAsync(
@@ -131,6 +183,8 @@ public static class DatabaseBootstrapper
             null,
             null,
             null,
+            "EFECTIVO",
+            "[\"EFECTIVO\",\"TARJETA\",\"TRANSFERENCIA\",\"APLICATIVO\",\"OTRO\"]",
             SeedData.SeedTimestamp));
 
         await dbContext.SaveChangesAsync(cancellationToken);

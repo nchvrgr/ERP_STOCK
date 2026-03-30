@@ -3,6 +3,7 @@ using Servidor.Aplicacion.Contratos;
 using Servidor.Aplicacion.Dtos.Empresa;
 using Servidor.Dominio.Entities;
 using Servidor.Infraestructura.Persistence;
+using System.Text.Json;
 
 namespace Servidor.Infraestructura.Repositories;
 
@@ -19,18 +20,10 @@ public sealed class EmpresaDatosRepository : IEmpresaDatosRepository
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.EmpresaDatos.AsNoTracking()
-            .Where(x => x.TenantId == tenantId)
-            .Select(x => new EmpresaDatosDto(
-                x.Id,
-                x.RazonSocial,
-                x.Cuit,
-                x.Telefono,
-                x.Direccion,
-                x.Email,
-                x.Web,
-                x.Observaciones))
-            .FirstOrDefaultAsync(cancellationToken);
+        var entity = await _dbContext.EmpresaDatos.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId, cancellationToken);
+
+        return entity is null ? null : ToDto(entity);
     }
 
     public async Task<EmpresaDatosDto> UpsertAsync(
@@ -54,6 +47,8 @@ public sealed class EmpresaDatosRepository : IEmpresaDatosRepository
                 request.Email,
                 request.Web,
                 request.Observaciones,
+                request.MedioPagoHabitual,
+                SerializeMediosPago(request.MediosPago),
                 nowUtc);
 
             _dbContext.EmpresaDatos.Add(entity);
@@ -68,11 +63,19 @@ public sealed class EmpresaDatosRepository : IEmpresaDatosRepository
                 request.Email,
                 request.Web,
                 request.Observaciones,
+                request.MedioPagoHabitual,
+                SerializeMediosPago(request.MediosPago),
                 nowUtc);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        return ToDto(entity);
+    }
+
+    private static EmpresaDatosDto ToDto(EmpresaDatos entity)
+    {
+        var mediosPago = DeserializeMediosPago(entity.MediosPagoJson);
         return new EmpresaDatosDto(
             entity.Id,
             entity.RazonSocial,
@@ -81,7 +84,37 @@ public sealed class EmpresaDatosRepository : IEmpresaDatosRepository
             entity.Direccion,
             entity.Email,
             entity.Web,
-            entity.Observaciones);
+            entity.Observaciones,
+            entity.MedioPagoHabitual,
+            mediosPago);
+    }
+
+    private static string? SerializeMediosPago(IReadOnlyList<string>? mediosPago)
+    {
+        if (mediosPago is null || mediosPago.Count == 0)
+        {
+            return null;
+        }
+
+        return JsonSerializer.Serialize(mediosPago);
+    }
+
+    private static IReadOnlyList<string> DeserializeMediosPago(string? mediosPagoJson)
+    {
+        if (string.IsNullOrWhiteSpace(mediosPagoJson))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(mediosPagoJson);
+            return parsed ?? new List<string>();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
     }
 }
 

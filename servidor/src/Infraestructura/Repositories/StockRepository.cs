@@ -8,6 +8,7 @@ namespace Servidor.Infraestructura.Repositories;
 
 public sealed class StockRepository : IStockRepository
 {
+    private const int MaxRemitoSequence = 9_999_999;
     private readonly PosDbContext _dbContext;
 
     public StockRepository(PosDbContext dbContext)
@@ -441,6 +442,97 @@ public sealed class StockRepository : IStockRepository
             empresa?.Cuit,
             empresa?.Telefono,
             empresa?.Direccion);
+    }
+
+    public async Task<int> GetNextRemitoSequenceAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var connection = _dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            await using var updateCommand = connection.CreateCommand();
+            updateCommand.Transaction = transaction;
+
+            if (_dbContext.Database.IsSqlite())
+            {
+                updateCommand.CommandText = $"""
+                    UPDATE empresa_datos
+                    SET RemitoSecuencia =
+                        CASE
+                            WHEN COALESCE(RemitoSecuencia, 0) >= {MaxRemitoSequence} THEN 1
+                            ELSE COALESCE(RemitoSecuencia, 0) + 1
+                        END
+                    WHERE TenantId = @tenantId;
+                    """;
+            }
+            else
+            {
+                updateCommand.CommandText = $"""
+                    UPDATE empresa_datos
+                    SET "RemitoSecuencia" =
+                        CASE
+                            WHEN COALESCE("RemitoSecuencia", 0) >= {MaxRemitoSequence} THEN 1
+                            ELSE COALESCE("RemitoSecuencia", 0) + 1
+                        END
+                    WHERE "TenantId" = @tenantId;
+                    """;
+            }
+
+            var tenantParam = updateCommand.CreateParameter();
+            tenantParam.ParameterName = "@tenantId";
+            tenantParam.Value = tenantId;
+            updateCommand.Parameters.Add(tenantParam);
+
+            var rows = await updateCommand.ExecuteNonQueryAsync(cancellationToken);
+            if (rows == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return 1;
+            }
+
+            await using var selectCommand = connection.CreateCommand();
+            selectCommand.Transaction = transaction;
+            if (_dbContext.Database.IsSqlite())
+            {
+                selectCommand.CommandText = "SELECT COALESCE(RemitoSecuencia, 0) FROM empresa_datos WHERE TenantId = @tenantId LIMIT 1;";
+            }
+            else
+            {
+                selectCommand.CommandText = "SELECT COALESCE(\"RemitoSecuencia\", 0) FROM empresa_datos WHERE \"TenantId\" = @tenantId LIMIT 1;";
+            }
+
+            var selectTenantParam = selectCommand.CreateParameter();
+            selectTenantParam.ParameterName = "@tenantId";
+            selectTenantParam.Value = tenantId;
+            selectCommand.Parameters.Add(selectTenantParam);
+
+            var result = await selectCommand.ExecuteScalarAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return Convert.ToInt32(result ?? 1);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 }
 

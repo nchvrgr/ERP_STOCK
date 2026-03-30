@@ -22,6 +22,8 @@ public sealed class EmpresaDatosConfiguration : IEntityTypeConfiguration<Empresa
         builder.Property(x => x.Email).HasMaxLength(160);
         builder.Property(x => x.Web).HasMaxLength(180);
         builder.Property(x => x.Observaciones).HasMaxLength(1000);
+        builder.Property(x => x.MedioPagoHabitual).HasMaxLength(100);
+        builder.Property(x => x.MediosPagoJson).HasMaxLength(4000);
 
         builder.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone").IsRequired();

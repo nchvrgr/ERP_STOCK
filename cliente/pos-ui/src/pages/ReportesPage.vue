@@ -43,7 +43,7 @@
       </v-card>
 
       <v-row dense class="mb-4">
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="4">
           <v-card class="pos-card pa-4">
             <div class="text-caption text-medium-emphasis">Ventas</div>
             <div v-if="loading" class="mt-2">
@@ -52,16 +52,7 @@
             <div v-else class="text-h5">{{ formatMoney(resumen.totalIngresos) }}</div>
           </v-card>
         </v-col>
-        <v-col cols="12" md="3">
-          <v-card class="pos-card pa-4">
-            <div class="text-caption text-medium-emphasis">Egresos</div>
-            <div v-if="loading" class="mt-2">
-              <v-skeleton-loader type="text" />
-            </div>
-            <div v-else class="text-h5">{{ formatMoney(resumen.totalEgresos) }}</div>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="4">
           <v-card class="pos-card pa-4">
             <div class="text-caption text-medium-emphasis">Total facturado</div>
             <div v-if="loading" class="mt-2">
@@ -70,7 +61,7 @@
             <div v-else class="text-h5">{{ formatMoney(resumen.totalFacturado) }}</div>
           </v-card>
         </v-col>
-        <v-col cols="12" md="3">
+        <v-col cols="12" md="4">
           <v-card class="pos-card pa-4">
             <div class="text-caption text-medium-emphasis">Total cotizado</div>
             <div v-if="loading" class="mt-2">
@@ -93,12 +84,12 @@
             <div v-if="loading" class="mt-3">
               <v-skeleton-loader type="image" height="180" />
             </div>
-            <div ref="ventasWrapperRef" v-else class="chart-wrapper mt-3">
+            <div ref="ventasWrapperRef" v-else :class="['chart-wrapper', 'chart-wrapper--ventas', 'mt-3', { 'chart-wrapper--night': isNightMode }]">
               <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="chart-svg">
                 <polyline
                   :points="ventasLine"
                   fill="none"
-                  stroke="#5A0F1C"
+                  :stroke="ventasLineColor"
                   stroke-width="1.2"
                 />
                 <circle
@@ -107,7 +98,7 @@
                   :cx="point.x"
                   :cy="point.y"
                   r="1.8"
-                  fill="#C6A46C"
+                  :fill="ventasPointColor"
                 />
                 <rect
                   v-for="(area, idx) in ventasHitAreas"
@@ -146,7 +137,7 @@
             <div v-if="loading" class="mt-3">
               <v-skeleton-loader type="image" height="180" />
             </div>
-            <div ref="mediosWrapperRef" v-else class="chart-wrapper mt-3">
+            <div ref="mediosWrapperRef" v-else :class="['chart-wrapper', 'chart-wrapper--medios', 'mt-3', { 'chart-wrapper--night': isNightMode }]">
               <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="chart-svg">
                 <rect
                   v-for="(hit, idx) in mediosHitAreas"
@@ -167,7 +158,7 @@
                   :y="bar.y"
                   :width="bar.width"
                   :height="bar.height"
-                  fill="#ea580c"
+                  :fill="mediosBarColor"
                   rx="1"
                 />
               </svg>
@@ -188,7 +179,7 @@
 
       <v-row dense>
         <v-col cols="12" md="6">
-          <v-card class="pos-card pa-4">
+          <v-card class="pos-card pa-4 reportes-table-card">
             <div class="d-flex align-center justify-space-between">
               <div>
                 <div class="text-h6">Top productos</div>
@@ -208,12 +199,19 @@
               :items="topProductos"
               density="compact"
               item-key="productoId"
-            />
+            >
+              <template v-slot:[`item.nombre`]="{ item }">
+                <div class="reportes-truncate reportes-truncate--nombre">{{ item.nombre || '-' }}</div>
+              </template>
+              <template v-slot:[`item.sku`]="{ item }">
+                <div class="reportes-truncate reportes-truncate--sku">{{ item.sku || '-' }}</div>
+              </template>
+            </v-data-table>
           </v-card>
         </v-col>
 
         <v-col cols="12" md="6">
-          <v-card class="pos-card pa-4">
+          <v-card class="pos-card pa-4 reportes-table-card">
             <div class="d-flex align-center justify-space-between">
               <div>
                 <div class="text-h6">Inmovilizado</div>
@@ -233,7 +231,14 @@
               :items="inmovilizado"
               density="compact"
               item-key="productoId"
-            />
+            >
+              <template v-slot:[`item.nombre`]="{ item }">
+                <div class="reportes-truncate reportes-truncate--nombre">{{ item.nombre || '-' }}</div>
+              </template>
+              <template v-slot:[`item.sku`]="{ item }">
+                <div class="reportes-truncate reportes-truncate--sku">{{ item.sku || '-' }}</div>
+              </template>
+            </v-data-table>
           </v-card>
         </v-col>
       </v-row>
@@ -250,12 +255,18 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useTheme } from 'vuetify';
 import { useAuthStore } from '../stores/auth';
 import { getJson } from '../services/apiClient';
 import { formatMoney } from '../utils/currency';
 
 const auth = useAuthStore();
+const theme = useTheme();
 const canView = computed(() => auth.hasPermission('PERM_REPORTES_VER'));
+const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
+const ventasLineColor = computed(() => (isNightMode.value ? '#C9A770' : '#5A0F1C'));
+const ventasPointColor = computed(() => (isNightMode.value ? '#C9A770' : '#C6A46C'));
+const mediosBarColor = computed(() => (isNightMode.value ? '#C9A770' : '#ea580c'));
 
 const today = new Date();
 const sevenDaysAgo = new Date();
@@ -551,12 +562,22 @@ onMounted(() => {
   animation: fade-in 0.3s ease;
 }
 
+.v-theme--posNightTheme .reportes-page {
+  background: #1C1412;
+}
+
 .chart-wrapper {
   border: 1px solid rgba(214, 208, 198, 0.9);
   border-radius: 12px;
   padding: 12px;
   background: #fff;
   position: relative;
+}
+
+.chart-wrapper--night {
+  background: #2D1B19;
+  border-color: #3D2622;
+  box-shadow: 0 0 0 1px #3D2622, 0 0 14px rgba(255, 107, 69, 0.2);
 }
 
 .chart-svg {
@@ -573,6 +594,10 @@ onMounted(() => {
   gap: 8px;
 }
 
+.chart-wrapper--night .chart-labels {
+  color: #8C7D7A;
+}
+
 .chart-labels span {
   flex: 1;
   min-width: 0;
@@ -585,7 +610,7 @@ onMounted(() => {
 .chart-tooltip {
   position: absolute;
   z-index: 2;
-  background: rgba(59, 10, 18, 0.92);
+  background: rgba(45, 27, 25, 0.95);
   color: #fff;
   font-size: 0.75rem;
   padding: 6px 8px;
@@ -593,6 +618,25 @@ onMounted(() => {
   pointer-events: none;
   max-width: min(220px, calc(100% - 16px));
   white-space: normal;
-  box-shadow: 0 10px 22px rgba(59, 10, 18, 0.18);
+  border: 1px solid #3D2622;
+  box-shadow: 0 0 0 1px #3D2622, 0 6px 16px rgba(255, 107, 69, 0.18);
+}
+
+.reportes-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reportes-truncate--nombre {
+  max-width: 280px;
+}
+
+.reportes-truncate--sku {
+  max-width: 160px;
+}
+
+.reportes-table-card {
+  min-height: 470px;
 }
 </style>

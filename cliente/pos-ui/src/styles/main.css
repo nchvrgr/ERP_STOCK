@@ -105,11 +105,12 @@ body {
     radial-gradient(circle at top left, var(--pos-bg-spot-a), transparent 28%),
     radial-gradient(circle at bottom right, var(--pos-bg-spot-b), transparent 26%),
     linear-gradient(180deg, var(--pos-bg) 0%, var(--pos-bg-gradient-end) 100%);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .v-main {
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 h1,

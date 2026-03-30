@@ -8,6 +8,15 @@ namespace Servidor.Aplicacion.CasosDeUso.Empresa;
 
 public sealed class EmpresaDatosService
 {
+    private static readonly string[] DefaultMediosPago =
+    {
+        "EFECTIVO",
+        "TARJETA",
+        "TRANSFERENCIA",
+        "APLICATIVO",
+        "OTRO"
+    };
+
     private readonly IEmpresaDatosRepository _empresaDatosRepository;
     private readonly IRequestContext _requestContext;
     private readonly IAuditLogService _auditLogService;
@@ -28,10 +37,26 @@ public sealed class EmpresaDatosService
         var data = await _empresaDatosRepository.GetAsync(tenantId, cancellationToken);
         if (data is not null)
         {
-            return data;
+            var mediosPago = NormalizeMediosPago(data.MediosPago);
+            var medioPagoHabitual = NormalizeMedioPagoHabitual(data.MedioPagoHabitual, mediosPago);
+            return data with
+            {
+                MedioPagoHabitual = medioPagoHabitual,
+                MediosPago = mediosPago
+            };
         }
 
-        return new EmpresaDatosDto(Guid.Empty, string.Empty, null, null, null, null, null, null);
+        return new EmpresaDatosDto(
+            Guid.Empty,
+            string.Empty,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "EFECTIVO",
+            DefaultMediosPago);
     }
 
     public async Task<EmpresaDatosDto> UpsertAsync(EmpresaDatosUpsertDto request, CancellationToken cancellationToken)
@@ -48,6 +73,9 @@ public sealed class EmpresaDatosService
 
         var tenantId = EnsureTenant();
         var before = await _empresaDatosRepository.GetAsync(tenantId, cancellationToken);
+        var normalizedMediosPago = NormalizeMediosPago(request.MediosPago);
+        var normalizedMedioPagoHabitual = NormalizeMedioPagoHabitual(request.MedioPagoHabitual, normalizedMediosPago);
+
         var normalized = request with
         {
             RazonSocial = request.RazonSocial.Trim(),
@@ -56,7 +84,9 @@ public sealed class EmpresaDatosService
             Direccion = NormalizeNullable(request.Direccion),
             Email = NormalizeNullable(request.Email),
             Web = NormalizeNullable(request.Web),
-            Observaciones = NormalizeNullable(request.Observaciones)
+            Observaciones = NormalizeNullable(request.Observaciones),
+            MedioPagoHabitual = normalizedMedioPagoHabitual,
+            MediosPago = normalizedMediosPago
         };
 
         var saved = await _empresaDatosRepository.UpsertAsync(tenantId, normalized, DateTimeOffset.UtcNow, cancellationToken);
@@ -82,6 +112,36 @@ public sealed class EmpresaDatosService
 
         var trimmed = value.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private static IReadOnlyList<string> NormalizeMediosPago(IReadOnlyList<string>? mediosPago)
+    {
+        var source = mediosPago is { Count: > 0 } ? mediosPago : DefaultMediosPago;
+
+        var normalized = source
+            .Select(m => (m ?? string.Empty).Trim().ToUpperInvariant())
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(20)
+            .ToList();
+
+        if (!normalized.Contains("EFECTIVO", StringComparer.OrdinalIgnoreCase))
+        {
+            normalized.Insert(0, "EFECTIVO");
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeMedioPagoHabitual(string? medioPagoHabitual, IReadOnlyList<string> mediosPago)
+    {
+        var normalized = string.IsNullOrWhiteSpace(medioPagoHabitual)
+            ? "EFECTIVO"
+            : medioPagoHabitual.Trim().ToUpperInvariant();
+
+        return mediosPago.Contains(normalized, StringComparer.OrdinalIgnoreCase)
+            ? normalized
+            : "EFECTIVO";
     }
 
     private Guid EnsureTenant()

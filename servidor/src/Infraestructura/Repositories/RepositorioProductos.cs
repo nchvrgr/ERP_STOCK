@@ -508,7 +508,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
                                                 && item.ProductoId == productId
                                                 && movimiento.TenantId == tenantId
                                                 && !(movimiento.Tipo == StockMovimientoTipo.Ajuste
-                                                         && EF.Functions.ILike(movimiento.Motivo, "%stock inicial%"))
+                                                         && movimiento.Motivo != null
+                                                         && movimiento.Motivo.ToLower().Contains("stock inicial"))
                                             select item.Id).AnyAsync(cancellationToken)
             || await _dbContext.RecepcionItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
             || await _dbContext.DevolucionItems.AsNoTracking().AnyAsync(i => i.TenantId == tenantId && i.ProductoId == productId, cancellationToken)
@@ -542,7 +543,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
                                                                                                                  && item.ProductoId == productId
                                                                                                                  && movimiento.TenantId == tenantId
                                                                                                                  && movimiento.Tipo == StockMovimientoTipo.Ajuste
-                                                                                                                 && EF.Functions.ILike(movimiento.Motivo, "%stock inicial%")
+                                                                                                                 && movimiento.Motivo != null
+                                                                                                                 && movimiento.Motivo.ToLower().Contains("stock inicial")
                                                                                                              select item)
                         .ToListAsync(cancellationToken);
                 var movimientosAjusteInicialIds = stockMovimientoItemsAjusteInicial

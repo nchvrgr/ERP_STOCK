@@ -18,6 +18,8 @@ public sealed class EmpresaDatos : EntityBase
         string? email,
         string? web,
         string? observaciones,
+        string? medioPagoHabitual,
+        string? mediosPagoJson,
         DateTimeOffset createdAtUtc)
         : base(id, tenantId, createdAtUtc)
     {
@@ -30,6 +32,8 @@ public sealed class EmpresaDatos : EntityBase
         Email = email;
         Web = web;
         Observaciones = observaciones;
+        MedioPagoHabitual = medioPagoHabitual;
+        MediosPagoJson = mediosPagoJson;
     }
 
     public string RazonSocial { get; private set; } = string.Empty;
@@ -39,6 +43,8 @@ public sealed class EmpresaDatos : EntityBase
     public string? Email { get; private set; }
     public string? Web { get; private set; }
     public string? Observaciones { get; private set; }
+    public string? MedioPagoHabitual { get; private set; }
+    public string? MediosPagoJson { get; private set; }
 
     public void Update(
         string razonSocial,
@@ -48,6 +54,8 @@ public sealed class EmpresaDatos : EntityBase
         string? email,
         string? web,
         string? observaciones,
+        string? medioPagoHabitual,
+        string? mediosPagoJson,
         DateTimeOffset updatedAtUtc)
     {
         if (string.IsNullOrWhiteSpace(razonSocial)) throw new ArgumentException("RazonSocial is required.", nameof(razonSocial));
@@ -59,6 +67,8 @@ public sealed class EmpresaDatos : EntityBase
         Email = email;
         Web = web;
         Observaciones = observaciones;
+        MedioPagoHabitual = medioPagoHabitual;
+        MediosPagoJson = mediosPagoJson;
         MarkUpdated(updatedAtUtc);
     }
 }

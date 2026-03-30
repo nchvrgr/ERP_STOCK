@@ -142,6 +142,12 @@
                   class="products-table"
                   density="compact"
                 >
+                  <template v-slot:[`item.name`]="{ item }">
+                    <div class="truncate-cell proveedor-name-cell">{{ item.name || '-' }}</div>
+                  </template>
+                  <template v-slot:[`item.direccion`]="{ item }">
+                    <div class="truncate-cell proveedor-direccion-cell">{{ item.direccion || '-' }}</div>
+                  </template>
                   <template v-slot:[`item.isActive`]="{ item }">
                     <v-chip size="small" :color="item.isActive ? 'success' : 'error'" variant="tonal">
                       {{ item.isActive ? 'Activo' : 'Inactivo' }}
@@ -214,6 +220,9 @@
                   class="products-table"
                   density="compact"
                 >
+                  <template v-slot:[`item.name`]="{ item }">
+                    <div class="truncate-cell categoria-name-cell">{{ item.name || '-' }}</div>
+                  </template>
                   <template v-slot:[`item.margenGananciaPct`]="{ item }">
                     {{ Number(item.margenGananciaPct || 0).toFixed(2) }}%
                   </template>
@@ -295,6 +304,8 @@
                 v-model="form.name"
                 variant="outlined"
                 density="comfortable"
+                maxlength="80"
+                counter="80"
                 :error-messages="errors.name"
                 @blur="validateField('name')"
                 required
@@ -309,6 +320,8 @@
                 v-model="form.sku"
                 variant="outlined"
                 density="comfortable"
+                maxlength="50"
+                counter="50"
                 :error-messages="errors.sku"
                 inputmode="numeric"
                 @update:model-value="onSkuInput"
@@ -501,6 +514,8 @@
               label="Nombre"
               variant="outlined"
               density="comfortable"
+              maxlength="100"
+              counter="100"
               :error-messages="proveedorErrors.name"
               @blur="validateProveedorField('name')"
               required
@@ -510,6 +525,8 @@
               label="Telefono"
               variant="outlined"
               density="comfortable"
+              maxlength="20"
+              counter="20"
               :error-messages="proveedorErrors.telefono"
               @blur="validateProveedorField('telefono')"
               required
@@ -519,12 +536,16 @@
               label="CUIT"
               variant="outlined"
               density="comfortable"
+              maxlength="15"
+              counter="15"
             />
             <v-text-field
               v-model="proveedorForm.direccion"
               label="Direccion"
               variant="outlined"
               density="comfortable"
+              maxlength="100"
+              counter="100"
             />
             <v-switch
               :model-value="proveedorForm.isActive"
@@ -553,6 +574,8 @@
               label="Nombre"
               variant="outlined"
               density="comfortable"
+              maxlength="80"
+              counter="80"
               :error-messages="categoriaErrors.name"
               @blur="validateCategoriaField('name')"
               required
@@ -1757,6 +1780,18 @@ onMounted(() => {
 
 .product-sku-cell {
   max-width: 150px;
+}
+
+.proveedor-name-cell {
+  max-width: 280px;
+}
+
+.proveedor-direccion-cell {
+  max-width: 280px;
+}
+
+.categoria-name-cell {
+  max-width: 280px;
 }
 
 .delete-row-action {

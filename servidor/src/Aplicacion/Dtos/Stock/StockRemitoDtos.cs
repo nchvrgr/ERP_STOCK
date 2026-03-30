@@ -39,6 +39,12 @@ public sealed record StockRemitoPdfDataDto(
     DateTimeOffset Fecha,
     string RemitoNumero,
     StockRemitoHeaderDto Header,
-    IReadOnlyList<StockRemitoPdfProveedorDto> Proveedores);
+    IReadOnlyList<StockRemitoPdfProveedorDto> Proveedores,
+    string? RemitoId = null);
+
+public sealed record StockRemitoPdfResultDto(
+    byte[] Pdf,
+    string RemitoId,
+    string RemitoNumero);
 
 

@@ -142,8 +142,14 @@
               class="stock-table"
               density="compact"
             >
+              <template v-slot:[`item.nombre`]="{ item }">
+                <div class="saldo-text-truncate saldo-text-truncate--nombre">{{ item.nombre }}</div>
+              </template>
               <template v-slot:[`item.proveedor`]="{ item }">
-                {{ item.proveedor || 'SIN PROVEEDOR' }}
+                <div class="saldo-text-truncate saldo-text-truncate--proveedor">{{ item.proveedor || 'SIN PROVEEDOR' }}</div>
+              </template>
+              <template v-slot:[`item.sku`]="{ item }">
+                <div class="saldo-text-truncate saldo-text-truncate--sku">{{ item.sku }}</div>
               </template>
             </v-data-table>
           </div>
@@ -275,13 +281,23 @@
         <v-card-actions class="justify-end">
           <v-btn variant="text" @click="remitoDialog = false">Cancelar</v-btn>
           <v-btn
+            variant="tonal"
             color="primary"
             class="text-none"
             :loading="remitoLoading"
             :disabled="!remitoItems.length"
-            @click="generarRemito"
+            @click="generarRemitoNormal"
           >
             Generar PDF
+          </v-btn>
+          <v-btn
+            color="primary"
+            class="text-none"
+            :loading="remitoLoadingPorProveedor"
+            :disabled="!remitoItems.length"
+            @click="generarRemitoPorProveedor"
+          >
+            Generar PDF por prov.
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -335,6 +351,7 @@ const proveedorLoading = ref(false);
 const remitoDialog = ref(false);
 const remitoItems = ref([]);
 const remitoLoading = ref(false);
+const remitoLoadingPorProveedor = ref(false);
 
 const snackbar = ref({
   show: false,
@@ -504,7 +521,7 @@ const printVentaTicket = async (ventaNumero) => {
             <button type="button" onclick="window.close()">Cerrar</button>
           </div>
           <h1>Ticket de venta</h1>
-          <div>Venta N°: ${ventaData.numero ?? '-'}</div>
+          <div>Venta Nro: ${ventaData.numero ?? '-'}</div>
           <div>Fecha: ${formatDateTime(ventaData.createdAt)}</div>
           <table>
             <thead>
@@ -734,6 +751,7 @@ const openRemito = async () => {
     productoId: alerta.productoId,
     nombre: alerta.nombre,
     sku: alerta.sku,
+    proveedorId: alerta.proveedorId || null,
     proveedor: alerta.proveedor,
     cantidadActual: alerta.cantidadActual,
     stockDeseado: alerta.stockDeseado ?? 0,
@@ -752,7 +770,50 @@ const removeRemitoItem = (productoId) => {
   remitoItems.value = remitoItems.value.filter((item) => item.productoId !== productoId);
 };
 
-const generarRemito = async () => {
+const getFilenameFromContentDisposition = (contentDisposition, fallbackName) => {
+  if (!contentDisposition) return fallbackName;
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]).replace(/"/g, '') || fallbackName;
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1] || fallbackName;
+};
+
+const requestRemitoPdf = async (items, proveedorId = null, fallbackName = 'remito-alertas.pdf') => {
+  const response = await fetch(buildApiUrl('/api/v1/stock/alertas/remito'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {})
+    },
+    body: JSON.stringify({ items, proveedorId })
+  });
+
+  if (!response.ok) {
+    let message = 'No se pudo generar el remito.';
+    try {
+      const data = await response.json();
+      message = extractProblemMessage(data);
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = getFilenameFromContentDisposition(response.headers.get('content-disposition'), fallbackName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const generarRemitoNormal = async () => {
   if (remitoLoading.value) return;
   const items = remitoItems.value
     .filter((item) => Number(item.cantidad) > 0)
@@ -766,41 +827,57 @@ const generarRemito = async () => {
   remitoLoading.value = true;
   try {
     const proveedorId = alertaProveedor.value?.id || null;
-    const response = await fetch(buildApiUrl('/api/v1/stock/alertas/remito'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {})
-      },
-      body: JSON.stringify({ items, proveedorId })
-    });
-
-    if (!response.ok) {
-      let message = 'No se pudo generar el remito.';
-      try {
-        const data = await response.json();
-        message = extractProblemMessage(data);
-      } catch {
-        // ignore
-      }
-      throw new Error(message);
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'remito-alertas.pdf';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    await requestRemitoPdf(items, proveedorId, 'remito-alertas.pdf');
     flash('success', 'Remito generado');
     remitoDialog.value = false;
   } catch (err) {
     flash('error', err?.message || 'No se pudo generar el remito.');
   } finally {
     remitoLoading.value = false;
+  }
+};
+
+const generarRemitoPorProveedor = async () => {
+  if (remitoLoadingPorProveedor.value) return;
+
+  const items = remitoItems.value
+    .filter((item) => Number(item.cantidad) > 0)
+    .map((item) => ({
+      productoId: item.productoId,
+      cantidad: Number(item.cantidad),
+      proveedorId: item.proveedorId,
+      proveedor: item.proveedor || 'SIN_PROVEEDOR'
+    }));
+
+  if (!items.length) {
+    flash('error', 'No hay cantidades para generar.');
+    return;
+  }
+
+  remitoLoadingPorProveedor.value = true;
+  try {
+    const groups = new Map();
+    for (const item of items) {
+      const key = item.proveedorId || `SIN:${item.proveedor}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          proveedorId: item.proveedorId || null,
+          items: []
+        });
+      }
+      groups.get(key).items.push({ productoId: item.productoId, cantidad: item.cantidad });
+    }
+
+    for (const group of groups.values()) {
+      await requestRemitoPdf(group.items, group.proveedorId, 'remito-alertas.pdf');
+    }
+
+    flash('success', 'Remitos por proveedor generados');
+    remitoDialog.value = false;
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron generar los remitos por proveedor.');
+  } finally {
+    remitoLoadingPorProveedor.value = false;
   }
 };
 
@@ -931,6 +1008,9 @@ onBeforeUnmount(() => {});
 
 .stock-alert-list :deep(.v-list-item) {
   background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  margin-bottom: 8px;
 }
 
 .stock-alert-dot--secondary {
@@ -941,13 +1021,6 @@ onBeforeUnmount(() => {});
 .stock-alert-dot--info {
   background: rgba(var(--v-theme-info), 0.2);
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-info), 0.42);
-}
-
-.stock-alert-list :deep(.v-list-item) {
-  border: 1px solid rgba(122, 90, 58, 0.12);
-  border-radius: 14px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.86);
 }
 
 .remito-preview-list {
@@ -975,6 +1048,24 @@ onBeforeUnmount(() => {});
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.saldo-text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saldo-text-truncate--nombre {
+  max-width: 280px;
+}
+
+.saldo-text-truncate--proveedor {
+  max-width: 200px;
+}
+
+.saldo-text-truncate--sku {
+  max-width: 130px;
 }
 
 </style>

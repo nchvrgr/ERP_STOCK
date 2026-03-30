@@ -155,8 +155,6 @@ public sealed class RemitoPdfGenerator : IRemitoPdfGenerator
         WriteText(sb, leftBoxX + 120, topBoxY + 54, 9, data.Header.EmpresaCuit ?? "-");
         WriteText(sb, leftBoxX + 10, topBoxY + 38, 9, "Direccion", true);
         WriteText(sb, leftBoxX + 120, topBoxY + 38, 9, Truncate(data.Header.EmpresaDireccion ?? "-", 34));
-        WriteText(sb, leftBoxX + 10, topBoxY + 22, 9, "Localidad", true);
-        WriteText(sb, leftBoxX + 120, topBoxY + 22, 9, data.Header.SucursalNombre);
         WriteText(sb, leftBoxX + 10, topBoxY + 6, 9, "Telefono", true);
         WriteText(sb, leftBoxX + 120, topBoxY + 6, 9, data.Header.EmpresaTelefono ?? "-");
 
@@ -164,7 +162,7 @@ public sealed class RemitoPdfGenerator : IRemitoPdfGenerator
         var numeroRemito = totalPages > 1 || proveedorIndex > 1
             ? $"{data.RemitoNumero}-{proveedorIndex:00}"
             : data.RemitoNumero;
-        WriteText(sb, rightBoxX + 10, topBoxY + 55, 11, $"N\u00b0 {numeroRemito}", true);
+        WriteText(sb, rightBoxX + 10, topBoxY + 55, 11, $"Nro: {numeroRemito}", true);
         WriteText(sb, rightBoxX + 10, topBoxY + 35, 10, $"Fecha {data.Fecha:dd/MM/yyyy}");
         if (totalPages > 1)
         {
@@ -181,17 +179,11 @@ public sealed class RemitoPdfGenerator : IRemitoPdfGenerator
         WriteText(sb, tableX + 90, providerBoxY + 60, 9, proveedorNombre);
         WriteText(sb, tableX + 10, providerBoxY + 44, 9, "Domicilio", true);
         WriteText(sb, tableX + 90, providerBoxY + 44, 9, proveedorDireccion);
-        WriteText(sb, tableX + 10, providerBoxY + 28, 9, "Localidad", true);
-        WriteText(sb, tableX + 90, providerBoxY + 28, 9, "-");
         WriteText(sb, tableX + 10, providerBoxY + 12, 9, "CUIT", true);
         WriteText(sb, tableX + 90, providerBoxY + 12, 9, proveedorCuit);
 
         WriteText(sb, tableX + 300, providerBoxY + 60, 9, "Telefono", true);
         WriteText(sb, tableX + 380, providerBoxY + 60, 9, proveedorTelefono);
-        WriteText(sb, tableX + 300, providerBoxY + 44, 9, "C.P.", true);
-        WriteText(sb, tableX + 380, providerBoxY + 44, 9, "-");
-        WriteText(sb, tableX + 300, providerBoxY + 28, 9, "Provincia", true);
-        WriteText(sb, tableX + 380, providerBoxY + 28, 9, "-");
 
         // Fondo del encabezado de tabla
         sb.AppendLine("0.23 0.04 0.07 rg");

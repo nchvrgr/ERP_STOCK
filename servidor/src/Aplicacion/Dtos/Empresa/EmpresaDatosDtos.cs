@@ -8,7 +8,9 @@ public sealed record EmpresaDatosDto(
     string? Direccion,
     string? Email,
     string? Web,
-    string? Observaciones);
+    string? Observaciones,
+    string? MedioPagoHabitual,
+    IReadOnlyList<string> MediosPago);
 
 public sealed record EmpresaDatosUpsertDto(
     string RazonSocial,
@@ -17,6 +19,8 @@ public sealed record EmpresaDatosUpsertDto(
     string? Direccion,
     string? Email,
     string? Web,
-    string? Observaciones);
+    string? Observaciones,
+    string? MedioPagoHabitual,
+    IReadOnlyList<string>? MediosPago);
 
 
