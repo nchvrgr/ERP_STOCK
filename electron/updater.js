@@ -7,10 +7,7 @@ const { app, dialog, shell } = require('electron/main');
 
 const packageJson = require('../package.json');
 
-const RELEASES_TAGS_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases/tags';
-const UPDATE_CHANNEL_BRANCH = String(process.env.ERP_STOCK_UPDATE_BRANCH || 'client').trim() || 'client';
-const UPDATE_CHANNEL_PACKAGE_URL = process.env.ERP_STOCK_UPDATE_CHANNEL_URL ||
-  `https://raw.githubusercontent.com/nchvrgr/ERP_STOCK/${UPDATE_CHANNEL_BRANCH}/package.json`;
+const RELEASES_API_BASE_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases';
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function normalizeVersion(version) {
@@ -281,13 +278,30 @@ async function resolveUpdateState(options = {}) {
 
   const testRelease = getTestReleaseConfig();
   const currentVersion = normalizeVersion(packageJson.version);
-  const channelPayload = testRelease || await requestJson(UPDATE_CHANNEL_PACKAGE_URL);
-  const latestVersion = normalizeVersion(testRelease ? channelPayload?.tag_name : channelPayload?.version);
+  let release = testRelease;
+
+  if (!release) {
+    const releaseUrl =
+      process.env.ERP_STOCK_UPDATE_RELEASE_URL ||
+      `${RELEASES_API_BASE_URL}/latest`;
+    release = await requestJson(releaseUrl);
+    log(`update check using release url=${releaseUrl}`);
+  }
+
+  const latestVersion = normalizeVersion(release?.tag_name);
+
+  if (!latestVersion) {
+    log('update unavailable: latest release without valid tag_name');
+    return {
+      status: 'unavailable',
+      currentVersion,
+      latestVersion: currentVersion,
+      message: 'No se pudo determinar la ultima version publicada.'
+    };
+  }
 
   if (testRelease) {
     log(`update check using test mode=${process.env.ERP_STOCK_UPDATE_TEST_MODE}`);
-  } else {
-    log(`update check using branch=${UPDATE_CHANNEL_BRANCH} url=${UPDATE_CHANNEL_PACKAGE_URL}`);
   }
 
   if (!latestVersion || !isNewerVersion(latestVersion, currentVersion)) {
@@ -297,26 +311,6 @@ async function resolveUpdateState(options = {}) {
       currentVersion,
       latestVersion: latestVersion || currentVersion
     };
-  }
-
-  let release = testRelease;
-  if (!release) {
-    const releaseUrl =
-      process.env.ERP_STOCK_UPDATE_RELEASE_URL ||
-      `${RELEASES_TAGS_URL}/v${encodeURIComponent(latestVersion)}`;
-
-    try {
-      release = await requestJson(releaseUrl);
-      log(`update release lookup url=${releaseUrl}`);
-    } catch (error) {
-      log(`update unavailable: channelVersion=${latestVersion} releaseLookupFailed=${error instanceof Error ? error.message : String(error)}`);
-      return {
-        status: 'unavailable',
-        currentVersion,
-        latestVersion,
-        message: `Se detecto la version ${latestVersion} en la branch ${UPDATE_CHANNEL_BRANCH}, pero todavia no hay un instalador publicado para esa version.`
-      };
-    }
   }
 
   const releaseVersion = normalizeVersion(release?.tag_name);
