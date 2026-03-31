@@ -95,9 +95,10 @@
             :loading="installingUpdate"
             @click="installAppUpdate"
           >
-            Instalar
+            {{ updateNotice.isMandatory ? 'Actualizar Obligatoriamente' : 'Actualizar Ahora' }}
           </v-btn>
           <v-btn
+            v-if="!updateNotice.isMandatory"
             variant="text"
             size="small"
             class="text-none"
@@ -183,8 +184,11 @@ const checkForAppUpdate = async () => {
     if (result?.status === 'available') {
       updateNotice.value = {
         status: 'available',
-        type: 'info',
-        message: `Se encontro una nueva actualizacion: v${result.latestVersion}.`
+        isMandatory: Boolean(result.isMandatory),
+        type: result.isMandatory ? 'warning' : 'info',
+        message: result.isMandatory
+          ? 'Esta actualizacion es obligatoria para seguir usando ERP_STOCK. Por favor, actualiza ahora.'
+          : `Se encontro una nueva actualizacion: v${result.latestVersion}.`
       };
       return;
     }
@@ -234,8 +238,11 @@ const installAppUpdate = async () => {
     if (result?.status === 'cancelled') {
       updateNotice.value = {
         status: 'available',
+        isMandatory: Boolean(result?.isMandatory),
         type: 'info',
-        message: `Se encontro una nueva actualizacion: v${result.latestVersion}.`
+        message: result?.isMandatory
+          ? 'Esta actualizacion es obligatoria para seguir usando ERP_STOCK. Por favor, actualiza ahora.'
+          : `Se encontro una nueva actualizacion: v${result.latestVersion}.`
       };
       return;
     }

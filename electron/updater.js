@@ -509,15 +509,6 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     throw new Error(`No se encontró el instalador descargado: ${installerPath}`);
   }
 
-  if (options.restartAfterInstall && process.platform === 'win32') {
-    const restartAccepted = await promptForRestartInstall(mainWindow, options.versionLabel || 'nueva');
-    log(`update restart prompt accepted=${restartAccepted}`);
-
-    if (!restartAccepted) {
-      return { cancelled: true };
-    }
-  }
-
   if (process.platform === 'win32') {
     let started = false;
 
@@ -699,6 +690,7 @@ async function installLatestUpdateOnDemand(options = {}) {
       status: 'installing',
       currentVersion: updateState.currentVersion,
       latestVersion: updateState.latestVersion,
+      isMandatory: updateState.isMandatory,
       message: `Instalador ejecutado para instalar la version ${updateState.latestVersion}.`
     };
   } catch (error) {
