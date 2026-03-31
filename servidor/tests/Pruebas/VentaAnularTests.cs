@@ -95,7 +95,7 @@ public sealed class VentaAnularTests : IClassFixture<WebApiFactory>
     private async Task<(VentaDto Venta, Guid ProductoId)> CrearVentaConfirmadaAsync(HttpClient client)
     {
         var code = $"CODE-{Guid.NewGuid():N}";
-        var sku = $"SKU-{Guid.NewGuid():N}";
+        var sku = TestData.NewNumericSku();
         var proveedorId = await TestData.CreateProveedorAsync(client);
 
         var createResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(

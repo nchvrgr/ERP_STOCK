@@ -30,7 +30,7 @@ public sealed class StockAlertTests : IClassFixture<WebApiFactory>
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
         var proveedorId = await TestData.CreateProveedorAsync(client);
-        var skuCritico = $"SKU-CRIT-{Guid.NewGuid():N}";
+        var skuCritico = TestData.NewNumericSku();
         var criticoResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto Critico {Guid.NewGuid():N}",
             skuCritico,
@@ -43,7 +43,7 @@ public sealed class StockAlertTests : IClassFixture<WebApiFactory>
         var critico = await criticoResponse.Content.ReadFromJsonAsync<ProductoDetalleDto>();
         Assert.NotNull(critico);
 
-        var skuBajo = $"SKU-BAJO-{Guid.NewGuid():N}";
+        var skuBajo = TestData.NewNumericSku();
         var bajoResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto Bajo {Guid.NewGuid():N}",
             skuBajo,

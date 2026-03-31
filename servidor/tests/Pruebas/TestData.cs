@@ -6,6 +6,11 @@ namespace Servidor.Pruebas;
 
 public static class TestData
 {
+    public static string NewNumericSku()
+    {
+        return $"{Random.Shared.NextInt64(100_000_000_000, 999_999_999_999)}";
+    }
+
     public static async Task<Guid> CreateProveedorAsync(HttpClient client, string? name = null)
     {
         var payload = new ProveedorCreateDto(

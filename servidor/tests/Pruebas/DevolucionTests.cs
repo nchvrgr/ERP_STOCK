@@ -124,7 +124,7 @@ public sealed class DevolucionTests : IClassFixture<WebApiFactory>
     private static async Task<(VentaDto Venta, Guid ProductoId)> CrearVentaConProductoAsync(HttpClient client, string code)
     {
         var proveedorId = await TestData.CreateProveedorAsync(client);
-        var sku = $"SKU-{Guid.NewGuid():N}";
+        var sku = TestData.NewNumericSku();
         var createResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto {Guid.NewGuid():N}",
             sku,

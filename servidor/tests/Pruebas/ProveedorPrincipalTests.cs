@@ -51,7 +51,7 @@ public sealed class ProveedorPrincipalTests : IClassFixture<WebApiFactory>
         var proveedorB = await proveedorBResponse.Content.ReadFromJsonAsync<ProveedorDto>();
         Assert.NotNull(proveedorB);
 
-        var sku = $"SKU-{Guid.NewGuid():N}";
+        var sku = TestData.NewNumericSku();
         var productResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto {Guid.NewGuid():N}",
             sku,

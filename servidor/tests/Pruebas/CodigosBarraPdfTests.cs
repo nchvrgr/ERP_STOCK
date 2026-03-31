@@ -34,8 +34,8 @@ public sealed class CodigosBarraPdfTests : IClassFixture<WebApiFactory>
 
         var productoAName = $"ProductoA-{Guid.NewGuid():N}";
         var productoBName = $"ProductoB-{Guid.NewGuid():N}";
-        var productoA = await CreateProducto(client, productoAName, $"SKUA-{Guid.NewGuid():N}".Substring(0, 12), proveedorA);
-        var productoB = await CreateProducto(client, productoBName, $"SKUB-{Guid.NewGuid():N}".Substring(0, 12), proveedorB);
+        var productoA = await CreateProducto(client, productoAName, TestData.NewNumericSku(), proveedorA);
+        var productoB = await CreateProducto(client, productoBName, TestData.NewNumericSku(), proveedorB);
 
         var request = new CodigosBarraRequestDto(new[] { productoA.Id, productoB.Id });
         var response = await client.PostAsJsonAsync("/api/v1/etiquetas/codigos-barra/pdf", request);

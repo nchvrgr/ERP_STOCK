@@ -98,7 +98,7 @@ public sealed class ReportesTests : IClassFixture<WebApiFactory>
     private static async Task<Guid> CrearProductoAsync(HttpClient client, string code)
     {
         var proveedorId = await TestData.CreateProveedorAsync(client);
-        var sku = $"SKU-{Guid.NewGuid():N}";
+        var sku = TestData.NewNumericSku();
         var createResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto {Guid.NewGuid():N}",
             sku,

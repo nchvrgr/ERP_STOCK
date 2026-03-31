@@ -31,8 +31,8 @@ public sealed class ImportacionProductosTests : IClassFixture<WebApiFactory>
 
         var csv = new StringBuilder()
             .AppendLine("sku,nombre,codigo,precio_base,activo")
-            .AppendLine("SKU-1,Prod Uno,CODE-1,10,true")
-            .AppendLine("SKU-1,Prod Dos,CODE-2,12,true")
+            .AppendLine("1001,Prod Uno,CODE-1,10,true")
+            .AppendLine("1001,Prod Dos,CODE-2,12,true")
             .ToString();
 
         var content = BuildMultipart(csv);
@@ -56,8 +56,8 @@ public sealed class ImportacionProductosTests : IClassFixture<WebApiFactory>
             PermissionCodes.ProductoVer);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var sku1 = $"SKU-IMP-{Guid.NewGuid():N}";
-        var sku2 = $"SKU-IMP-{Guid.NewGuid():N}";
+        var sku1 = TestData.NewNumericSku();
+        var sku2 = TestData.NewNumericSku();
 
         var csv = new StringBuilder()
             .AppendLine("sku,nombre,codigo,precio_base,activo")

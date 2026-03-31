@@ -29,7 +29,7 @@ public sealed class StockMovementTests : IClassFixture<WebApiFactory>
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
         var proveedorId = await TestData.CreateProveedorAsync(client);
-        var sku = $"SKU-{Guid.NewGuid():N}";
+        var sku = TestData.NewNumericSku();
         var createResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto {Guid.NewGuid():N}",
             sku,
@@ -67,7 +67,7 @@ public sealed class StockMovementTests : IClassFixture<WebApiFactory>
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
         var proveedorId = await TestData.CreateProveedorAsync(client);
-        var sku = $"SKU-{Guid.NewGuid():N}";
+        var sku = TestData.NewNumericSku();
         var createResponse = await client.PostAsJsonAsync("/api/v1/productos", new ProductoCrearDto(
             $"Producto {Guid.NewGuid():N}",
             sku,
