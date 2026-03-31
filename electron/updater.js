@@ -411,6 +411,11 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();
   }
+
+  // Give the installer a brief head start before closing the app gracefully.
+  setTimeout(() => {
+    app.quit();
+  }, 800);
 }
 
 async function checkForUpdates(options = {}) {

@@ -57,7 +57,11 @@ function logElectron(message, error) {
 
 function prepareForInstallUpdate() {
   isInstallingUpdate = true;
+  isQuitting = true;
   logElectron('prepareForInstallUpdate');
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  }
 }
 
 function getBackendExecutable() {
