@@ -12,7 +12,6 @@ const UPDATE_CHANNEL_BRANCH = String(process.env.ERP_STOCK_UPDATE_BRANCH || 'cli
 const UPDATE_CHANNEL_PACKAGE_URL = process.env.ERP_STOCK_UPDATE_CHANNEL_URL ||
   `https://raw.githubusercontent.com/nchvrgr/ERP_STOCK/${UPDATE_CHANNEL_BRANCH}/package.json`;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const WINDOWS_INSTALL_ARGUMENTS = ['/S'];
 
 function normalizeVersion(version) {
   return String(version || '').trim().replace(/^v/i, '');
@@ -523,53 +522,28 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     if (!restartAccepted) {
       return { cancelled: true };
     }
+  }
 
-    const helperPath = createWindowsRestartHelper(
-      installerPath,
-      packageJson.build?.productName || 'Vinedos de la Villa',
-      normalizeVersion(options.versionLabel || ''),
-      process.pid
-    );
+  const openResult = await shell.openPath(installerPath);
+  if (openResult) {
+    log(`shell.openPath failed: ${openResult}`);
 
-    const helper = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', helperPath],
-      {
+    if (process.platform !== 'win32') {
+      throw new Error(openResult);
+    }
+
+    try {
+      const cmd = `start "" "${installerPath.replace(/"/g, '""')}"`;
+      const child = spawn('cmd.exe', ['/d', '/s', '/c', cmd], {
         detached: true,
         stdio: 'ignore',
         windowsHide: true
-      }
-    );
-    helper.unref();
-    log(`update helper started path=${helperPath}`);
-
-    if (typeof options.onInstallStarted === 'function') {
-      await options.onInstallStarted();
-    }
-
-    app.quit();
-    return { restarting: true };
-  }
-
-  let installerStarted = false;
-  if (process.platform === 'win32') {
-    try {
-      const child = spawn(installerPath, WINDOWS_INSTALL_ARGUMENTS, {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: false
       });
       child.unref();
-      installerStarted = true;
+      log(`installer started via cmd fallback path=${installerPath}`);
     } catch (error) {
-      log('installer spawn failed, falling back to shell.openPath', error);
-    }
-  }
-
-  if (!installerStarted) {
-    const openResult = await shell.openPath(installerPath);
-    if (openResult) {
-      throw new Error(openResult);
+      log('installer cmd fallback failed', error);
+      throw new Error(openResult || (error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -579,10 +553,12 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     await options.onInstallStarted();
   }
 
-  // Give the installer a brief head start before closing the app gracefully.
+  // Give the installer enough time to become visible before closing the app.
   setTimeout(() => {
     app.quit();
-  }, 800);
+  }, 1800);
+
+  return { restarting: true };
 }
 
 async function checkForUpdates(options = {}) {
