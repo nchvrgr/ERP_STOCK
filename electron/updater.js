@@ -510,56 +510,30 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
   }
 
   if (process.platform === 'win32') {
-    let started = false;
+    const openResult = await shell.openPath(installerPath);
+    if (!openResult) {
+      log(`installer opened via shell path=${installerPath}`);
+    } else {
+      log(`shell.openPath failed on windows: ${openResult}`);
 
-    try {
-      const child = spawn(installerPath, [], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: false
-      });
-      child.unref();
-      started = true;
-      log(`installer started via direct spawn path=${installerPath}`);
-    } catch (error) {
-      log('installer direct spawn failed', error);
-    }
-
-    if (!started) {
-      try {
-        const quotedPath = quotePowerShellLiteral(installerPath);
-        const command = `Start-Process -FilePath ${quotedPath}`;
-        const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], {
-          detached: true,
-          stdio: 'ignore',
-          windowsHide: true
-        });
-        child.unref();
-        started = true;
-        log(`installer started via powershell path=${installerPath}`);
-      } catch (error) {
-        log('installer powershell start failed', error);
-      }
-    }
-
-    if (!started) {
+      let started = false;
       try {
         const cmd = `start "" "${installerPath.replace(/"/g, '""')}"`;
         const child = spawn('cmd.exe', ['/d', '/s', '/c', cmd], {
           detached: true,
           stdio: 'ignore',
-          windowsHide: true
+          windowsHide: false
         });
         child.unref();
         started = true;
-        log(`installer started via cmd path=${installerPath}`);
+        log(`installer started via cmd fallback path=${installerPath}`);
       } catch (error) {
-        log('installer cmd start failed', error);
+        log('installer cmd fallback failed', error);
       }
-    }
 
-    if (!started) {
-      throw new Error('No se pudo ejecutar el instalador descargado.');
+      if (!started) {
+        throw new Error(`No se pudo ejecutar el instalador descargado. ${openResult}`);
+      }
     }
   } else {
     const openResult = await shell.openPath(installerPath);
@@ -599,10 +573,7 @@ async function checkForUpdates(options = {}) {
     });
   } catch (error) {
     log('update check failed', error);
-    dialog.showErrorBox(
-      'Error de actualizacion',
-      `No se pudo iniciar el instalador. ${error instanceof Error ? error.message : String(error)}`
-    );
+    // Silent failure by design during background checks.
   }
 }
 

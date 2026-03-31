@@ -27,7 +27,28 @@ npm version $Version --no-git-tag-version | Out-Null
 
 # 2) Build de instalador para generar .exe, .blockmap y latest.yml.
 if (-not $SkipBuild) {
-  npx electron-builder --win nsis
+  Get-Process | Where-Object {
+    $_.Path -like '*release\\win-unpacked*' -or $_.Path -like '*release2\\win-unpacked*'
+  } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+  if (Test-Path 'release2') {
+    Remove-Item 'release2' -Recurse -Force
+  }
+
+  npx electron-builder --win dir --config.directories.output=release2
+  npx electron-builder --win nsis --config.directories.output=release2
+
+  Copy-Item 'release2\Vinedos.de.la.Villa.Setup.exe' 'release\Vinedos.de.la.Villa.Setup.exe' -Force
+  Copy-Item 'release2\Vinedos.de.la.Villa.Setup.exe.blockmap' 'release\Vinedos.de.la.Villa.Setup.exe.blockmap' -Force
+  Copy-Item 'release2\latest.yml' 'release\latest.yml' -Force
+
+  New-Item -ItemType Directory -Path 'release\win-unpacked' -Force | Out-Null
+  robocopy 'release2\win-unpacked' 'release\win-unpacked' /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS | Out-Null
+  if ($LASTEXITCODE -ge 8) {
+    throw "Robocopy fallo con codigo $LASTEXITCODE"
+  }
+
+  Remove-Item 'release2' -Recurse -Force
 }
 
 # 3) Commit + tag + push.
