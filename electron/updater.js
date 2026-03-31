@@ -7,8 +7,12 @@ const { app, dialog, shell } = require('electron/main');
 
 const packageJson = require('../package.json');
 
-const RELEASES_API_BASE_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases';
+const RELEASES_TAGS_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases/tags';
+const UPDATE_CHANNEL_BRANCH = String(process.env.ERP_STOCK_UPDATE_BRANCH || 'client').trim() || 'client';
+const UPDATE_CHANNEL_PACKAGE_URL = process.env.ERP_STOCK_UPDATE_CHANNEL_URL ||
+  `https://raw.githubusercontent.com/nchvrgr/ERP_STOCK/${UPDATE_CHANNEL_BRANCH}/package.json`;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const WINDOWS_INSTALL_ARGUMENTS = ['/S'];
 
 function normalizeVersion(version) {
   return String(version || '').trim().replace(/^v/i, '');
@@ -278,30 +282,13 @@ async function resolveUpdateState(options = {}) {
 
   const testRelease = getTestReleaseConfig();
   const currentVersion = normalizeVersion(packageJson.version);
-  let release = testRelease;
-
-  if (!release) {
-    const releaseUrl =
-      process.env.ERP_STOCK_UPDATE_RELEASE_URL ||
-      `${RELEASES_API_BASE_URL}/latest`;
-    release = await requestJson(releaseUrl);
-    log(`update check using release url=${releaseUrl}`);
-  }
-
-  const latestVersion = normalizeVersion(release?.tag_name);
-
-  if (!latestVersion) {
-    log('update unavailable: latest release without valid tag_name');
-    return {
-      status: 'unavailable',
-      currentVersion,
-      latestVersion: currentVersion,
-      message: 'No se pudo determinar la ultima version publicada.'
-    };
-  }
+  const channelPayload = testRelease || await requestJson(UPDATE_CHANNEL_PACKAGE_URL);
+  const latestVersion = normalizeVersion(testRelease ? channelPayload?.tag_name : channelPayload?.version);
 
   if (testRelease) {
     log(`update check using test mode=${process.env.ERP_STOCK_UPDATE_TEST_MODE}`);
+  } else {
+    log(`update check using branch=${UPDATE_CHANNEL_BRANCH} url=${UPDATE_CHANNEL_PACKAGE_URL}`);
   }
 
   if (!latestVersion || !isNewerVersion(latestVersion, currentVersion)) {
@@ -311,6 +298,26 @@ async function resolveUpdateState(options = {}) {
       currentVersion,
       latestVersion: latestVersion || currentVersion
     };
+  }
+
+  let release = testRelease;
+  if (!release) {
+    const releaseUrl =
+      process.env.ERP_STOCK_UPDATE_RELEASE_URL ||
+      `${RELEASES_TAGS_URL}/v${encodeURIComponent(latestVersion)}`;
+
+    try {
+      release = await requestJson(releaseUrl);
+      log(`update release lookup url=${releaseUrl}`);
+    } catch (error) {
+      log(`update unavailable: channelVersion=${latestVersion} releaseLookupFailed=${error instanceof Error ? error.message : String(error)}`);
+      return {
+        status: 'unavailable',
+        currentVersion,
+        latestVersion,
+        message: `Se detecto la version ${latestVersion} en la branch ${UPDATE_CHANNEL_BRANCH}, pero todavia no hay un instalador publicado para esa version.`
+      };
+    }
   }
 
   const releaseVersion = normalizeVersion(release?.tag_name);
@@ -371,13 +378,13 @@ async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
 async function promptForRestartInstall(mainWindow, versionLabel) {
   const result = await dialog.showMessageBox(mainWindow || null, {
     type: 'info',
-    buttons: ['Instalar ahora', 'Cancelar'],
+    buttons: ['Aceptar', 'Cancelar'],
     defaultId: 0,
     cancelId: 1,
     noLink: true,
-    title: 'Instalar actualizacion',
-    message: `Se ejecutara el instalador de la version ${versionLabel}.`,
-    detail: 'La aplicacion no se cerrara automaticamente.'
+    title: 'Reiniciar para actualizar',
+    message: `Se instalara la version ${versionLabel} y la app se reiniciara automaticamente.`,
+    detail: 'Guarda cualquier cambio pendiente antes de continuar.'
   });
 
   return result.response === 0;
@@ -415,16 +422,18 @@ function createWindowsRestartHelper(installerPath, productName, targetVersion, p
     '      $candidate = Join-Path $entry.InstallLocation ($Name + ".exe")',
     '      if (Test-Path $candidate) { return $candidate }',
     '    }',
-    '    if ($entry.DisplayIcon) {',
-    "      $displayIconPath = ([string]$entry.DisplayIcon).Split(',')[0].Trim('\"')",
-    '      if ($displayIconPath -and (Test-Path $displayIconPath)) { return $displayIconPath }',
-    '    }',
     "    $matches = [regex]::Matches([string]$entry.UninstallString, '\"([^\"]+)\"')",
     '    if ($matches.Count -gt 0) {',
     "      $uninstallPath = $matches[0].Groups[1].Value",
     '      if ($uninstallPath) {',
     '        $candidate = Join-Path (Split-Path -Parent $uninstallPath) ($Name + ".exe")',
     '        if (Test-Path $candidate) { return $candidate }',
+    '      }',
+    '    }',
+    '    if ($entry.DisplayIcon) {',
+    "      $displayIconPath = ([string]$entry.DisplayIcon).Split(',')[0].Trim('\"')",
+    "      if ($displayIconPath -and ([System.IO.Path]::GetExtension($displayIconPath) -ieq '.exe') -and (Test-Path $displayIconPath)) {",
+    '        return $displayIconPath',
     '      }',
     '    }',
     '  }',
@@ -448,21 +457,69 @@ function createWindowsRestartHelper(installerPath, productName, targetVersion, p
     '  }',
     '  return $false',
     '}',
-    'function Wait-ForTargetVersion {',
-    '  param([string]$Name, [string]$ExpectedVersion, [int]$TimeoutSeconds)',
+    'function Get-TrackedProcesses {',
+    '  param([string]$Name)',
+    "  $programsRoot = Join-Path $env:LOCALAPPDATA 'Programs'",
+    "  $appProcessName = [System.IO.Path]::GetFileNameWithoutExtension(($Name + '.exe'))",
+    "  $processNames = @($appProcessName, 'ApiWeb') | Where-Object { $_ } | Select-Object -Unique",
+    '  $matches = @()',
+    '  foreach ($processName in $processNames) {',
+    '    $matches += @(Get-Process -Name $processName -ErrorAction SilentlyContinue |',
+    '      Where-Object { $_.Path -and $_.Path.StartsWith($programsRoot, [System.StringComparison]::OrdinalIgnoreCase) })',
+    '  }',
+    '  return $matches | Sort-Object Id -Unique',
+    '}',
+    'function Wait-ForAppShutdown {',
+    '  param([string]$Name, [int]$TimeoutSeconds)',
     '  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)',
     '  while ((Get-Date) -lt $deadline) {',
-    '    $entry = Resolve-InstalledEntry -Name $Name',
-    '    if ($entry -and [string]$entry.DisplayVersion -eq $ExpectedVersion) {',
-    '      return $entry',
-    '    }',
-    '    Start-Sleep -Seconds 2',
+    '    $running = @(Get-TrackedProcesses -Name $Name)',
+    '    if (-not $running -or $running.Count -eq 0) { return $true }',
+    '    Start-Sleep -Seconds 1',
     '  }',
-    '  return $null',
+    '  return $false',
+    '}',
+    'function Stop-LingeringProcesses {',
+    '  param([string]$Name)',
+    '  $running = @(Get-TrackedProcesses -Name $Name)',
+    '  if (-not $running -or $running.Count -eq 0) { return $true }',
+    '  foreach ($process in $running) {',
+    '    Write-HelperLog "stopping lingering process name=$($process.ProcessName) pid=$($process.Id) path=$($process.Path)"',
+    '    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue',
+    '  }',
+    '  Start-Sleep -Seconds 2',
+    '  return (Wait-ForAppShutdown -Name $Name -TimeoutSeconds 15)',
+    '}',
+    'function Start-AppWithRetry {',
+    '  param([string]$ExePath, [int]$Attempts, [int]$DelaySeconds)',
+    "  $processName = [System.IO.Path]::GetFileNameWithoutExtension($ExePath)",
+    '  for ($attempt = 1; $attempt -le $Attempts; $attempt += 1) {',
+    '    if (-not (Test-Path $ExePath)) {',
+    '      Write-HelperLog "launch skipped missing exe=$ExePath"',
+    '      return $false',
+    '    }',
+    '    Start-Process -FilePath $ExePath -WorkingDirectory (Split-Path -Parent $ExePath) | Out-Null',
+    '    Write-HelperLog "launch attempt=$attempt exe=$ExePath"',
+    '    Start-Sleep -Seconds $DelaySeconds',
+    '    $running = Get-Process -Name $processName -ErrorAction SilentlyContinue |',
+    '      Where-Object { $_.Path -eq $ExePath } |',
+    '      Select-Object -First 1',
+    '    if ($running) {',
+    '      Write-HelperLog "launch confirmed attempt=$attempt pid=$($running.Id)"',
+    '      return $true',
+    '    }',
+    '  }',
+    '  return $false',
     '}',
     'Write-HelperLog "helper start targetVersion=$targetVersion parentPid=$parentPid installer=$installer"',
-    '$parentExited = Wait-ForProcessExit -Pid $parentPid -TimeoutSeconds 60',
+    '$parentExited = Wait-ForProcessExit -TargetPid $parentPid -TimeoutSeconds 60',
     'Write-HelperLog "parent exited=$parentExited"',
+    '$gracefulShutdown = Wait-ForAppShutdown -Name $productName -TimeoutSeconds 20',
+    'Write-HelperLog "graceful shutdown complete=$gracefulShutdown"',
+    'if (-not $gracefulShutdown) {',
+    '  $forcedShutdown = Stop-LingeringProcesses -Name $productName',
+    '  Write-HelperLog "forced shutdown complete=$forcedShutdown"',
+    '}',
     'Start-Sleep -Seconds 1',
     "$installerProcess = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait -WindowStyle Hidden",
     '$installerExitCode = if ($installerProcess) { $installerProcess.ExitCode } else { -1 }',
@@ -471,23 +528,48 @@ function createWindowsRestartHelper(installerPath, productName, targetVersion, p
     '  Remove-Item -LiteralPath $PSCommandPath -Force',
     '  exit',
     '}',
-    '$installedEntry = Wait-ForTargetVersion -Name $productName -ExpectedVersion $targetVersion -TimeoutSeconds 90',
-    'if (-not $installedEntry) {',
-    '  Write-HelperLog "target version not detected after install"',
-    '  Remove-Item -LiteralPath $PSCommandPath -Force',
-    '  exit',
-    '}',
     '$installedExe = Resolve-InstalledExe -Name $productName',
-    'Write-HelperLog "installed exe=$installedExe version=$($installedEntry.DisplayVersion)"',
+    '$installedEntry = Resolve-InstalledEntry -Name $productName',
+    'Write-HelperLog "post-install exe=$installedExe registryVersion=$($installedEntry.DisplayVersion)"',
     'if ($installedExe -and (Test-Path $installedExe)) {',
-    '  Start-Process -FilePath $installedExe | Out-Null',
-    '  Write-HelperLog "restarted installed app"',
+    '  Start-Sleep -Seconds 3',
+    '  $started = Start-AppWithRetry -ExePath $installedExe -Attempts 5 -DelaySeconds 3',
+    '  Write-HelperLog "restarted installed app started=$started"',
     '}',
     'Remove-Item -LiteralPath $PSCommandPath -Force'
   ].join('\r\n');
 
   fs.writeFileSync(helperPath, helperScript);
   return helperPath;
+}
+
+function createWindowsRestartLauncher(helperPath) {
+  const launcherBaseName = `vinedos-update-restart-${Date.now()}`;
+  const launcherPath = path.join(os.tmpdir(), `${launcherBaseName}.cmd`);
+  const scriptPath = path.join(os.tmpdir(), `${launcherBaseName}.vbs`);
+  const powershellPath = path.join(
+    process.env.SystemRoot || 'C:\\Windows',
+    'System32',
+    'WindowsPowerShell',
+    'v1.0',
+    'powershell.exe'
+  );
+  const vbsScript = [
+    'Set shell = CreateObject("WScript.Shell")',
+    'quote = Chr(34)',
+    `command = quote & "${powershellPath.replace(/"/g, '""')}" & quote & " -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " & quote & "${helperPath.replace(/"/g, '""')}" & quote`,
+    'shell.Run command, 0, False',
+    'CreateObject("Scripting.FileSystemObject").DeleteFile WScript.ScriptFullName, True'
+  ].join('\r\n');
+  const launcherScript = [
+    '@echo off',
+    `start "" /b "%SystemRoot%\\System32\\wscript.exe" //nologo "${scriptPath}"`,
+    'del "%~f0" >nul 2>&1'
+  ].join('\r\n');
+
+  fs.writeFileSync(scriptPath, vbsScript);
+  fs.writeFileSync(launcherPath, launcherScript);
+  return launcherPath;
 }
 
 async function runInstaller(asset, mainWindow, log, options = {}) {
@@ -509,46 +591,72 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     throw new Error(`No se encontró el instalador descargado: ${installerPath}`);
   }
 
-  if (process.platform === 'win32') {
-    const openResult = await shell.openPath(installerPath);
-    if (!openResult) {
-      log(`installer opened via shell path=${installerPath}`);
-    } else {
-      log(`shell.openPath failed on windows: ${openResult}`);
+  if (options.restartAfterInstall && process.platform === 'win32') {
+    const restartAccepted = await promptForRestartInstall(mainWindow, options.versionLabel || 'nueva');
+    log(`update restart prompt accepted=${restartAccepted}`);
 
-      let started = false;
-      try {
-        const cmd = `start "" "${installerPath.replace(/"/g, '""')}"`;
-        const child = spawn('cmd.exe', ['/d', '/s', '/c', cmd], {
-          detached: true,
-          stdio: 'ignore',
-          windowsHide: false
-        });
-        child.unref();
-        started = true;
-        log(`installer started via cmd fallback path=${installerPath}`);
-      } catch (error) {
-        log('installer cmd fallback failed', error);
-      }
-
-      if (!started) {
-        throw new Error(`No se pudo ejecutar el instalador descargado. ${openResult}`);
-      }
+    if (!restartAccepted) {
+      return { cancelled: true };
     }
-  } else {
+
+    const helperPath = createWindowsRestartHelper(
+      installerPath,
+      packageJson.build?.productName || 'Vinedos de la Villa',
+      normalizeVersion(options.versionLabel || ''),
+      process.pid
+    );
+    const launcherPath = createWindowsRestartLauncher(helperPath);
+
+    const helper = spawn(
+      launcherPath,
+      [],
+      {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        shell: true
+      }
+    );
+    helper.unref();
+    log(`update helper started launcher=${launcherPath} helper=${helperPath}`);
+
+    if (typeof options.onInstallStarted === 'function') {
+      await options.onInstallStarted();
+    }
+
+    setTimeout(() => {
+      app.quit();
+    }, 1500);
+    return { restarting: true };
+  }
+
+  let installerStarted = false;
+  if (process.platform === 'win32') {
+    try {
+      const child = spawn(installerPath, WINDOWS_INSTALL_ARGUMENTS, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false
+      });
+      child.unref();
+      installerStarted = true;
+    } catch (error) {
+      log('installer spawn failed, falling back to shell.openPath', error);
+    }
+  }
+
+  if (!installerStarted) {
     const openResult = await shell.openPath(installerPath);
     if (openResult) {
-      log(`shell.openPath failed: ${openResult}`);
       throw new Error(openResult);
     }
-    log(`installer opened path=${installerPath}`);
   }
+
+  log(`installer opened path=${installerPath}`);
 
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();
   }
-
-  return { started: true };
 }
 
 async function checkForUpdates(options = {}) {
@@ -565,6 +673,9 @@ async function checkForUpdates(options = {}) {
     log(`update prompt result accepted=${accepted}`);
 
     if (!accepted) {
+      if (updateState.isMandatory) {
+        app.quit();
+      }
       return;
     }
 
@@ -573,7 +684,10 @@ async function checkForUpdates(options = {}) {
     });
   } catch (error) {
     log('update check failed', error);
-    // Silent failure by design during background checks.
+    dialog.showErrorBox(
+      'Error de actualizacion',
+      `No se pudo iniciar el instalador. ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -643,7 +757,7 @@ async function installLatestUpdateOnDemand(options = {}) {
     }
 
     const installResult = await runInstaller(updateState.installerAsset, mainWindow, log, {
-      restartAfterInstall: false,
+      restartAfterInstall: true,
       versionLabel: updateState.latestVersion,
       onInstallStarted: options.onInstallStarted
     });
@@ -661,8 +775,7 @@ async function installLatestUpdateOnDemand(options = {}) {
       status: 'installing',
       currentVersion: updateState.currentVersion,
       latestVersion: updateState.latestVersion,
-      isMandatory: updateState.isMandatory,
-      message: `Instalador ejecutado para instalar la version ${updateState.latestVersion}.`
+      message: `Reiniciando para instalar la version ${updateState.latestVersion}.`
     };
   } catch (error) {
     log('update install on demand failed', error);
