@@ -371,13 +371,13 @@ async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
 async function promptForRestartInstall(mainWindow, versionLabel) {
   const result = await dialog.showMessageBox(mainWindow || null, {
     type: 'info',
-    buttons: ['Abrir instalador', 'Cancelar'],
+    buttons: ['Actualizar ahora', 'Cancelar'],
     defaultId: 0,
     cancelId: 1,
     noLink: true,
-    title: 'Instalar actualizacion',
-    message: `Se abrira el instalador de la version ${versionLabel}.`,
-    detail: 'La aplicacion no se cerrara automaticamente.'
+    title: 'Reiniciar para actualizar',
+    message: `Se instalara la version ${versionLabel} y la app se reiniciara automaticamente.`,
+    detail: 'Guarda cualquier cambio pendiente antes de continuar.'
   });
 
   return result.response === 0;
@@ -518,14 +518,7 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     }
   }
 
-  const openResult = await shell.openPath(installerPath);
-  if (openResult) {
-    log(`shell.openPath failed: ${openResult}`);
-
-    if (process.platform !== 'win32') {
-      throw new Error(openResult);
-    }
-
+  if (process.platform === 'win32') {
     try {
       const cmd = `start "" "${installerPath.replace(/"/g, '""')}"`;
       const child = spawn('cmd.exe', ['/d', '/s', '/c', cmd], {
@@ -534,17 +527,28 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
         windowsHide: true
       });
       child.unref();
-      log(`installer started via cmd fallback path=${installerPath}`);
+      log(`installer started via cmd path=${installerPath}`);
     } catch (error) {
-      log('installer cmd fallback failed', error);
-      throw new Error(openResult || (error instanceof Error ? error.message : String(error)));
+      log('installer cmd start failed', error);
+      throw new Error(error instanceof Error ? error.message : String(error));
     }
+  } else {
+    const openResult = await shell.openPath(installerPath);
+    if (openResult) {
+      log(`shell.openPath failed: ${openResult}`);
+      throw new Error(openResult);
+    }
+    log(`installer opened path=${installerPath}`);
   }
-
-  log(`installer opened path=${installerPath}`);
 
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();
+  }
+
+  if (options.restartAfterInstall) {
+    setTimeout(() => {
+      app.quit();
+    }, 1800);
   }
 
   return { started: true };
@@ -666,7 +670,7 @@ async function installLatestUpdateOnDemand(options = {}) {
       status: 'installing',
       currentVersion: updateState.currentVersion,
       latestVersion: updateState.latestVersion,
-      message: `Instalador abierto para la version ${updateState.latestVersion}.`
+      message: `Reiniciando para instalar la version ${updateState.latestVersion}.`
     };
   } catch (error) {
     log('update install on demand failed', error);
