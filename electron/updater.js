@@ -8,6 +8,9 @@ const { app, dialog, shell } = require('electron/main');
 const packageJson = require('../package.json');
 
 const RELEASES_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases/latest';
+const UPDATE_CHANNEL_BRANCH = String(process.env.ERP_STOCK_UPDATE_BRANCH || 'client').trim() || 'client';
+const UPDATE_CHANNEL_PACKAGE_URL = process.env.ERP_STOCK_UPDATE_CHANNEL_URL ||
+  `https://raw.githubusercontent.com/nchvrgr/ERP_STOCK/${UPDATE_CHANNEL_BRANCH}/package.json`;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function normalizeVersion(version) {
@@ -277,12 +280,14 @@ async function resolveUpdateState(options = {}) {
   const log = typeof options.log === 'function' ? options.log : () => {};
 
   const testRelease = getTestReleaseConfig();
-  const release = testRelease || await requestJson(process.env.ERP_STOCK_UPDATE_RELEASE_URL || RELEASES_URL);
-  const latestVersion = normalizeVersion(release?.tag_name);
   const currentVersion = normalizeVersion(packageJson.version);
+  const channelPayload = testRelease || await requestJson(UPDATE_CHANNEL_PACKAGE_URL);
+  const latestVersion = normalizeVersion(testRelease ? channelPayload?.tag_name : channelPayload?.version);
 
   if (testRelease) {
     log(`update check using test mode=${process.env.ERP_STOCK_UPDATE_TEST_MODE}`);
+  } else {
+    log(`update check using branch=${UPDATE_CHANNEL_BRANCH} url=${UPDATE_CHANNEL_PACKAGE_URL}`);
   }
 
   if (!latestVersion || !isNewerVersion(latestVersion, currentVersion)) {
@@ -291,6 +296,19 @@ async function resolveUpdateState(options = {}) {
       status: 'up-to-date',
       currentVersion,
       latestVersion: latestVersion || currentVersion
+    };
+  }
+
+  const release = testRelease || await requestJson(process.env.ERP_STOCK_UPDATE_RELEASE_URL || RELEASES_URL);
+  const releaseVersion = normalizeVersion(release?.tag_name);
+
+  if (!testRelease && releaseVersion !== latestVersion) {
+    log(`update unavailable: channelVersion=${latestVersion} releaseVersion=${releaseVersion || 'none'}`);
+    return {
+      status: 'unavailable',
+      currentVersion,
+      latestVersion,
+      message: `Se detecto la version ${latestVersion} en la branch ${UPDATE_CHANNEL_BRANCH}, pero todavia no hay un instalador publicado para esa version.`
     };
   }
 
