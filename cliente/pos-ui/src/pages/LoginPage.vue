@@ -226,7 +226,16 @@ const installAppUpdate = async () => {
       updateNotice.value = {
         status: 'installing',
         type: 'success',
-        message: result.message || `Instalando version ${result?.latestVersion || ''}.`
+        message: result.message || `Reiniciando para instalar la version ${result?.latestVersion || ''}.`
+      };
+      return;
+    }
+
+    if (result?.status === 'cancelled') {
+      updateNotice.value = {
+        status: 'available',
+        type: 'info',
+        message: `Se encontro una nueva actualizacion: v${result.latestVersion}.`
       };
       return;
     }

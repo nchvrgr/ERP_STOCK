@@ -7,11 +7,12 @@ const { app, dialog, shell } = require('electron/main');
 
 const packageJson = require('../package.json');
 
-const RELEASES_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases/latest';
+const RELEASES_TAGS_URL = 'https://api.github.com/repos/nchvrgr/ERP_STOCK/releases/tags';
 const UPDATE_CHANNEL_BRANCH = String(process.env.ERP_STOCK_UPDATE_BRANCH || 'client').trim() || 'client';
 const UPDATE_CHANNEL_PACKAGE_URL = process.env.ERP_STOCK_UPDATE_CHANNEL_URL ||
   `https://raw.githubusercontent.com/nchvrgr/ERP_STOCK/${UPDATE_CHANNEL_BRANCH}/package.json`;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const WINDOWS_INSTALL_ARGUMENTS = ['/S'];
 
 function normalizeVersion(version) {
   return String(version || '').trim().replace(/^v/i, '');
@@ -299,18 +300,27 @@ async function resolveUpdateState(options = {}) {
     };
   }
 
-  const release = testRelease || await requestJson(process.env.ERP_STOCK_UPDATE_RELEASE_URL || RELEASES_URL);
-  const releaseVersion = normalizeVersion(release?.tag_name);
+  let release = testRelease;
+  if (!release) {
+    const releaseUrl =
+      process.env.ERP_STOCK_UPDATE_RELEASE_URL ||
+      `${RELEASES_TAGS_URL}/v${encodeURIComponent(latestVersion)}`;
 
-  if (!testRelease && releaseVersion !== latestVersion) {
-    log(`update unavailable: channelVersion=${latestVersion} releaseVersion=${releaseVersion || 'none'}`);
-    return {
-      status: 'unavailable',
-      currentVersion,
-      latestVersion,
-      message: `Se detecto la version ${latestVersion} en la branch ${UPDATE_CHANNEL_BRANCH}, pero todavia no hay un instalador publicado para esa version.`
-    };
+    try {
+      release = await requestJson(releaseUrl);
+      log(`update release lookup url=${releaseUrl}`);
+    } catch (error) {
+      log(`update unavailable: channelVersion=${latestVersion} releaseLookupFailed=${error instanceof Error ? error.message : String(error)}`);
+      return {
+        status: 'unavailable',
+        currentVersion,
+        latestVersion,
+        message: `Se detecto la version ${latestVersion} en la branch ${UPDATE_CHANNEL_BRANCH}, pero todavia no hay un instalador publicado para esa version.`
+      };
+    }
   }
+
+  const releaseVersion = normalizeVersion(release?.tag_name);
 
   const installerAsset = findInstallerAsset(release);
   if (!hasUsableInstallerSource(installerAsset)) {
@@ -365,6 +375,128 @@ async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
   return result.response === 0;
 }
 
+async function promptForRestartInstall(mainWindow, versionLabel) {
+  const result = await dialog.showMessageBox(mainWindow || null, {
+    type: 'info',
+    buttons: ['Aceptar', 'Cancelar'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+    title: 'Reiniciar para actualizar',
+    message: `Se instalara la version ${versionLabel} y la app se reiniciara automaticamente.`,
+    detail: 'Guarda cualquier cambio pendiente antes de continuar.'
+  });
+
+  return result.response === 0;
+}
+
+function quotePowerShellLiteral(value) {
+  return `'${String(value || '').replace(/'/g, "''")}'`;
+}
+
+function createWindowsRestartHelper(installerPath, productName, targetVersion, parentPid) {
+  const helperPath = path.join(os.tmpdir(), `vinedos-update-restart-${Date.now()}.ps1`);
+  const helperScript = [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    `$installer = ${quotePowerShellLiteral(installerPath)}`,
+    `$productName = ${quotePowerShellLiteral(productName)}`,
+    `$targetVersion = ${quotePowerShellLiteral(targetVersion)}`,
+    `$parentPid = ${Number.isFinite(parentPid) ? parentPid : -1}`,
+    "$logPath = Join-Path $env:TEMP 'vinedos-update-helper.log'",
+    'function Write-HelperLog {',
+    '  param([string]$Message)',
+    '  Add-Content -LiteralPath $logPath -Value ("[{0}] {1}" -f (Get-Date).ToString("o"), $Message)',
+    '}',
+    'function Resolve-InstalledEntry {',
+    '  param([string]$Name)',
+    "  return Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue |",
+    '    Where-Object { $_.DisplayName -like ($Name + "*") -and $_.UninstallString } |',
+    '    Sort-Object DisplayVersion -Descending |',
+    '    Select-Object -First 1',
+    '}',
+    'function Resolve-InstalledExe {',
+    '  param([string]$Name)',
+    '  $entry = Resolve-InstalledEntry -Name $Name',
+    '  if ($entry) {',
+    '    if ($entry.InstallLocation) {',
+    '      $candidate = Join-Path $entry.InstallLocation ($Name + ".exe")',
+    '      if (Test-Path $candidate) { return $candidate }',
+    '    }',
+    '    if ($entry.DisplayIcon) {',
+    "      $displayIconPath = ([string]$entry.DisplayIcon).Split(',')[0].Trim('\"')",
+    '      if ($displayIconPath -and (Test-Path $displayIconPath)) { return $displayIconPath }',
+    '    }',
+    "    $matches = [regex]::Matches([string]$entry.UninstallString, '\"([^\"]+)\"')",
+    '    if ($matches.Count -gt 0) {',
+    "      $uninstallPath = $matches[0].Groups[1].Value",
+    '      if ($uninstallPath) {',
+    '        $candidate = Join-Path (Split-Path -Parent $uninstallPath) ($Name + ".exe")',
+    '        if (Test-Path $candidate) { return $candidate }',
+    '      }',
+    '    }',
+    '  }',
+    "  $programsDir = Join-Path $env:LOCALAPPDATA 'Programs'",
+    '  if (Test-Path $programsDir) {',
+    '    $candidate = Get-ChildItem -Path $programsDir -Recurse -Filter ($Name + ".exe") -ErrorAction SilentlyContinue |',
+    '      Sort-Object LastWriteTime -Descending |',
+    '      Select-Object -First 1 -ExpandProperty FullName',
+    '    if ($candidate) { return $candidate }',
+    '  }',
+    '  return $null',
+    '}',
+    'function Wait-ForProcessExit {',
+    '  param([int]$TargetPid, [int]$TimeoutSeconds)',
+    '  if ($TargetPid -lt 1) { return $true }',
+    '  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)',
+    '  while ((Get-Date) -lt $deadline) {',
+    '    $process = Get-Process -Id $TargetPid -ErrorAction SilentlyContinue',
+    '    if (-not $process) { return $true }',
+    '    Start-Sleep -Milliseconds 500',
+    '  }',
+    '  return $false',
+    '}',
+    'function Wait-ForTargetVersion {',
+    '  param([string]$Name, [string]$ExpectedVersion, [int]$TimeoutSeconds)',
+    '  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)',
+    '  while ((Get-Date) -lt $deadline) {',
+    '    $entry = Resolve-InstalledEntry -Name $Name',
+    '    if ($entry -and [string]$entry.DisplayVersion -eq $ExpectedVersion) {',
+    '      return $entry',
+    '    }',
+    '    Start-Sleep -Seconds 2',
+    '  }',
+    '  return $null',
+    '}',
+    'Write-HelperLog "helper start targetVersion=$targetVersion parentPid=$parentPid installer=$installer"',
+    '$parentExited = Wait-ForProcessExit -Pid $parentPid -TimeoutSeconds 60',
+    'Write-HelperLog "parent exited=$parentExited"',
+    'Start-Sleep -Seconds 1',
+    "$installerProcess = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait -WindowStyle Hidden",
+    '$installerExitCode = if ($installerProcess) { $installerProcess.ExitCode } else { -1 }',
+    'Write-HelperLog "installer exit code=$installerExitCode"',
+    'if ($installerExitCode -ne 0) {',
+    '  Remove-Item -LiteralPath $PSCommandPath -Force',
+    '  exit',
+    '}',
+    '$installedEntry = Wait-ForTargetVersion -Name $productName -ExpectedVersion $targetVersion -TimeoutSeconds 90',
+    'if (-not $installedEntry) {',
+    '  Write-HelperLog "target version not detected after install"',
+    '  Remove-Item -LiteralPath $PSCommandPath -Force',
+    '  exit',
+    '}',
+    '$installedExe = Resolve-InstalledExe -Name $productName',
+    'Write-HelperLog "installed exe=$installedExe version=$($installedEntry.DisplayVersion)"',
+    'if ($installedExe -and (Test-Path $installedExe)) {',
+    '  Start-Process -FilePath $installedExe | Out-Null',
+    '  Write-HelperLog "restarted installed app"',
+    '}',
+    'Remove-Item -LiteralPath $PSCommandPath -Force'
+  ].join('\r\n');
+
+  fs.writeFileSync(helperPath, helperScript);
+  return helperPath;
+}
+
 async function runInstaller(asset, mainWindow, log, options = {}) {
   let installerPath = String(asset.local_path || '').trim();
 
@@ -384,10 +516,45 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     throw new Error(`No se encontró el instalador descargado: ${installerPath}`);
   }
 
+  if (options.restartAfterInstall && process.platform === 'win32') {
+    const restartAccepted = await promptForRestartInstall(mainWindow, options.versionLabel || 'nueva');
+    log(`update restart prompt accepted=${restartAccepted}`);
+
+    if (!restartAccepted) {
+      return { cancelled: true };
+    }
+
+    const helperPath = createWindowsRestartHelper(
+      installerPath,
+      packageJson.build?.productName || 'Vinedos de la Villa',
+      normalizeVersion(options.versionLabel || ''),
+      process.pid
+    );
+
+    const helper = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', helperPath],
+      {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true
+      }
+    );
+    helper.unref();
+    log(`update helper started path=${helperPath}`);
+
+    if (typeof options.onInstallStarted === 'function') {
+      await options.onInstallStarted();
+    }
+
+    app.quit();
+    return { restarting: true };
+  }
+
   let installerStarted = false;
   if (process.platform === 'win32') {
     try {
-      const child = spawn(installerPath, [], {
+      const child = spawn(installerPath, WINDOWS_INSTALL_ARGUMENTS, {
         detached: true,
         stdio: 'ignore',
         windowsHide: false
@@ -515,15 +682,26 @@ async function installLatestUpdateOnDemand(options = {}) {
       };
     }
 
-    await runInstaller(updateState.installerAsset, mainWindow, log, {
+    const installResult = await runInstaller(updateState.installerAsset, mainWindow, log, {
+      restartAfterInstall: true,
+      versionLabel: updateState.latestVersion,
       onInstallStarted: options.onInstallStarted
     });
+
+    if (installResult?.cancelled) {
+      return {
+        status: 'cancelled',
+        currentVersion: updateState.currentVersion,
+        latestVersion: updateState.latestVersion,
+        message: 'La actualizacion fue cancelada.'
+      };
+    }
 
     return {
       status: 'installing',
       currentVersion: updateState.currentVersion,
       latestVersion: updateState.latestVersion,
-      message: `Instalando version ${updateState.latestVersion}.`
+      message: `Reiniciando para instalar la version ${updateState.latestVersion}.`
     };
   } catch (error) {
     log('update install on demand failed', error);
