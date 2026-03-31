@@ -441,14 +441,14 @@
               </div>
             </v-col>
           </v-row>
-          <div class="product-final-price">
+          <div :class="['product-final-price', { 'product-final-price--night': isNightMode }]">
             <span class="product-final-price__label">Precio final:</span>
             <span class="product-final-price__value">{{ formatMoney(precioVentaCalculado) }}</span>
           </div>
 
           <div class="text-subtitle-2 product-section-title">Stock</div>
           <v-row dense>
-            <v-col cols="12" md="4">
+            <v-col v-if="productEditorMode === 'new'" cols="12" md="4">
               <v-text-field
                 v-model="form.stockInicial"
                 label="Stock inicial"
@@ -457,13 +457,12 @@
                 step="0.01"
                 variant="outlined"
                 density="comfortable"
-                :disabled="!!form.id"
                 :error-messages="errors.stockInicial"
                 @focus="clearZeroOnFocus(form, 'stockInicial')"
                 @blur="validateField('stockInicial')"
               />
             </v-col>
-            <v-col cols="12" md="4">
+            <v-col cols="12" :md="productEditorMode === 'new' ? 4 : 6">
               <v-text-field
                 v-model="stockConfig.stockMinimo"
                 label="Stock minimo"
@@ -477,8 +476,8 @@
                 @blur="validateField('stockMinimo')"
               />
             </v-col>
-            <v-col cols="12" md="4">
-              <div class="product-status-row">
+            <v-col cols="12" :md="productEditorMode === 'new' ? 4 : 6">
+              <div :class="['product-status-row', { 'product-status-row--night': isNightMode }]">
                 <span class="product-status-row__label">Estado:</span>
                 <v-switch
                   :model-value="form.isActive"
@@ -626,6 +625,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useTheme } from 'vuetify';
 import MoneyField from '../components/MoneyField.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
@@ -636,6 +636,8 @@ const tab = ref('productos');
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const theme = useTheme();
+const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
 
 const products = ref([]);
 const loading = ref(false);
@@ -908,7 +910,9 @@ const validateField = (field) => {
     }
   }
   if (field === 'stockInicial') {
-    if (form.stockInicial === '') {
+    if (productEditorMode.value !== 'new') {
+      errors.stockInicial = '';
+    } else if (form.stockInicial === '') {
       errors.stockInicial = '';
     } else if (Number(form.stockInicial) < 0 || Number.isNaN(Number(form.stockInicial))) {
       errors.stockInicial = 'Stock inicial invalido.';
@@ -925,7 +929,11 @@ const validateForm = () => {
   validateField('precioBase');
   validateField('margenPct');
   validateField('precioVentaManual');
-  validateField('stockInicial');
+  if (productEditorMode.value === 'new') {
+    validateField('stockInicial');
+  } else {
+    errors.stockInicial = '';
+  }
   validateField('stockMinimo');
   return (
     !errors.name &&
@@ -1811,14 +1819,22 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   margin: 0 0 0;
-  border-radius: 12px;
-  background: rgba(198, 164, 108, 0.14);
+  border: 1px solid rgba(198, 164, 108, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(198, 164, 108, 0.2), rgba(90, 15, 28, 0.06));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .product-price-row {
   margin-bottom: -6px;
+}
+
+.product-final-price--night {
+  border-color: rgba(197, 139, 148, 0.34);
+  background: linear-gradient(135deg, rgba(197, 139, 148, 0.18), rgba(198, 164, 108, 0.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .product-final-price__label {
@@ -1833,17 +1849,38 @@ onMounted(() => {
   color: rgb(59, 10, 18);
 }
 
+.product-final-price--night .product-final-price__label {
+  color: rgba(244, 239, 230, 0.82);
+}
+
+.product-final-price--night .product-final-price__value {
+  color: rgb(244, 239, 230);
+}
+
 .product-status-row {
   min-height: 56px;
   display: flex;
   align-items: center;
   gap: 12px;
+  color: rgb(58, 58, 58);
 }
 
 .product-status-row__label {
   font-size: 0.95rem;
   font-weight: 600;
   color: rgb(58, 58, 58);
+}
+
+.product-status-row--night {
+  color: rgba(244, 239, 230, 0.9);
+}
+
+.product-status-row--night .product-status-row__label {
+  color: rgba(244, 239, 230, 0.9);
+}
+
+.product-status-row--night :deep(.v-label) {
+  color: rgba(244, 239, 230, 0.9);
 }
 
 .product-dialog-action {

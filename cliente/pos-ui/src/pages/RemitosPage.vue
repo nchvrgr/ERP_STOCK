@@ -4,9 +4,6 @@
       <div class="d-flex align-center gap-3">
         <div>
           <div class="text-h6">Ingreso manual de remito</div>
-          <div class="text-caption text-medium-emphasis">
-            El proveedor es opcional y funciona como filtro
-          </div>
         </div>
       </div>
 
@@ -301,7 +298,7 @@
                 </div>
               </v-col>
             </v-row>
-            <div class="product-final-price">
+            <div :class="['product-final-price', { 'product-final-price--night': isNightMode }]">
               <span class="product-final-price__label">Precio final:</span>
               <span class="product-final-price__value">{{ formatMoney(createPrecioVentaCalculado) }}</span>
             </div>
@@ -337,7 +334,7 @@
                 />
               </v-col>
               <v-col cols="12" md="4">
-                <div class="product-status-row">
+                <div :class="['product-status-row', { 'product-status-row--night': isNightMode }]">
                   <span class="product-status-row__label">Estado:</span>
                   <v-switch
                     :model-value="createForm.isActive"
@@ -427,7 +424,7 @@
           </div>
         </v-card-text>
         <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="cantidadModalDialog = false">Cancelar</v-btn>
+          <v-btn variant="text" @click="closeCantidadModal">Cancelar</v-btn>
           <v-btn color="primary" @click="confirmarAgregarProducto">Agregar producto</v-btn>
         </v-card-actions>
       </v-card>
@@ -437,10 +434,13 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { useTheme } from 'vuetify';
 import MoneyField from '../components/MoneyField.vue';
 import { getJson, postJson, requestJson } from '../services/apiClient';
 import { formatMoney } from '../utils/currency';
 
+const theme = useTheme();
+const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
 const loadingProveedores = ref(false);
 const loadingProductos = ref(false);
 const loadingCategorias = ref(false);
@@ -706,6 +706,19 @@ const buildNewProductSuggestion = (term) => {
     : `Agregar nuevo producto: '${normalized}'`;
 };
 
+const openCantidadModal = (producto) => {
+  if (!producto) return;
+  cantidadModalProducto.value = producto;
+  cantidadModalQuantity.value = 1;
+  cantidadModalDialog.value = true;
+};
+
+const closeCantidadModal = () => {
+  cantidadModalDialog.value = false;
+  cantidadModalProducto.value = null;
+  cantidadModalQuantity.value = 1;
+};
+
 const addProducto = async (producto, qty = 1) => {
   if (!producto) return;
   addingItem.value = true;
@@ -741,9 +754,7 @@ const onProductoSeleccionado = async (productId) => {
     return;
   }
 
-  cantidadModalProducto.value = producto;
-  cantidadModalQuantity.value = 1;
-  cantidadModalDialog.value = true;
+  openCantidadModal(producto);
 };
 
 const confirmarAgregarProducto = async () => {
@@ -753,9 +764,9 @@ const confirmarAgregarProducto = async () => {
     flash('error', 'La cantidad debe ser mayor a 0.');
     return;
   }
-  cantidadModalDialog.value = false;
-  await addProducto(cantidadModalProducto.value, cantidad);
-  cantidadModalProducto.value = null;
+  const producto = cantidadModalProducto.value;
+  closeCantidadModal();
+  await addProducto(producto, cantidad);
 };
 
 const removeItem = (productId) => {
@@ -998,15 +1009,13 @@ const handleProductInputEnter = async () => {
 
   const selectedProduct = productos.value.find((p) => p.id === selectedProductoId.value);
   if (selectedProduct) {
-    await addProducto(selectedProduct);
-    flash('success', `Producto agregado: ${selectedProduct.name}`);
+    openCantidadModal(selectedProduct);
     return;
   }
 
   if (productoOptions.value.length > 0) {
     const firstMatch = productoOptions.value[0];
-    await addProducto(firstMatch);
-    flash('success', `Producto agregado: ${firstMatch.name}`);
+    openCantidadModal(firstMatch);
     return;
   }
 
@@ -1022,21 +1031,18 @@ const handleProductInputEnter = async () => {
   const all = data || [];
   const exact = all.find((p) => (p.sku || '').trim().toLowerCase() === search.toLowerCase());
   if (exact) {
-    await addProducto(exact);
-    flash('success', `Producto agregado: ${exact.name}`);
+    openCantidadModal(exact);
     return;
   }
 
   const exactName = all.find((p) => (p.name || '').trim().toLowerCase() === search.toLowerCase());
   if (exactName) {
-    await addProducto(exactName);
-    flash('success', `Producto agregado: ${exactName.name}`);
+    openCantidadModal(exactName);
     return;
   }
 
   if (all.length > 0) {
-    await addProducto(all[0]);
-    flash('success', `Producto agregado: ${all[0].name}`);
+    openCantidadModal(all[0]);
     return;
   }
 
@@ -1284,14 +1290,22 @@ watch(
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   margin: 0;
-  border-radius: 12px;
-  background: rgba(198, 164, 108, 0.14);
+  border: 1px solid rgba(198, 164, 108, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(198, 164, 108, 0.2), rgba(90, 15, 28, 0.06));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .product-price-row {
   margin-bottom: -6px;
+}
+
+.product-final-price--night {
+  border-color: rgba(197, 139, 148, 0.34);
+  background: linear-gradient(135deg, rgba(197, 139, 148, 0.18), rgba(198, 164, 108, 0.12));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .product-final-price__label {
@@ -1306,17 +1320,38 @@ watch(
   color: rgb(59, 10, 18);
 }
 
+.product-final-price--night .product-final-price__label {
+  color: rgba(244, 239, 230, 0.82);
+}
+
+.product-final-price--night .product-final-price__value {
+  color: rgb(244, 239, 230);
+}
+
 .product-status-row {
   min-height: 56px;
   display: flex;
   align-items: center;
   gap: 12px;
+  color: rgb(58, 58, 58);
 }
 
 .product-status-row__label {
   font-size: 0.95rem;
   font-weight: 600;
   color: rgb(58, 58, 58);
+}
+
+.product-status-row--night {
+  color: rgba(244, 239, 230, 0.9);
+}
+
+.product-status-row--night .product-status-row__label {
+  color: rgba(244, 239, 230, 0.9);
+}
+
+.product-status-row--night :deep(.v-label) {
+  color: rgba(244, 239, 230, 0.9);
 }
 
 .product-dialog-action {

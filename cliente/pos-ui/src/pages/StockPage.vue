@@ -17,64 +17,14 @@
       <v-window-item value="saldos" class="stock-window-item">
         <v-card class="pos-card pa-4 stock-list-card">
           <div class="d-flex flex-wrap align-center gap-3 mb-4">
-            <div class="text-h6">Lista de stock</div>
+            <div class="text-h6">Ajuste de stock</div>
           </div>
-          <v-row dense class="align-center">
-            <v-col cols="12" md="3">
-              <v-autocomplete
-                v-model="saldoProducto"
-                :items="saldoProductosLookup"
-                :loading="saldoProductosLoading"
-                item-title="label"
-                return-object
-                clearable
-                label="Producto"
-                prepend-inner-icon="mdi-magnify"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                @update:search="searchSaldoProductos"
-                @update:model-value="onSaldoProductoChanged"
-              />
-            </v-col>
-            <v-col cols="12" md="5">
-              <v-autocomplete
-                v-model="saldoProveedor"
-                :items="proveedoresLookup"
-                item-title="label"
-                return-object
-                clearable
-                label="Proveedor"
-                prepend-inner-icon="mdi-magnify"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                :loading="proveedorLoading"
-                @update:search="searchProveedores"
-              />
-            </v-col>
-            <v-col cols="12" md="2" class="d-none d-md-flex"></v-col>
-            <v-col cols="12" md="2" class="d-flex align-center justify-md-end">
-              <v-btn
-                color="primary"
-                variant="tonal"
-                class="text-none w-100"
-                :loading="saldosLoading"
-                @click="loadSaldos"
-              >
-                Buscar
-              </v-btn>
-            </v-col>
-          </v-row>
 
-          <v-divider class="my-4" />
-
-          <div class="text-subtitle-2">Ajuste de stock</div>
-          <div class="text-caption text-medium-emphasis">
+          <div class="text-caption text-medium-emphasis stock-section-copy">
             Modificá la cantidad, guardá el motivo y el sistema dejará el ajuste asentado.
           </div>
 
-          <v-row dense class="mt-2">
+          <v-row dense class="mt-2 stock-adjust-row">
             <v-col cols="12" md="4">
               <v-autocomplete
                 v-model="ajusteProducto"
@@ -132,6 +82,58 @@
               Guardar ajuste
             </v-btn>
           </div>
+
+          <v-divider class="my-4" />
+
+          <div class="d-flex flex-wrap align-center gap-3 mb-4">
+            <div class="text-h6">Lista de stock</div>
+          </div>
+          <v-row dense class="align-center stock-search-row">
+            <v-col cols="12" md="4">
+              <v-autocomplete
+                v-model="saldoProducto"
+                :items="saldoProductosLookup"
+                :loading="saldoProductosLoading"
+                item-title="label"
+                return-object
+                clearable
+                label="Producto"
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                @update:search="searchSaldoProductos"
+                @update:model-value="onSaldoProductoChanged"
+              />
+            </v-col>
+            <v-col cols="12" md="5">
+              <v-autocomplete
+                v-model="saldoProveedor"
+                :items="proveedoresLookup"
+                item-title="label"
+                return-object
+                clearable
+                label="Proveedor"
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                :loading="proveedorLoading"
+                @update:search="searchProveedores"
+              />
+            </v-col>
+            <v-col cols="12" md="3" class="d-flex align-center">
+              <v-btn
+                color="primary"
+                variant="tonal"
+                class="text-none w-100"
+                :loading="saldosLoading"
+                @click="loadSaldos"
+              >
+                Buscar
+              </v-btn>
+            </v-col>
+          </v-row>
 
           <div class="stock-table-shell mt-3">
             <v-data-table
@@ -956,6 +958,14 @@ onBeforeUnmount(() => {});
   min-height: calc(100vh - 180px);
   display: flex;
   flex-direction: column;
+}
+
+.stock-section-copy,
+.stock-adjust-row,
+.stock-search-row {
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
 }
 
 .stock-table-shell {

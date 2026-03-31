@@ -45,19 +45,19 @@
           <div class="caja-table-shell mt-4">
             <v-data-table
               :headers="historialHeaders"
-              :items="historial"
+              :items="historialRows"
               :items-per-page="10"
               item-key="sesionId"
               class="caja-table"
               density="compact"
             >
-              <template v-slot:[`item.aperturaAt`]="{ item }">{{ formatDate(item.aperturaAt) }}</template>
-              <template v-slot:[`item.cierreAt`]="{ item }">{{ formatDate(item.cierreAt) }}</template>
+              <template v-slot:[`item.aperturaSort`]="{ item }">{{ formatDate(item.aperturaAt) }}</template>
+              <template v-slot:[`item.cierreSort`]="{ item }">{{ formatDate(item.cierreAt) }}</template>
               <template v-slot:[`item.turno`]="{ item }">{{ formatTurno(item.turno) }}</template>
               <template v-slot:[`item.montoInicial`]="{ item }">{{ formatMoney(item.montoInicial) }}</template>
-              <template v-slot:[`item.totalContado`]="{ item }">{{ formatMoney(item.totalContado) }}</template>
+              <template v-slot:[`item.totalContadoSort`]="{ item }">{{ formatMoney(item.totalContado) }}</template>
               <template v-slot:[`item.diferencia`]="{ item }">{{ formatMoney(item.diferencia) }}</template>
-              <template v-slot:[`item.rangoVentas`]="{ item }">
+              <template v-slot:[`item.ventasSort`]="{ item }">
                 <span v-if="item.ventaDesde && item.ventaHasta">De {{ item.ventaDesde }} a {{ item.ventaHasta }}</span>
                 <span v-else>-</span>
               </template>
@@ -111,6 +111,15 @@ const historialLoading = ref(false);
 const historialFrom = ref('');
 const historialTo = ref('');
 const historial = ref([]);
+const historialRows = computed(() =>
+  historial.value.map((row) => ({
+    ...row,
+    aperturaSort: toDateSortValue(row.aperturaAt),
+    cierreSort: toDateSortValue(row.cierreAt),
+    totalContadoSort: Number(row.totalContado ?? 0),
+    ventasSort: getVentasSortValue(row)
+  }))
+);
 
 const snackbar = ref({
   show: false,
@@ -121,14 +130,35 @@ const snackbar = ref({
 const historialHeaders = [
   { title: 'Cajero', value: 'cajero' },
   { title: 'Turno', value: 'turno' },
-  { title: 'Apertura', value: 'aperturaAt' },
-  { title: 'Cierre', value: 'cierreAt' },
+  { title: 'Apertura', value: 'aperturaSort' },
+  { title: 'Cierre', value: 'cierreSort' },
   { title: 'Monto inicial', value: 'montoInicial' },
-  { title: 'Total contado', value: 'totalContado' },
+  { title: 'Total contado', value: 'totalContadoSort' },
   { title: 'Diferencia', value: 'diferencia' },
-  { title: 'Ventas', value: 'rangoVentas' },
-  { title: '', value: 'acciones', align: 'end' }
+  { title: 'Ventas', value: 'ventasSort' },
+  { title: '', value: 'acciones', align: 'end', sortable: false }
 ];
+
+function toDateSortValue(value) {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function getVentasSortValue(row) {
+  const desde = Number(row?.ventaDesde ?? 0);
+  const hasta = Number(row?.ventaHasta ?? 0);
+
+  if (desde > 0 && hasta >= desde) {
+    return (hasta - desde) + 1;
+  }
+
+  if (desde > 0 || hasta > 0) {
+    return 1;
+  }
+
+  return 0;
+}
 
 const formatDate = (value) => {
   if (!value) return '-';

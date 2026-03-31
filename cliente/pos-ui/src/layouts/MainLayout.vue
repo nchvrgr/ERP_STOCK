@@ -9,7 +9,7 @@
       <div class="d-flex flex-column h-100">
         <div class="pa-4">
           <div class="d-flex align-center gap-2">
-            <v-icon size="28" color="primary">mdi-storefront</v-icon>
+            <img :src="brandMarkSrc" alt="" class="drawer-brand-mark" />
             <div>
               <div class="text-subtitle-1 drawer-brand-title">Viñedos de la Villa</div>
               <div class="text-caption drawer-brand-subtitle">Gestión comercial</div>
@@ -97,6 +97,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { applyColorMode, POS_COLOR_MODE_DARK, POS_COLOR_MODE_LIGHT } from '../utils/colorMode';
 import { useStockAlertsStore } from '../stores/stockAlerts';
+import brandMarkDark from '../assets/brand-mark-dark.png';
+import brandMarkLight from '../assets/brand-mark-light.png';
 
 const auth = useAuthStore();
 const stockAlerts = useStockAlertsStore();
@@ -185,6 +187,8 @@ const isDarkMode = computed({
   }
 });
 
+const brandMarkSrc = computed(() => (isDarkMode.value ? brandMarkDark : brandMarkLight));
+
 const isStockMenuItem = (item) => (item?.path || item?.to) === '/stock';
 
 const refreshStockAlerts = () => {
@@ -249,6 +253,14 @@ const logout = () => {
 .drawer-brand-title {
   color: var(--pos-accent-dark);
   font-weight: 700;
+}
+
+.drawer-brand-mark {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex: 0 0 28px;
+  object-fit: contain;
 }
 
 .drawer-brand-subtitle {

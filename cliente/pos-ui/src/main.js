@@ -5,6 +5,7 @@ import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { aliases, mdi } from 'vuetify/iconsets/mdi-svg';
+import { es } from 'vuetify/locale';
 import { h, watch } from 'vue';
 import {
   mdiAccount,
@@ -26,7 +27,6 @@ import {
   mdiPlus,
   mdiPrinterOutline,
   mdiQrcodeScan,
-  mdiStorefront,
   mdiWarehouse
 } from '@mdi/js';
 import 'vuetify/styles';
@@ -70,7 +70,6 @@ const mdiPaths = {
   mdiPlus,
   mdiPrinterOutline,
   mdiQrcodeScan,
-  mdiStorefront,
   mdiWarehouse
 };
 
@@ -83,6 +82,13 @@ const mdiSvgSet = {
 };
 
 const initialColorMode = getStoredColorMode();
+const spanishLocale = {
+  ...es,
+  dataFooter: {
+    ...es.dataFooter,
+    pageText: '{0}-{1} de {2}'
+  }
+};
 
 const vuetify = createVuetify({
   components,
@@ -125,6 +131,13 @@ const vuetify = createVuetify({
           error: '#f87171'
         }
       }
+    }
+  },
+  locale: {
+    locale: 'es',
+    fallback: 'es',
+    messages: {
+      es: spanishLocale
     }
   }
 });

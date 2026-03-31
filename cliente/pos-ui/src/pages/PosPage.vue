@@ -69,7 +69,7 @@
               <div>
                 <div class="text-h6">Carrito</div>
                 <div class="text-caption text-medium-emphasis">
-                  {{ items.length }} items - Lista {{ venta?.listaPrecio || 'Minorista' }}
+                  Items: {{ totalItems }}
                 </div>
               </div>
             </div>
@@ -156,7 +156,7 @@
               <strong>- {{ formatMoney(totalDescuento) }}</strong>
             </div>
             <div class="mt-3">
-              <div class="text-caption text-medium-emphasis mb-2">Descuento manual</div>
+              <div class="text-caption text-medium-emphasis mb-2">Descuento manual sobre el total</div>
               <div class="pos-discount-row">
                 <v-text-field
                   v-model="discountPct"
@@ -186,9 +186,6 @@
             <div class="pos-total-net">
               <div class="text-body-2 text-medium-emphasis">Total neto</div>
               <strong>{{ formatMoney(totalNeto) }}</strong>
-            </div>
-            <div class="text-caption text-medium-emphasis mt-3">
-              Items: {{ totalItems }}
             </div>
 
             <v-divider class="my-3" />

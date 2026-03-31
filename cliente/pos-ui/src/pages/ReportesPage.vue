@@ -10,7 +10,6 @@
         <div class="d-flex flex-wrap align-center gap-3">
           <div>
             <div class="text-h6">Dashboard de reportes</div>
-            <div class="text-caption text-medium-emphasis">Rangos y KPIs</div>
           </div>
           <v-spacer />
           <v-text-field
@@ -41,36 +40,6 @@
           </v-btn>
         </div>
       </v-card>
-
-      <v-row dense class="mb-4">
-        <v-col cols="12" md="4">
-          <v-card class="pos-card pa-4">
-            <div class="text-caption text-medium-emphasis">Ventas</div>
-            <div v-if="loading" class="mt-2">
-              <v-skeleton-loader type="text" />
-            </div>
-            <div v-else class="text-h5">{{ formatMoney(resumen.totalIngresos) }}</div>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="4">
-          <v-card class="pos-card pa-4">
-            <div class="text-caption text-medium-emphasis">Total facturado</div>
-            <div v-if="loading" class="mt-2">
-              <v-skeleton-loader type="text" />
-            </div>
-            <div v-else class="text-h5">{{ formatMoney(resumen.totalFacturado) }}</div>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="4">
-          <v-card class="pos-card pa-4">
-            <div class="text-caption text-medium-emphasis">Total cotizado</div>
-            <div v-if="loading" class="mt-2">
-              <v-skeleton-loader type="text" />
-            </div>
-            <div v-else class="text-h5">{{ formatMoney(resumen.totalNoFacturado) }}</div>
-          </v-card>
-        </v-col>
-      </v-row>
 
       <v-row dense class="mb-4">
         <v-col cols="12" md="6">
@@ -185,9 +154,6 @@
                 <div class="text-h6">Top productos</div>
                 <div class="text-caption text-medium-emphasis">Top 10 mas vendidos</div>
               </div>
-              <v-btn variant="tonal" color="primary" class="text-none" @click="exportCsv('top-productos')">
-                Exportar CSV
-              </v-btn>
             </div>
             <div v-if="loading" class="mt-3">
               <v-skeleton-loader type="table" />
@@ -215,11 +181,8 @@
             <div class="d-flex align-center justify-space-between">
               <div>
                 <div class="text-h6">Inmovilizado</div>
-                <div class="text-caption text-medium-emphasis">Sin ventas en el rango</div>
+                <div class="text-caption text-medium-emphasis">Sin ventas en el rango de fecha</div>
               </div>
-              <v-btn variant="tonal" color="primary" class="text-none" @click="exportCsv('inmovilizado')">
-                Exportar CSV
-              </v-btn>
             </div>
             <div v-if="loading" class="mt-3">
               <v-skeleton-loader type="table" />
@@ -280,12 +243,6 @@ const filters = reactive({
 const loading = ref(false);
 const ventasChart = ref(null);
 const mediosChart = ref(null);
-const resumen = ref({
-  totalIngresos: 0,
-  totalEgresos: 0,
-  totalFacturado: 0,
-  totalNoFacturado: 0
-});
 const topProductos = ref([]);
 const inmovilizado = ref([]);
 
@@ -490,21 +447,18 @@ const loadReports = async () => {
   try {
     const query = buildQuery();
 
-    const [resumenResp, ventasResp, mediosResp, topResp, inmResp] = await Promise.all([
-      getJson(`/api/v1/reportes/resumen-ventas?${query}`),
+    const [ventasResp, mediosResp, topResp, inmResp] = await Promise.all([
       getJson(`/api/v1/reportes/ventas-por-dia?${query}`),
       getJson(`/api/v1/reportes/medios-pago?${query}`),
       getJson(`/api/v1/reportes/top-productos?${query}&top=10`),
       getJson(`/api/v1/reportes/stock-inmovilizado?${query}`)
     ]);
 
-    if (!resumenResp.response.ok) throw new Error(extractProblemMessage(resumenResp.data));
     if (!ventasResp.response.ok) throw new Error(extractProblemMessage(ventasResp.data));
     if (!mediosResp.response.ok) throw new Error(extractProblemMessage(mediosResp.data));
     if (!topResp.response.ok) throw new Error(extractProblemMessage(topResp.data));
     if (!inmResp.response.ok) throw new Error(extractProblemMessage(inmResp.data));
 
-    resumen.value = resumenResp.data || resumen.value;
     ventasChart.value = ventasResp.data;
     mediosChart.value = mediosResp.data;
     topProductos.value = topResp.data?.rows || [];
@@ -516,39 +470,6 @@ const loadReports = async () => {
     flash('error', err?.message || 'No se pudieron cargar los reportes.');
   } finally {
     loading.value = false;
-  }
-};
-
-const toCsv = (rows, headers) => {
-  const headerLine = headers.map((header) => `"${header.title}"`).join(',');
-  const lines = rows.map((row) =>
-    headers
-      .map((header) => {
-        const value = row[header.value] ?? '';
-        return `"${String(value).replace(/"/g, '""')}"`;
-      })
-      .join(',')
-  );
-
-  return [headerLine, ...lines].join('\n');
-};
-
-const downloadFile = (content, filename) => {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
-const exportCsv = (type) => {
-  if (type === 'top-productos') {
-    downloadFile(toCsv(topProductos.value, topHeaders), 'top-productos.csv');
-  }
-  if (type === 'inmovilizado') {
-    downloadFile(toCsv(inmovilizado.value, inmovilizadoHeaders), 'stock-inmovilizado.csv');
   }
 };
 
