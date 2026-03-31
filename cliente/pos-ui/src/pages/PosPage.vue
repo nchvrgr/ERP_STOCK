@@ -836,7 +836,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import MoneyField from '../components/MoneyField.vue';
 import { useAuthStore } from '../stores/auth';
 import { getJson, postJson, requestJson } from '../services/apiClient';
-import { formatMoney } from '../utils/currency';
+import { formatMoney, roundMoney } from '../utils/currency';
 
 const auth = useAuthStore();
 const POS_LAST_CAJA_KEY = 'pos-last-caja-id';
@@ -1188,10 +1188,17 @@ const persistVentaDraft = () => {
     return acc;
   }, {});
 
+  const itemDiscountMap = items.value.reduce((acc, item) => {
+    if (!item?.id) return acc;
+    acc[String(item.id)] = normalizeDiscountPct(item.descuentoPct ?? '0');
+    return acc;
+  }, {});
+
   localStorage.setItem(POS_VENTA_DRAFT_KEY, JSON.stringify({
     ventaId: ventaId.value,
     discountPct: normalizeDiscountPct(discountPct.value),
-    itemPriceMap
+    itemPriceMap,
+    itemDiscountMap
   }));
 };
 
@@ -1583,10 +1590,7 @@ const applyItemDto = (dto) => {
   const index = items.value.findIndex((item) => item.id === dto.id);
   const previousItem = index >= 0 ? items.value[index] : null;
   const descuentoPct = previousItem?.descuentoPct ?? '0';
-  const precioUnitario = dto.precioUnitario;
-  const descuentoMonto = (precioUnitario * Number(descuentoPct)) / 100;
-  const precioConDescuento = Math.max(precioUnitario - descuentoMonto, 0);
-  const subtotal = dto.cantidad * precioConDescuento;
+  const subtotal = dto.cantidad * dto.precioUnitario;
 
   const item = {
     id: dto.id,
@@ -1597,7 +1601,7 @@ const applyItemDto = (dto) => {
     precioUnitario: dto.precioUnitario,
     descuentoPct: descuentoPct,
     precioLista: previousItem?.precioLista ?? dto.precioUnitario,
-    subtotal: subtotal
+    subtotal
   };
 
   if (index >= 0) {
@@ -1683,6 +1687,13 @@ const restoreVenta = async () => {
         if (!Number.isNaN(draftPrecioLista) && draftPrecioLista > 0) {
           item.precioLista = draftPrecioLista;
         }
+      });
+    }
+
+    if (draft?.itemDiscountMap && typeof draft.itemDiscountMap === 'object') {
+      restoredItems.forEach((item) => {
+        item.descuentoPct = normalizeDiscountPct(draft.itemDiscountMap[String(item.id)] ?? '0');
+        item.subtotal = item.cantidad * item.precioUnitario;
       });
     }
 
@@ -1923,7 +1934,7 @@ const commitQty = async (item) => {
   }
 };
 
-const commitDiscount = (item) => {
+const commitDiscount = async (item) => {
   const descuentoPct = Number(descuentoPctEdits.value[item.id] || 0);
   if (!canEdit.value) return;
   if (Number.isNaN(descuentoPct) || descuentoPct < 0 || descuentoPct > 100) {
@@ -1932,20 +1943,38 @@ const commitDiscount = (item) => {
     return;
   }
   if (String(descuentoPct) === String(item.descuentoPct)) return;
+  if (!ventaId.value) return;
 
-  // Recalcular subtotal con descuento
-  const precioUnitario = item.precioUnitario;
-  const descuentoMonto = (precioUnitario * descuentoPct) / 100;
-  const precioConDescuento = Math.max(precioUnitario - descuentoMonto, 0);
-  const nuevoSubtotal = item.cantidad * precioConDescuento;
+  const precioLista = Number(item.precioLista ?? item.precioUnitario ?? 0);
+  const nuevoPrecioUnitario = roundMoneyValue(precioLista * (1 - descuentoPct / 100));
 
-  // Actualizar item localmente
-  item.descuentoPct = String(descuentoPct);
-  item.subtotal = nuevoSubtotal;
-  descuentoPctEdits.value[item.id] = descuentoPct;
-  pricing.value = null;
-  persistVentaDraft();
-  flash('success', 'Descuento aplicado');
+  try {
+    const { response, data } = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        cantidad: item.cantidad,
+        precioUnitario: nuevoPrecioUnitario
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    item.descuentoPct = normalizeDiscountPct(descuentoPct);
+    applyItemDto(data);
+    const updatedItem = items.value.find((line) => line.id === item.id);
+    if (updatedItem) {
+      updatedItem.descuentoPct = normalizeDiscountPct(descuentoPct);
+      descuentoPctEdits.value[item.id] = updatedItem.descuentoPct;
+    }
+    pricing.value = null;
+    persistVentaDraft();
+    flash('success', 'Descuento aplicado');
+  } catch (err) {
+    descuentoPctEdits.value[item.id] = item.descuentoPct || '0';
+    flash('error', err?.message || 'No se pudo aplicar el descuento.');
+  }
 };
 
 const clearDiscountZero = (item) => {
@@ -1977,7 +2006,9 @@ const applyDiscount = async () => {
   try {
     for (const item of items.value) {
       const precioLista = Number(item.precioLista ?? item.precioUnitario ?? 0);
-      const nuevoPrecio = roundMoneyValue(precioLista * (1 - pct / 100));
+      const descuentoItemPct = Number(item.descuentoPct || 0);
+      const precioConDescuentoItem = roundMoneyValue(precioLista * (1 - descuentoItemPct / 100));
+      const nuevoPrecio = roundMoneyValue(precioConDescuentoItem * (1 - pct / 100));
       const { response, data } = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -2265,7 +2296,7 @@ const confirmarVenta = async () => {
     const payload = {
       pagos: pagos.value
         .filter((line) => line.medioPago && line.monto > 0)
-        .map((line) => ({ medioPago: line.medioPago, monto: line.monto })),
+        .map((line) => ({ medioPago: line.medioPago, monto: roundMoney(line.monto) })),
       cajaSesionId: cajaSessionId.value || null,
       facturada: facturacionSeleccion.value
     };

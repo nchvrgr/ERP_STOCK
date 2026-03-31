@@ -16,6 +16,7 @@ node_modules/
 **/dev-dist/
 desktop-build/
 release/
+tmp-desktop-data/
 
 # Logs and temp
 *.log

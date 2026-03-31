@@ -34,7 +34,6 @@ import './styles/main.css';
 import router from './router';
 import { useAuthStore } from './stores/auth';
 import { setTokenProvider, setUnauthorizedHandler } from './services/apiClient';
-import { registerSW } from 'virtual:pwa-register';
 import { applyColorMode, getStoredColorMode, getThemeName, POS_COLOR_MODE_DARK } from './utils/colorMode';
 
 const toMdiExportName = (iconName) => {
@@ -170,18 +169,6 @@ watch(
     }
   }
 );
-
-const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
-
-if (import.meta.env.PROD && !isElectron) {
-  registerSW({ immediate: true });
-} else if (isElectron && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    registrations.forEach((registration) => {
-      registration.unregister();
-    });
-  });
-}
 
 auth.initializeFirebaseSession().finally(() => {
   app.mount('#app');

@@ -1,15 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import LoginPage from '../pages/LoginPage.vue';
-import MainLayout from '../layouts/MainLayout.vue';
-import ProductosPage from '../pages/ProductosPage.vue';
-import StockPage from '../pages/StockPage.vue';
-import ReportesPage from '../pages/ReportesPage.vue';
-import CajaPage from '../pages/CajaPage.vue';
-import RemitosPage from '../pages/RemitosPage.vue';
-import PreRecepcionPage from '../pages/PreRecepcionPage.vue';
-import RecepcionPage from '../pages/RecepcionPage.vue';
-import EmpresaDatosPage from '../pages/EmpresaDatosPage.vue';
+
+const LoginPage = () => import('../pages/LoginPage.vue');
+const MainLayout = () => import('../layouts/MainLayout.vue');
+const ProductosPage = () => import('../pages/ProductosPage.vue');
+const StockPage = () => import('../pages/StockPage.vue');
+const ReportesPage = () => import('../pages/ReportesPage.vue');
+const CajaPage = () => import('../pages/CajaPage.vue');
+const RemitosPage = () => import('../pages/RemitosPage.vue');
+const PreRecepcionPage = () => import('../pages/PreRecepcionPage.vue');
+const RecepcionPage = () => import('../pages/RecepcionPage.vue');
+const EmpresaDatosPage = () => import('../pages/EmpresaDatosPage.vue');
 
 const routes = [
   {

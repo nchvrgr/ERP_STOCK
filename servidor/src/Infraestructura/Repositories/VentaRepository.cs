@@ -20,6 +20,9 @@ public sealed class VentaRepository : IVentaRepository
         _dbContext = dbContext;
     }
 
+    private static decimal RoundMoney(decimal amount) =>
+        Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+
     public async Task<Guid> CreateAsync(
         Guid tenantId,
         Guid sucursalId,
@@ -522,9 +525,9 @@ public sealed class VentaRepository : IVentaRepository
             .Where(i => i.TenantId == tenantId && i.VentaId == ventaId)
             .ToListAsync(cancellationToken);
 
-        var totalNeto = items.Sum(i => i.Cantidad * i.PrecioUnitario);
+        var totalNeto = RoundMoney(items.Sum(i => i.Cantidad * i.PrecioUnitario));
 
-        var totalPagos = request.Pagos?.Sum(p => p.Monto) ?? 0m;
+        var totalPagos = RoundMoney(request.Pagos?.Sum(p => p.Monto) ?? 0m);
         if (totalNeto != totalPagos)
         {
             throw new ValidationException(
