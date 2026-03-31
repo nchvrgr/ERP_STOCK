@@ -371,13 +371,13 @@ async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
 async function promptForRestartInstall(mainWindow, versionLabel) {
   const result = await dialog.showMessageBox(mainWindow || null, {
     type: 'info',
-    buttons: ['Actualizar ahora', 'Cancelar'],
+    buttons: ['Instalar ahora', 'Cancelar'],
     defaultId: 0,
     cancelId: 1,
     noLink: true,
-    title: 'Reiniciar para actualizar',
-    message: `Se instalara la version ${versionLabel} y la app se reiniciara automaticamente.`,
-    detail: 'Guarda cualquier cambio pendiente antes de continuar.'
+    title: 'Instalar actualizacion',
+    message: `Se ejecutara el instalador de la version ${versionLabel}.`,
+    detail: 'La aplicacion no se cerrara automaticamente.'
   });
 
   return result.response === 0;
@@ -519,18 +519,56 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
   }
 
   if (process.platform === 'win32') {
+    let started = false;
+
     try {
-      const cmd = `start "" "${installerPath.replace(/"/g, '""')}"`;
-      const child = spawn('cmd.exe', ['/d', '/s', '/c', cmd], {
+      const child = spawn(installerPath, [], {
         detached: true,
         stdio: 'ignore',
-        windowsHide: true
+        windowsHide: false
       });
       child.unref();
-      log(`installer started via cmd path=${installerPath}`);
+      started = true;
+      log(`installer started via direct spawn path=${installerPath}`);
     } catch (error) {
-      log('installer cmd start failed', error);
-      throw new Error(error instanceof Error ? error.message : String(error));
+      log('installer direct spawn failed', error);
+    }
+
+    if (!started) {
+      try {
+        const quotedPath = quotePowerShellLiteral(installerPath);
+        const command = `Start-Process -FilePath ${quotedPath}`;
+        const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true
+        });
+        child.unref();
+        started = true;
+        log(`installer started via powershell path=${installerPath}`);
+      } catch (error) {
+        log('installer powershell start failed', error);
+      }
+    }
+
+    if (!started) {
+      try {
+        const cmd = `start "" "${installerPath.replace(/"/g, '""')}"`;
+        const child = spawn('cmd.exe', ['/d', '/s', '/c', cmd], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true
+        });
+        child.unref();
+        started = true;
+        log(`installer started via cmd path=${installerPath}`);
+      } catch (error) {
+        log('installer cmd start failed', error);
+      }
+    }
+
+    if (!started) {
+      throw new Error('No se pudo ejecutar el instalador descargado.');
     }
   } else {
     const openResult = await shell.openPath(installerPath);
@@ -543,12 +581,6 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
 
   if (typeof options.onInstallStarted === 'function') {
     await options.onInstallStarted();
-  }
-
-  if (options.restartAfterInstall) {
-    setTimeout(() => {
-      app.quit();
-    }, 1800);
   }
 
   return { started: true };
@@ -568,9 +600,6 @@ async function checkForUpdates(options = {}) {
     log(`update prompt result accepted=${accepted}`);
 
     if (!accepted) {
-      if (updateState.isMandatory) {
-        app.quit();
-      }
       return;
     }
 
@@ -652,7 +681,7 @@ async function installLatestUpdateOnDemand(options = {}) {
     }
 
     const installResult = await runInstaller(updateState.installerAsset, mainWindow, log, {
-      restartAfterInstall: true,
+      restartAfterInstall: false,
       versionLabel: updateState.latestVersion,
       onInstallStarted: options.onInstallStarted
     });
@@ -670,7 +699,7 @@ async function installLatestUpdateOnDemand(options = {}) {
       status: 'installing',
       currentVersion: updateState.currentVersion,
       latestVersion: updateState.latestVersion,
-      message: `Reiniciando para instalar la version ${updateState.latestVersion}.`
+      message: `Instalador ejecutado para instalar la version ${updateState.latestVersion}.`
     };
   } catch (error) {
     log('update install on demand failed', error);
