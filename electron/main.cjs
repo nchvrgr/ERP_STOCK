@@ -4,7 +4,7 @@ const http = require('node:http');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
-const { checkForUpdatesOnDemand } = require('./updater');
+const { checkForUpdatesOnDemand, installLatestUpdateOnDemand } = require('./updater');
 
 const APP_PORT = 18450;
 const APP_URL = `http://127.0.0.1:${APP_PORT}`;
@@ -337,6 +337,14 @@ ipcMain.handle('ticket-preview:open', async (_, payload) => {
 
 ipcMain.handle('app:update:check', async () => {
   return checkForUpdatesOnDemand({
+    mainWindow,
+    log: logElectron,
+    onInstallStarted: prepareForInstallUpdate
+  });
+});
+
+ipcMain.handle('app:update:install', async () => {
+  return installLatestUpdateOnDemand({
     mainWindow,
     log: logElectron,
     onInstallStarted: prepareForInstallUpdate

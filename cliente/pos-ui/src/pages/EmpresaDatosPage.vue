@@ -110,27 +110,6 @@
             </div>
           </v-col>
         </v-row>
-
-        <v-divider class="my-4" />
-
-        <div class="mb-2">
-          <div class="text-subtitle-2 section-subtitle">Actualizar app</div>
-          <div class="text-caption text-medium-emphasis">
-            Busca e instala la ultima version disponible de la aplicacion.
-          </div>
-        </div>
-        <div class="d-flex align-center gap-2">
-          <v-btn
-            color="primary"
-            variant="tonal"
-            class="text-none"
-            :loading="checkingUpdate"
-            :disabled="!canCheckUpdates"
-            @click="checkForAppUpdate"
-          >
-            Actualizar app
-          </v-btn>
-        </div>
       </div>
     </v-card>
 
@@ -148,11 +127,9 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { getJson, requestJson } from '../services/apiClient';
 
 const saving = ref(false);
-const checkingUpdate = ref(false);
 const loading = ref(false);
 const configDirty = ref(false);
 const nuevoMedioPago = ref('');
-const desktopBridge = typeof window !== 'undefined' ? window.desktopBridge || null : null;
 const form = reactive({
   razonSocial: '',
   cuit: '',
@@ -191,8 +168,6 @@ const mediosPagoOptions = computed(() =>
     value: medio
   }))
 );
-
-const canCheckUpdates = computed(() => typeof desktopBridge?.checkForAppUpdate === 'function');
 
 const flash = (type, text) => {
   snackbar.value = {
@@ -337,34 +312,6 @@ const save = async () => {
     flash('error', err?.message || 'No se pudieron guardar los datos.');
   } finally {
     saving.value = false;
-  }
-};
-
-const checkForAppUpdate = async () => {
-  if (!canCheckUpdates.value || checkingUpdate.value) {
-    return;
-  }
-
-  checkingUpdate.value = true;
-
-  try {
-    const result = await desktopBridge.checkForAppUpdate();
-
-    if (result?.status === 'up-to-date') {
-      flash('success', result.message || 'La app ya esta actualizada.');
-      return;
-    }
-
-    if (result?.status === 'installing') {
-      flash('success', result.message || 'Se inicio la actualizacion.');
-      return;
-    }
-
-    flash('error', result?.message || 'No se pudo verificar la actualizacion.');
-  } catch (err) {
-    flash('error', err?.message || 'No se pudo verificar la actualizacion.');
-  } finally {
-    checkingUpdate.value = false;
   }
 };
 

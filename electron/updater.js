@@ -429,6 +429,46 @@ async function checkForUpdates(options = {}) {
 
 async function checkForUpdatesOnDemand(options = {}) {
   const log = typeof options.log === 'function' ? options.log : () => {};
+
+  try {
+    const updateState = await resolveUpdateState({ log });
+
+    if (updateState.status === 'up-to-date') {
+      return {
+        status: 'up-to-date',
+        currentVersion: updateState.currentVersion,
+        latestVersion: updateState.latestVersion,
+        message: 'No se encontraron nuevas actualizaciones.'
+      };
+    }
+
+    if (updateState.status === 'unavailable') {
+      return {
+        status: 'error',
+        currentVersion: updateState.currentVersion,
+        latestVersion: updateState.latestVersion,
+        message: updateState.message
+      };
+    }
+
+    return {
+      status: 'available',
+      currentVersion: updateState.currentVersion,
+      latestVersion: updateState.latestVersion,
+      isMandatory: updateState.isMandatory,
+      message: `Se encontro una nueva actualizacion: v${updateState.latestVersion}.`
+    };
+  } catch (error) {
+    log('update on demand failed', error);
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+async function installLatestUpdateOnDemand(options = {}) {
+  const log = typeof options.log === 'function' ? options.log : () => {};
   const mainWindow = options.mainWindow || null;
 
   try {
@@ -439,7 +479,7 @@ async function checkForUpdatesOnDemand(options = {}) {
         status: 'up-to-date',
         currentVersion: updateState.currentVersion,
         latestVersion: updateState.latestVersion,
-        message: `La app ya esta actualizada (${updateState.currentVersion}).`
+        message: 'No se encontraron nuevas actualizaciones.'
       };
     }
 
@@ -455,6 +495,7 @@ async function checkForUpdatesOnDemand(options = {}) {
     await runInstaller(updateState.installerAsset, mainWindow, log, {
       onInstallStarted: options.onInstallStarted
     });
+
     return {
       status: 'installing',
       currentVersion: updateState.currentVersion,
@@ -462,7 +503,7 @@ async function checkForUpdatesOnDemand(options = {}) {
       message: `Instalando version ${updateState.latestVersion}.`
     };
   } catch (error) {
-    log('update on demand failed', error);
+    log('update install on demand failed', error);
     return {
       status: 'error',
       message: error instanceof Error ? error.message : String(error)
@@ -472,5 +513,6 @@ async function checkForUpdatesOnDemand(options = {}) {
 
 module.exports = {
   checkForUpdates,
-  checkForUpdatesOnDemand
+  checkForUpdatesOnDemand,
+  installLatestUpdateOnDemand
 };

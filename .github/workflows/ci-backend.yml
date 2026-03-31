@@ -10,6 +10,9 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      TEST_DB_CONNECTION: Host=localhost;Port=5433;Database=posdb;Username=pos;Password=pospass
 
     services:
       postgres:
@@ -25,9 +28,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-
-    env:
-      TEST_DB_CONNECTION: Host=localhost;Port=5433;Database=posdb;Username=pos;Password=pospass
 
     steps:
       - name: Checkout
