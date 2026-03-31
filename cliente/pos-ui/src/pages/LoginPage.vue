@@ -226,7 +226,7 @@ const installAppUpdate = async () => {
       updateNotice.value = {
         status: 'installing',
         type: 'success',
-        message: result.message || `Reiniciando para instalar la version ${result?.latestVersion || ''}.`
+        message: result.message || `Instalador abierto para la version ${result?.latestVersion || ''}.`
       };
       return;
     }

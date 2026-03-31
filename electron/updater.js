@@ -371,13 +371,13 @@ async function promptForUpdate(mainWindow, isMandatory, versionLabel) {
 async function promptForRestartInstall(mainWindow, versionLabel) {
   const result = await dialog.showMessageBox(mainWindow || null, {
     type: 'info',
-    buttons: ['Aceptar', 'Cancelar'],
+    buttons: ['Abrir instalador', 'Cancelar'],
     defaultId: 0,
     cancelId: 1,
     noLink: true,
-    title: 'Reiniciar para actualizar',
-    message: `Se instalara la version ${versionLabel} y la app se reiniciara automaticamente.`,
-    detail: 'Guarda cualquier cambio pendiente antes de continuar.'
+    title: 'Instalar actualizacion',
+    message: `Se abrira el instalador de la version ${versionLabel}.`,
+    detail: 'La aplicacion no se cerrara automaticamente.'
   });
 
   return result.response === 0;
@@ -547,12 +547,7 @@ async function runInstaller(asset, mainWindow, log, options = {}) {
     await options.onInstallStarted();
   }
 
-  // Give the installer enough time to become visible before closing the app.
-  setTimeout(() => {
-    app.quit();
-  }, 1800);
-
-  return { restarting: true };
+  return { started: true };
 }
 
 async function checkForUpdates(options = {}) {
@@ -671,7 +666,7 @@ async function installLatestUpdateOnDemand(options = {}) {
       status: 'installing',
       currentVersion: updateState.currentVersion,
       latestVersion: updateState.latestVersion,
-      message: `Reiniciando para instalar la version ${updateState.latestVersion}.`
+      message: `Instalador abierto para la version ${updateState.latestVersion}.`
     };
   } catch (error) {
     log('update install on demand failed', error);

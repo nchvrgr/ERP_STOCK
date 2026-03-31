@@ -152,6 +152,20 @@ Resultado esperado:
 - si el release tiene menos de 7 dias: dialogo con `Actualizar` y `Mas tarde`
 - si el release tiene mas de 7 dias: dialogo obligatorio con `Actualizar ahora`
 
+#### Publicar una nueva actualizacion con un comando
+
+Con GitHub CLI autenticado (`gh auth login`), puedes publicar una actualizacion completa asi:
+
+```powershell
+npm.cmd run desktop:publish-update -- 1.0.1 "Notas de la actualizacion"
+```
+
+Ese comando hace todo:
+- actualiza version en `package.json` y `package-lock.json`
+- genera instalador NSIS (`.exe`, `.blockmap`, `latest.yml`)
+- crea commit, tag `vX.Y.Z` y push a `main`
+- crea GitHub Release con los assets necesarios para el boton de actualizacion
+
 #### Flujo de prueba local sin depender de GitHub
 
 El updater soporta un modo de prueba por variables de entorno.
