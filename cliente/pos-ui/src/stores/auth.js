@@ -64,10 +64,6 @@ const normalizeSubscriptionStatus = (value) => {
     : 'inactive';
 };
 
-const normalizeErpUsername = (value) => {
-  return typeof value === 'string' ? value.trim() : '';
-};
-
 const buildInactiveSubscriptionMessage = () => {
   return '';
 };
@@ -272,7 +268,6 @@ export const useAuthStore = defineStore('auth', {
 
       const data = snapshot.data() || {};
       const status = normalizeSubscriptionStatus(data.subscriptionStatus);
-      this.erpUsername = normalizeErpUsername(data.erpUsername);
       const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
 
       this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
@@ -295,7 +290,6 @@ export const useAuthStore = defineStore('auth', {
 
           const data = snapshot.data() || {};
           const status = normalizeSubscriptionStatus(data.subscriptionStatus);
-          this.erpUsername = normalizeErpUsername(data.erpUsername);
           const message = status === ACTIVE_SUBSCRIPTION_STATUS ? '' : buildInactiveSubscriptionMessage();
 
           this.saveLoginHints({ firebaseEmail: this.firebaseEmail });
@@ -381,14 +375,16 @@ export const useAuthStore = defineStore('auth', {
 
       this.saveToStorage();
     },
-    async login({ email, firebasePassword }) {
+    async login({ email, firebasePassword, loginAsAdmin, erpPassword }) {
       this.setAccessMessage('');
       this.saveLoginHints({ firebaseEmail: email || '' });
       await this.signInWithFirebase(email || '', firebasePassword || '');
+      this.erpUsername = loginAsAdmin ? 'admin' : 'cajero';
 
       const request = {
         firebaseEmail: (this.firebaseEmail || email || '').trim(),
-        erpUsername: this.erpUsername || null,
+        enterAsAdmin: Boolean(loginAsAdmin),
+        erpPassword: loginAsAdmin ? (erpPassword || null) : null,
         tenantId: null,
         sucursalId: null
       };

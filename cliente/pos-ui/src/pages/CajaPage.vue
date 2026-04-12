@@ -97,8 +97,7 @@ const canUsePos = computed(() => auth.hasPermission('PERM_VENTA_CREAR'));
 const canUseCaja = computed(
   () =>
     auth.hasPermission('PERM_CAJA_MOVIMIENTO') ||
-    hasAnyRole(['ENCARGADO', 'ADMIN']) ||
-    canUsePos.value
+    hasAnyRole(['CAJERO', 'ENCARGADO', 'ADMIN'])
 );
 const availableTabs = computed(() => {
   const tabs = [];
@@ -329,7 +328,7 @@ onBeforeUnmount(() => {
 }
 
 .ticket {
-  border: 1px dashed rgba(169, 138, 111, 0.45);
+  border: 1px dashed color-mix(in srgb, var(--pos-wood-soft) 45%, transparent);
   padding: 12px;
   border-radius: 10px;
   font-family: 'IBM Plex Sans', sans-serif;
@@ -341,7 +340,7 @@ onBeforeUnmount(() => {
 }
 
 .text-error {
-  color: #dc2626;
+  color: var(--pos-error);
 }
 
 @media print {

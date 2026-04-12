@@ -34,6 +34,7 @@ public sealed class AuthTests : IClassFixture<WebApiFactory>
         var client = _factory.CreateClient();
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new SolicitudLoginDto(
             "admin",
+            true,
             "admin",
             SeedData.TenantId,
             SeedData.SucursalId));

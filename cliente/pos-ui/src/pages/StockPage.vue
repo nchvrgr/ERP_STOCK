@@ -311,6 +311,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { buildApiUrl, getJson, postJson } from '../services/apiClient';
+import { getTicketWindowStyles } from '../theme/printStyles';
 import { formatMoney } from '../utils/currency';
 import {
   getHighestStockAlertLevel,
@@ -486,24 +487,7 @@ const printVentaTicket = async (ventaNumero) => {
         <head>
           <title>Ticket venta</title>
           <style>
-            @page { margin: 8mm; }
-            body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; }
-            h1 { margin: 0 0 6px 0; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-            th, td { border-bottom: 1px dashed #ccc; padding: 4px 0; }
-            th { text-align: left; font-weight: 600; }
-            .ticket-actions { display: flex; gap: 8px; margin-bottom: 12px; }
-            .ticket-actions button {
-              border: 1px solid #d6d0c6;
-              background: #fff;
-              border-radius: 999px;
-              padding: 6px 12px;
-              cursor: pointer;
-            }
-            @media print {
-              .ticket-actions { display: none; }
-              body { padding: 0; }
-            }
+            ${getTicketWindowStyles()}
           </style>
           <script>
             function openPrintPreview() {
@@ -1018,7 +1002,7 @@ onBeforeUnmount(() => {});
 
 .stock-alert-list :deep(.v-list-item) {
   background-color: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--pos-list-item-border);
   border-radius: 6px;
   margin-bottom: 8px;
 }
@@ -1045,12 +1029,12 @@ onBeforeUnmount(() => {});
   gap: 12px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(198, 164, 108, 0.1);
+  background: var(--pos-remito-preview-bg);
 }
 
 .remito-preview-row__title {
   font-weight: 700;
-  color: #3b0a12;
+  color: var(--pos-remito-preview-title);
 }
 
 @media (max-width: 960px) {

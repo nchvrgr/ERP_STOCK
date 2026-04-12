@@ -143,6 +143,12 @@ const menuItems = [
     icon: 'mdi-chart-areaspline',
     to: '/reportes',
     permission: 'PERM_REPORTES_VER'
+  },
+  {
+    title: 'Administrador',
+    icon: 'mdi-account',
+    to: '/usuarios',
+    permission: 'PERM_USUARIO_ADMIN'
   }
 ];
 

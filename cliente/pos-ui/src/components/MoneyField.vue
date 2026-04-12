@@ -257,7 +257,7 @@ const handleFocus = (event) => {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: rgb(90, 15, 28);
+  color: var(--pos-accent-strong);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;

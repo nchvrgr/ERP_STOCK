@@ -1760,7 +1760,7 @@ onMounted(() => {
   min-width: 180px;
   min-height: 46px;
   font-weight: 800;
-  box-shadow: 0 12px 24px rgba(90, 15, 28, 0.2);
+  box-shadow: var(--pos-primary-btn-shadow);
 }
 
 .product-print-action {
@@ -1807,7 +1807,7 @@ onMounted(() => {
 }
 
 .required-asterisk {
-  color: rgb(220, 38, 38);
+  color: var(--pos-error);
   font-weight: 800;
 }
 
@@ -1821,10 +1821,10 @@ onMounted(() => {
   gap: 10px;
   padding: 12px 16px;
   margin: 0 0 0;
-  border: 1px solid rgba(198, 164, 108, 0.24);
+  border: 1px solid var(--pos-price-panel-border);
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(198, 164, 108, 0.2), rgba(90, 15, 28, 0.06));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: var(--pos-price-panel-bg);
+  box-shadow: var(--pos-price-panel-sheen);
 }
 
 .product-price-row {
@@ -1832,29 +1832,29 @@ onMounted(() => {
 }
 
 .product-final-price--night {
-  border-color: rgba(197, 139, 148, 0.34);
-  background: linear-gradient(135deg, rgba(197, 139, 148, 0.18), rgba(198, 164, 108, 0.12));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: var(--pos-price-panel-night-border);
+  background: var(--pos-price-panel-night-bg);
+  box-shadow: var(--pos-price-panel-night-sheen);
 }
 
 .product-final-price__label {
   font-size: 0.95rem;
   font-weight: 700;
-  color: rgb(90, 15, 28);
+  color: var(--pos-accent-strong);
 }
 
 .product-final-price__value {
   font-size: 1.15rem;
   font-weight: 800;
-  color: rgb(59, 10, 18);
+  color: var(--pos-accent-dark);
 }
 
 .product-final-price--night .product-final-price__label {
-  color: rgba(244, 239, 230, 0.82);
+  color: var(--pos-inverse-soft);
 }
 
 .product-final-price--night .product-final-price__value {
-  color: rgb(244, 239, 230);
+  color: var(--pos-ink);
 }
 
 .product-status-row {
@@ -1862,25 +1862,25 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: rgb(58, 58, 58);
+  color: var(--pos-ink);
 }
 
 .product-status-row__label {
   font-size: 0.95rem;
   font-weight: 600;
-  color: rgb(58, 58, 58);
+  color: var(--pos-ink);
 }
 
 .product-status-row--night {
-  color: rgba(244, 239, 230, 0.9);
+  color: var(--pos-inverse);
 }
 
 .product-status-row--night .product-status-row__label {
-  color: rgba(244, 239, 230, 0.9);
+  color: var(--pos-inverse);
 }
 
 .product-status-row--night :deep(.v-label) {
-  color: rgba(244, 239, 230, 0.9);
+  color: var(--pos-inverse);
 }
 
 .product-dialog-action {

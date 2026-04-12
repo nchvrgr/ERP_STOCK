@@ -836,6 +836,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import MoneyField from '../components/MoneyField.vue';
 import { useAuthStore } from '../stores/auth';
 import { getJson, postJson, requestJson } from '../services/apiClient';
+import { getTicketWindowStyles } from '../theme/printStyles';
 import { formatMoney, roundMoney } from '../utils/currency';
 
 const auth = useAuthStore();
@@ -2422,28 +2423,11 @@ const printTicket = (ventaData, pagosData) => {
 
   win.document.write(`
     <html>
-      <head>
-        <title>Ticket venta</title>
-        <style>
-          @page { margin: 8mm; }
-          body { font-family: Arial, sans-serif; font-size: 12px; padding: 10px; }
-          h1 { margin: 0 0 6px 0; font-size: 14px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          th, td { border-bottom: 1px dashed #ccc; padding: 4px 0; }
-          th { text-align: left; font-weight: 600; }
-          .ticket-actions { display: flex; gap: 8px; margin-bottom: 12px; }
-          .ticket-actions button {
-            border: 1px solid #d6d0c6;
-            background: #fff;
-            border-radius: 999px;
-            padding: 6px 12px;
-            cursor: pointer;
-          }
-          @media print {
-            .ticket-actions { display: none; }
-            body { padding: 0; }
-          }
-        </style>
+        <head>
+          <title>Ticket venta</title>
+          <style>
+          ${getTicketWindowStyles()}
+          </style>
         <script>
           function openPrintPreview() {
             const cloned = document.documentElement.cloneNode(true);
@@ -2789,7 +2773,7 @@ onBeforeUnmount(() => {
   background: var(--pos-cancel-btn-bg) !important;
   color: var(--pos-cancel-btn-text) !important;
   border: 1px solid var(--pos-cancel-btn-border) !important;
-  box-shadow: 0 12px 24px rgba(201, 150, 147, 0.22);
+  box-shadow: var(--pos-cancel-btn-shadow);
 }
 
 .pos-payment-confirm-btn {
@@ -2807,8 +2791,8 @@ onBeforeUnmount(() => {
 
 .pos-totals-card {
   padding: 20px 20px 18px;
-  border: 1px solid rgba(153, 122, 126, 0.16);
-  box-shadow: 0 16px 34px rgba(113, 76, 84, 0.08);
+  border: 1px solid var(--pos-soft-panel-border);
+  box-shadow: var(--pos-soft-panel-shadow);
 }
 
 .pos-total-row {
@@ -2907,7 +2891,7 @@ onBeforeUnmount(() => {
   border-color: var(--pos-danger-btn-border);
   color: var(--pos-danger-btn-text);
   font-weight: 700;
-  box-shadow: 0 10px 18px rgba(191, 54, 46, 0.08);
+  box-shadow: var(--pos-danger-soft-shadow);
 }
 
 .pos-utility-action :deep(.v-btn__content) {
@@ -2946,7 +2930,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--pos-border);
   border-radius: 18px;
   background: var(--pos-card-soft);
-  box-shadow: 0 18px 40px rgba(59, 10, 18, 0.12);
+  box-shadow: var(--pos-overlay-card-shadow);
   text-align: center;
 }
 

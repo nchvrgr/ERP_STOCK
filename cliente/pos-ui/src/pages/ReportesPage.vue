@@ -227,9 +227,9 @@ const auth = useAuthStore();
 const theme = useTheme();
 const canView = computed(() => auth.hasPermission('PERM_REPORTES_VER'));
 const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
-const ventasLineColor = computed(() => (isNightMode.value ? '#C9A770' : '#5A0F1C'));
-const ventasPointColor = computed(() => (isNightMode.value ? '#C9A770' : '#C6A46C'));
-const mediosBarColor = computed(() => (isNightMode.value ? '#C9A770' : '#ea580c'));
+const ventasLineColor = computed(() => 'var(--pos-chart-line)');
+const ventasPointColor = computed(() => 'var(--pos-chart-point)');
+const mediosBarColor = computed(() => 'var(--pos-chart-bar)');
 
 const today = new Date();
 const sevenDaysAgo = new Date();
@@ -483,22 +483,13 @@ onMounted(() => {
   animation: fade-in 0.3s ease;
 }
 
-.v-theme--posNightTheme .reportes-page {
-  background: #1C1412;
-}
-
 .chart-wrapper {
-  border: 1px solid rgba(214, 208, 198, 0.9);
+  border: 1px solid var(--pos-chart-card-border);
   border-radius: 12px;
   padding: 12px;
-  background: #fff;
+  background: var(--pos-chart-card-bg);
+  box-shadow: var(--pos-chart-card-shadow);
   position: relative;
-}
-
-.chart-wrapper--night {
-  background: #2D1B19;
-  border-color: #3D2622;
-  box-shadow: 0 0 0 1px #3D2622, 0 0 14px rgba(255, 107, 69, 0.2);
 }
 
 .chart-svg {
@@ -510,13 +501,9 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: #475569;
+  color: var(--pos-chart-label);
   margin-top: 6px;
   gap: 8px;
-}
-
-.chart-wrapper--night .chart-labels {
-  color: #8C7D7A;
 }
 
 .chart-labels span {
@@ -531,16 +518,16 @@ onMounted(() => {
 .chart-tooltip {
   position: absolute;
   z-index: 2;
-  background: rgba(45, 27, 25, 0.95);
-  color: #fff;
+  background: var(--pos-chart-tooltip-bg);
+  color: var(--pos-chart-tooltip-text);
   font-size: 0.75rem;
   padding: 6px 8px;
   border-radius: 6px;
   pointer-events: none;
   max-width: min(220px, calc(100% - 16px));
   white-space: normal;
-  border: 1px solid #3D2622;
-  box-shadow: 0 0 0 1px #3D2622, 0 6px 16px rgba(255, 107, 69, 0.18);
+  border: 1px solid var(--pos-chart-tooltip-border);
+  box-shadow: var(--pos-chart-tooltip-shadow);
 }
 
 .reportes-truncate {

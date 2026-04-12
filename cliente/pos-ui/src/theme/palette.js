@@ -1,0 +1,231 @@
+const lightPalette = {
+  mode: 'light',
+  themeName: 'posTheme',
+  dark: false,
+  vuetifyColors: {
+    primary: '#3B0A12',
+    secondary: '#7A5A3A',
+    accent: '#C6A46C',
+    background: '#F4EFE6',
+    surface: '#FFFFFF',
+    info: '#A98A6F',
+    success: '#16A34A',
+    warning: '#C6A46C',
+    error: '#DC2626'
+  },
+  cssVars: {
+    '--pos-bg': '#F4EFE6',
+    '--pos-bg-secondary': '#E6D8C3',
+    '--pos-card': '#FFFFFF',
+    '--pos-card-soft': 'rgba(255, 252, 248, 0.94)',
+    '--pos-card-top': '#FFFFFF',
+    '--pos-card-bottom': '#FFFCF8',
+    '--pos-ink': '#3A3A3A',
+    '--pos-ink-muted': '#7A5A3A',
+    '--pos-accent': '#7A1E2C',
+    '--pos-accent-strong': '#5A0F1C',
+    '--pos-accent-dark': '#3B0A12',
+    '--pos-gold': '#C6A46C',
+    '--pos-wood': '#7A5A3A',
+    '--pos-wood-dark': '#4A2F1B',
+    '--pos-wood-soft': '#A98A6F',
+    '--pos-border': '#D6D0C6',
+    '--pos-shadow': '0 18px 38px rgba(74, 47, 27, 0.08)',
+    '--pos-bg-spot-a': 'rgba(198, 164, 108, 0.18)',
+    '--pos-bg-spot-b': 'rgba(122, 90, 58, 0.12)',
+    '--pos-bg-gradient-end': '#EFE6D9',
+    '--pos-drawer-top': 'rgba(255, 252, 248, 0.98)',
+    '--pos-drawer-bottom': 'rgba(230, 216, 195, 0.92)',
+    '--pos-drawer-overlay-a': 'rgba(90, 15, 28, 0.04)',
+    '--pos-drawer-overlay-b': 'rgba(122, 90, 58, 0.08)',
+    '--pos-appbar-bg': 'rgba(244, 239, 230, 0.9)',
+    '--pos-hover': 'rgba(198, 164, 108, 0.08)',
+    '--pos-tab-active': 'rgba(90, 15, 28, 0.1)',
+    '--pos-focus-ring': 'rgba(198, 164, 108, 0.16)',
+    '--pos-tonal-border': 'rgba(198, 164, 108, 0.28)',
+    '--pos-primary-btn-bg': '#3B0A12',
+    '--pos-primary-btn-text': '#FFF8F2',
+    '--pos-primary-btn-shadow': '0 12px 24px rgba(90, 15, 28, 0.2)',
+    '--pos-cancel-btn-bg': '#F3CCC7',
+    '--pos-cancel-btn-border': '#E7BBB5',
+    '--pos-cancel-btn-text': '#9C3942',
+    '--pos-cancel-btn-shadow': '0 12px 24px rgba(201, 150, 147, 0.22)',
+    '--pos-danger-btn-bg': 'rgba(220, 38, 38, 0.12)',
+    '--pos-danger-btn-border': 'rgba(220, 38, 38, 0.18)',
+    '--pos-danger-btn-text': '#991B1B',
+    '--pos-warn': '#C6A46C',
+    '--pos-error': '#DC2626',
+    '--pos-success': '#16A34A',
+    '--pos-scan-success-ring': '0 0 0 3px rgba(22, 163, 74, 0.25)',
+    '--pos-scan-error-ring': '0 0 0 3px rgba(220, 38, 38, 0.25)',
+    '--pos-hotkey-bg': 'rgba(198, 164, 108, 0.16)',
+    '--pos-elevated-btn-shadow': '0 12px 26px rgba(90, 15, 28, 0.18)',
+    '--pos-field-outline': 'rgba(214, 208, 198, 0.98)',
+    '--pos-list-active-bg': 'linear-gradient(90deg, rgba(90, 15, 28, 0.12), rgba(198, 164, 108, 0.08))',
+    '--pos-ticket-rule': '#CCCCCC',
+    '--pos-ticket-btn-border': '#D6D0C6',
+    '--pos-ticket-btn-bg': '#FFFFFF',
+    '--pos-ticket-btn-text': '#3A3A3A',
+    '--pos-list-item-border': 'rgba(90, 15, 28, 0.08)',
+    '--pos-soft-panel-border': 'rgba(153, 122, 126, 0.16)',
+    '--pos-soft-panel-shadow': '0 16px 34px rgba(113, 76, 84, 0.08)',
+    '--pos-danger-soft-shadow': '0 10px 18px rgba(191, 54, 46, 0.08)',
+    '--pos-overlay-card-shadow': '0 18px 40px rgba(59, 10, 18, 0.12)',
+    '--pos-price-panel-border': 'rgba(198, 164, 108, 0.24)',
+    '--pos-price-panel-bg': 'linear-gradient(135deg, rgba(198, 164, 108, 0.2), rgba(90, 15, 28, 0.06))',
+    '--pos-price-panel-sheen': 'inset 0 1px 0 rgba(255, 255, 255, 0.45)',
+    '--pos-price-panel-night-border': 'rgba(197, 139, 148, 0.34)',
+    '--pos-price-panel-night-bg': 'linear-gradient(135deg, rgba(197, 139, 148, 0.18), rgba(198, 164, 108, 0.12))',
+    '--pos-price-panel-night-sheen': 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    '--pos-inverse-soft': 'rgba(244, 239, 230, 0.82)',
+    '--pos-inverse': 'rgba(244, 239, 230, 0.9)',
+    '--pos-success-strong': '#15803D',
+    '--pos-success-surface': '#22C55E',
+    '--pos-success-ring': '0 0 0 4px rgba(34, 197, 94, 0.16)',
+    '--pos-chart-line': '#5A0F1C',
+    '--pos-chart-point': '#C6A46C',
+    '--pos-chart-bar': '#EA580C',
+    '--pos-chart-card-bg': '#FFFFFF',
+    '--pos-chart-card-border': 'rgba(214, 208, 198, 0.9)',
+    '--pos-chart-card-shadow': 'none',
+    '--pos-chart-label': '#475569',
+    '--pos-chart-tooltip-bg': 'rgba(59, 10, 18, 0.94)',
+    '--pos-chart-tooltip-text': '#FFFFFF',
+    '--pos-chart-tooltip-border': 'rgba(59, 10, 18, 0.45)',
+    '--pos-chart-tooltip-shadow': '0 6px 16px rgba(90, 15, 28, 0.18)',
+    '--pos-remito-preview-bg': 'rgba(198, 164, 108, 0.1)',
+    '--pos-remito-preview-title': '#3B0A12'
+  }
+};
+
+const darkPalette = {
+  mode: 'dark',
+  themeName: 'posNightTheme',
+  dark: true,
+  vuetifyColors: {
+    primary: '#C6A46C',
+    secondary: '#94A3B8',
+    accent: '#F1E2D2',
+    background: '#0F172A',
+    surface: '#1E293B',
+    info: '#94A3B8',
+    success: '#22C55E',
+    warning: '#C6A46C',
+    error: '#F87171'
+  },
+  cssVars: {
+    '--pos-bg': '#0F172A',
+    '--pos-bg-secondary': '#162033',
+    '--pos-card': '#1E293B',
+    '--pos-card-soft': 'rgba(30, 41, 59, 0.94)',
+    '--pos-card-top': '#243247',
+    '--pos-card-bottom': '#172133',
+    '--pos-ink': '#F1E2D2',
+    '--pos-ink-muted': '#94A3B8',
+    '--pos-accent': '#C6A46C',
+    '--pos-accent-strong': '#C6A46C',
+    '--pos-accent-dark': '#F1E2D2',
+    '--pos-gold': '#C6A46C',
+    '--pos-wood': '#94A3B8',
+    '--pos-wood-dark': '#CBD5E1',
+    '--pos-wood-soft': '#94A3B8',
+    '--pos-border': '#334155',
+    '--pos-shadow': '0 22px 44px rgba(0, 0, 0, 0.34)',
+    '--pos-bg-spot-a': 'rgba(148, 163, 184, 0.12)',
+    '--pos-bg-spot-b': 'rgba(198, 164, 108, 0.08)',
+    '--pos-bg-gradient-end': '#0B1120',
+    '--pos-drawer-top': 'rgba(15, 23, 42, 0.98)',
+    '--pos-drawer-bottom': 'rgba(13, 19, 35, 0.96)',
+    '--pos-drawer-overlay-a': 'rgba(148, 163, 184, 0.08)',
+    '--pos-drawer-overlay-b': 'rgba(198, 164, 108, 0.06)',
+    '--pos-appbar-bg': 'rgba(15, 23, 42, 0.88)',
+    '--pos-hover': 'rgba(148, 163, 184, 0.12)',
+    '--pos-tab-active': 'rgba(198, 164, 108, 0.18)',
+    '--pos-focus-ring': 'rgba(198, 164, 108, 0.2)',
+    '--pos-tonal-border': 'rgba(148, 163, 184, 0.22)',
+    '--pos-primary-btn-bg': '#C6A46C',
+    '--pos-primary-btn-text': '#0F172A',
+    '--pos-primary-btn-shadow': '0 14px 30px rgba(0, 0, 0, 0.34)',
+    '--pos-cancel-btn-bg': 'rgba(248, 113, 113, 0.18)',
+    '--pos-cancel-btn-border': 'rgba(248, 113, 113, 0.28)',
+    '--pos-cancel-btn-text': '#FECACA',
+    '--pos-cancel-btn-shadow': '0 12px 24px rgba(124, 45, 45, 0.18)',
+    '--pos-danger-btn-bg': 'rgba(248, 113, 113, 0.16)',
+    '--pos-danger-btn-border': 'rgba(248, 113, 113, 0.24)',
+    '--pos-danger-btn-text': '#FECACA',
+    '--pos-warn': '#C6A46C',
+    '--pos-error': '#F87171',
+    '--pos-success': '#22C55E',
+    '--pos-scan-success-ring': '0 0 0 3px rgba(34, 197, 94, 0.22)',
+    '--pos-scan-error-ring': '0 0 0 3px rgba(248, 113, 113, 0.22)',
+    '--pos-hotkey-bg': 'rgba(148, 163, 184, 0.16)',
+    '--pos-elevated-btn-shadow': '0 12px 26px rgba(0, 0, 0, 0.28)',
+    '--pos-field-outline': 'rgba(148, 163, 184, 0.38)',
+    '--pos-list-active-bg': 'linear-gradient(90deg, rgba(198, 164, 108, 0.16), rgba(148, 163, 184, 0.1))',
+    '--pos-ticket-rule': '#475569',
+    '--pos-ticket-btn-border': '#334155',
+    '--pos-ticket-btn-bg': '#1E293B',
+    '--pos-ticket-btn-text': '#F1E2D2',
+    '--pos-list-item-border': 'rgba(148, 163, 184, 0.16)',
+    '--pos-soft-panel-border': 'rgba(148, 163, 184, 0.18)',
+    '--pos-soft-panel-shadow': '0 16px 34px rgba(0, 0, 0, 0.24)',
+    '--pos-danger-soft-shadow': '0 10px 18px rgba(248, 113, 113, 0.12)',
+    '--pos-overlay-card-shadow': '0 18px 40px rgba(0, 0, 0, 0.28)',
+    '--pos-price-panel-border': 'rgba(198, 164, 108, 0.24)',
+    '--pos-price-panel-bg': 'linear-gradient(135deg, rgba(198, 164, 108, 0.14), rgba(148, 163, 184, 0.08))',
+    '--pos-price-panel-sheen': 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    '--pos-price-panel-night-border': 'rgba(198, 164, 108, 0.32)',
+    '--pos-price-panel-night-bg': 'linear-gradient(135deg, rgba(198, 164, 108, 0.16), rgba(148, 163, 184, 0.1))',
+    '--pos-price-panel-night-sheen': 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    '--pos-inverse-soft': 'rgba(241, 226, 210, 0.82)',
+    '--pos-inverse': 'rgba(241, 226, 210, 0.92)',
+    '--pos-success-strong': '#22C55E',
+    '--pos-success-surface': '#22C55E',
+    '--pos-success-ring': '0 0 0 4px rgba(34, 197, 94, 0.16)',
+    '--pos-chart-line': '#C6A46C',
+    '--pos-chart-point': '#F1E2D2',
+    '--pos-chart-bar': '#C6A46C',
+    '--pos-chart-card-bg': '#1E293B',
+    '--pos-chart-card-border': '#334155',
+    '--pos-chart-card-shadow': '0 0 0 1px rgba(51, 65, 85, 0.8), 0 0 14px rgba(15, 23, 42, 0.28)',
+    '--pos-chart-label': '#94A3B8',
+    '--pos-chart-tooltip-bg': 'rgba(15, 23, 42, 0.96)',
+    '--pos-chart-tooltip-text': '#F1E2D2',
+    '--pos-chart-tooltip-border': '#334155',
+    '--pos-chart-tooltip-shadow': '0 6px 16px rgba(2, 6, 23, 0.38)',
+    '--pos-remito-preview-bg': 'rgba(198, 164, 108, 0.14)',
+    '--pos-remito-preview-title': '#F1E2D2'
+  }
+};
+
+export const POS_PALETTES = {
+  light: lightPalette,
+  dark: darkPalette
+};
+
+export const normalizePaletteMode = (mode) => (mode === 'dark' ? 'dark' : 'light');
+
+export const getPalette = (mode) => POS_PALETTES[normalizePaletteMode(mode)];
+
+export const getThemeNameForMode = (mode) => getPalette(mode).themeName;
+
+export const buildVuetifyThemes = () =>
+  Object.values(POS_PALETTES).reduce((themes, palette) => {
+    themes[palette.themeName] = {
+      dark: palette.dark,
+      colors: palette.vuetifyColors
+    };
+    return themes;
+  }, {});
+
+export const applyPaletteVariables = (mode, target = typeof document !== 'undefined' ? document.documentElement : null) => {
+  const palette = getPalette(mode);
+
+  if (target) {
+    Object.entries(palette.cssVars).forEach(([name, value]) => {
+      target.style.setProperty(name, value);
+    });
+  }
+
+  return palette;
+};

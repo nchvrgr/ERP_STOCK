@@ -35,6 +35,7 @@ import router from './router';
 import { useAuthStore } from './stores/auth';
 import { setTokenProvider, setUnauthorizedHandler } from './services/apiClient';
 import { applyColorMode, getStoredColorMode, getThemeName, POS_COLOR_MODE_DARK } from './utils/colorMode';
+import { applyPaletteVariables, buildVuetifyThemes } from './theme/palette';
 
 const toMdiExportName = (iconName) => {
   if (!iconName.startsWith('mdi-')) return null;
@@ -81,6 +82,8 @@ const mdiSvgSet = {
 };
 
 const initialColorMode = getStoredColorMode();
+applyPaletteVariables(initialColorMode);
+
 const spanishLocale = {
   ...es,
   dataFooter: {
@@ -101,36 +104,7 @@ const vuetify = createVuetify({
   },
   theme: {
     defaultTheme: getThemeName(initialColorMode),
-    themes: {
-      posTheme: {
-        dark: false,
-        colors: {
-          primary: '#3B0A12',
-          secondary: '#7A5A3A',
-          accent: '#C6A46C',
-          background: '#F4EFE6',
-          surface: '#ffffff',
-          info: '#A98A6F',
-          success: '#16a34a',
-          warning: '#C6A46C',
-          error: '#dc2626'
-        }
-      },
-      posNightTheme: {
-        dark: true,
-        colors: {
-          primary: '#C58B94',
-          secondary: '#C6A46C',
-          accent: '#A7747D',
-          background: '#171211',
-          surface: '#241C1A',
-          info: '#B89A7E',
-          success: '#4ade80',
-          warning: '#D6B574',
-          error: '#f87171'
-        }
-      }
-    }
+    themes: buildVuetifyThemes()
   },
   locale: {
     locale: 'es',

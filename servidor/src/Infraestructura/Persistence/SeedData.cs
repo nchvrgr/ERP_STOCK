@@ -7,11 +7,13 @@ public static class SeedData
 {
     public static readonly DateTimeOffset SeedTimestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
     public const string AdminPasswordHash = "sha256:8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918";
+    public const string CashierPasswordHash = "sha256:89e04b1495a72cb72e966a805afdb4eb13e3106fef0f0db24c55c0bcdc779b4d";
     public const string LegacyAdminPasswordHash = "sha256:3eb3fe66b31e3b4d10fa70b5cad49c7112294af6ae4e476a1c405155d45aa121";
 
     public static readonly Guid TenantId = Guid.Parse("1f4f9f1a-2b7f-4d2c-8cf6-56d5b92f1a01");
     public static readonly Guid SucursalId = Guid.Parse("3b58fbc1-33f3-4e7e-9a34-9a0a3cf3c7a1");
     public static readonly Guid AdminUserId = Guid.Parse("c5a5020f-47f8-4b57-8a2a-1f9a4c495e2b");
+    public static readonly Guid CashierUserId = Guid.Parse("b5c7e4c0-6f91-4d6f-9d7a-6a1c2e348f11");
 
     public static readonly Guid RoleCajeroId = Guid.Parse("5e7f1a0b-8f29-4b6f-93a0-2f7a9f2c7b01");
     public static readonly Guid RoleEncargadoId = Guid.Parse("9b1b6f34-33d5-4a0c-9a11-0e2b9d5c1b02");
@@ -31,6 +33,14 @@ public static class SeedData
         TenantId,
         "admin",
         AdminPasswordHash,
+        SeedTimestamp,
+        true);
+
+    public static User CashierUser => new User(
+        CashierUserId,
+        TenantId,
+        "cajero",
+        CashierPasswordHash,
         SeedTimestamp,
         true);
 
@@ -63,7 +73,8 @@ public static class SeedData
 
     public static UserRole[] UserRoles =>
     [
-        new UserRole(Guid.Parse("f19b3d0a-92f1-4b7d-9d3f-05b0f8f1a101"), TenantId, AdminUserId, RoleAdminId, SeedTimestamp)
+        new UserRole(Guid.Parse("f19b3d0a-92f1-4b7d-9d3f-05b0f8f1a101"), TenantId, AdminUserId, RoleAdminId, SeedTimestamp),
+        new UserRole(Guid.Parse("8d0e993c-7342-4745-8f59-4ef988ee783f"), TenantId, CashierUserId, RoleCajeroId, SeedTimestamp)
     ];
 
     public static RolePermission[] RolePermissions =>
@@ -72,6 +83,10 @@ public static class SeedData
         new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c02"), TenantId, RoleCajeroId, Permissions[1].Id, SeedTimestamp),
         new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c03"), TenantId, RoleCajeroId, Permissions[4].Id, SeedTimestamp),
         new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c04"), TenantId, RoleCajeroId, Permissions[5].Id, SeedTimestamp),
+        new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c22"), TenantId, RoleCajeroId, Permissions[6].Id, SeedTimestamp),
+        new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c23"), TenantId, RoleCajeroId, Permissions[7].Id, SeedTimestamp),
+        new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c24"), TenantId, RoleCajeroId, Permissions[13].Id, SeedTimestamp),
+        new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c25"), TenantId, RoleCajeroId, Permissions[15].Id, SeedTimestamp),
         new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c05"), TenantId, RoleEncargadoId, Permissions[0].Id, SeedTimestamp),
         new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c06"), TenantId, RoleEncargadoId, Permissions[1].Id, SeedTimestamp),
         new RolePermission(Guid.Parse("a01b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c07"), TenantId, RoleEncargadoId, Permissions[2].Id, SeedTimestamp),

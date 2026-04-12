@@ -169,6 +169,7 @@ public static class DatabaseBootstrapper
         dbContext.Tenants.Add(SeedData.Tenant);
         dbContext.Sucursales.Add(SeedData.Sucursal);
         dbContext.Usuarios.Add(SeedData.AdminUser);
+        dbContext.Usuarios.Add(SeedData.CashierUser);
         dbContext.Roles.AddRange(SeedData.Roles);
         dbContext.Permisos.AddRange(SeedData.Permissions);
         dbContext.UsuarioRoles.AddRange(SeedData.UserRoles);
@@ -188,6 +189,7 @@ public static class DatabaseBootstrapper
             SeedData.SeedTimestamp));
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await EnsureCashierRolePermissionsAsync(dbContext, cancellationToken);
     }
 
     private static async Task UpgradeDesktopSeedDataAsync(PosDbContext dbContext, CancellationToken cancellationToken)
@@ -202,10 +204,94 @@ public static class DatabaseBootstrapper
 
         if (!string.Equals(admin.PasswordHash, SeedData.LegacyAdminPasswordHash, StringComparison.OrdinalIgnoreCase))
         {
+            await EnsureCashierUserAsync(dbContext, cancellationToken);
+            await EnsureCashierRolePermissionsAsync(dbContext, cancellationToken);
             return;
         }
 
         dbContext.Entry(admin).Property(nameof(User.PasswordHash)).CurrentValue = SeedData.AdminPasswordHash;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await EnsureCashierUserAsync(dbContext, cancellationToken);
+        await EnsureCashierRolePermissionsAsync(dbContext, cancellationToken);
+    }
+
+    private static async Task EnsureCashierUserAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var cashier = await dbContext.Usuarios
+            .FirstOrDefaultAsync(u => u.Username == "cajero", cancellationToken);
+
+        if (cashier is null)
+        {
+            cashier = await dbContext.Usuarios
+                .FirstOrDefaultAsync(u => u.Username == "empleado", cancellationToken);
+        }
+
+        if (cashier is null)
+        {
+            cashier = SeedData.CashierUser;
+            dbContext.Usuarios.Add(cashier);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            cashier.UpdateUsername("cajero");
+            cashier.SetActive(true);
+            dbContext.Entry(cashier).Property(nameof(User.Username)).CurrentValue = cashier.Username;
+            dbContext.Entry(cashier).Property(nameof(User.IsActive)).CurrentValue = cashier.IsActive;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var existingRoles = await dbContext.UsuarioRoles
+            .Where(ur => ur.UserId == cashier.Id)
+            .ToListAsync(cancellationToken);
+
+        if (existingRoles.Count > 0)
+        {
+            dbContext.UsuarioRoles.RemoveRange(existingRoles);
+        }
+
+        dbContext.UsuarioRoles.Add(new UserRole(
+            Guid.NewGuid(),
+            cashier.TenantId,
+            cashier.Id,
+            SeedData.RoleCajeroId,
+            DateTimeOffset.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureCashierRolePermissionsAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var requiredPermissionIds = SeedData.RolePermissions
+            .Where(x => x.RoleId == SeedData.RoleCajeroId)
+            .Select(x => x.PermissionId)
+            .Distinct()
+            .ToHashSet();
+
+        var existingPermissionIds = await dbContext.RolPermisos
+            .Where(rp => rp.RoleId == SeedData.RoleCajeroId)
+            .Select(rp => rp.PermissionId)
+            .ToListAsync(cancellationToken);
+
+        var missingPermissionIds = requiredPermissionIds
+            .Where(permissionId => !existingPermissionIds.Contains(permissionId))
+            .ToList();
+
+        if (missingPermissionIds.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var permissionId in missingPermissionIds)
+        {
+            dbContext.RolPermisos.Add(new RolePermission(
+                Guid.NewGuid(),
+                SeedData.TenantId,
+                SeedData.RoleCajeroId,
+                permissionId,
+                now));
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

@@ -35,6 +35,7 @@ public static class DependencyInjection
         });
         services.AddScoped<IRepositorioAutenticacion, RepositorioAutenticacion>();
         services.AddScoped<IRepositorioRolesUsuario, RepositorioRolesUsuario>();
+        services.AddScoped<IRepositorioUsuariosAdmin, RepositorioUsuariosAdmin>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IRepositorioProductos, RepositorioProductos>();
         services.AddScoped<IStockRepository, StockRepository>();

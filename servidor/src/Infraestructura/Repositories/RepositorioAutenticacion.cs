@@ -22,17 +22,16 @@ public sealed class RepositorioAutenticacion : IRepositorioAutenticacion
         Guid? sucursalId,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = firebaseEmail.Trim();
-        var atIndex = normalizedEmail.IndexOf('@');
-        var usernameAlias = atIndex > 0 ? normalizedEmail[..atIndex].Trim() : normalizedEmail;
         var normalizedErpUsername = erpUsername?.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedErpUsername))
+        {
+            return null;
+        }
 
         var userQuery = _dbContext.Usuarios
             .AsNoTracking()
-            .Where(u =>
-                (!string.IsNullOrWhiteSpace(normalizedErpUsername) && u.Username == normalizedErpUsername)
-                || u.Username == normalizedEmail
-                || u.Username == usernameAlias);
+            .Where(u => u.Username == normalizedErpUsername);
         if (tenantId.HasValue)
         {
             userQuery = userQuery.Where(u => u.TenantId == tenantId.Value);
@@ -96,6 +95,8 @@ public sealed class RepositorioAutenticacion : IRepositorioAutenticacion
             user.TenantId,
             resolvedSucursalId.Value,
             user.Id,
+            user.Username,
+            user.PasswordHash,
             roles,
             permissions,
             user.IsActive);

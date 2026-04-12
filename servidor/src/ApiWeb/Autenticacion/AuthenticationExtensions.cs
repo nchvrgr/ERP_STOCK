@@ -88,7 +88,8 @@ public static class AuthenticationExtensions
 
             options.AddPolicy("ROLE_ENCARGADO_ADMIN", policy =>
                 policy.RequireAssertion(context =>
-                    context.User.HasClaim("roles", "ENCARGADO")
+                    context.User.HasClaim("roles", "CAJERO")
+                    || context.User.HasClaim("roles", "ENCARGADO")
                     || context.User.HasClaim("roles", "ADMIN")));
         });
 

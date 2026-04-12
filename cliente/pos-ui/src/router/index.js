@@ -11,6 +11,7 @@ const RemitosPage = () => import('../pages/RemitosPage.vue');
 const PreRecepcionPage = () => import('../pages/PreRecepcionPage.vue');
 const RecepcionPage = () => import('../pages/RecepcionPage.vue');
 const EmpresaDatosPage = () => import('../pages/EmpresaDatosPage.vue');
+const UsuariosPage = () => import('../pages/UsuariosPage.vue');
 
 const routes = [
   {
@@ -79,6 +80,12 @@ const routes = [
         name: 'empresa',
         component: EmpresaDatosPage,
         meta: { permission: 'PERM_PRODUCTO_VER' }
+      },
+      {
+        path: 'usuarios',
+        name: 'usuarios',
+        component: UsuariosPage,
+        meta: { permission: 'PERM_USUARIO_ADMIN' }
       }
     ]
   },

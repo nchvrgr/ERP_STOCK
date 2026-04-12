@@ -19,9 +19,9 @@
 
             <v-form class="mt-4" @submit.prevent="submit">
               <v-text-field
-                ref="usernameRef"
+                ref="emailRef"
                 v-model="email"
-                label="Usuario"
+                label="Email de suscripción"
                 type="email"
                 variant="outlined"
                 density="comfortable"
@@ -30,7 +30,28 @@
               />
               <v-text-field
                 v-model="firebasePassword"
-                label="Contrasena"
+                label="Contrasena de suscripción"
+                type="password"
+                variant="outlined"
+                density="comfortable"
+                autocomplete="current-password"
+                required
+              />
+              <v-checkbox
+                v-model="loginAsAdmin"
+                label="Entrar como administrador"
+                color="primary"
+                hide-details
+                class="mt-1"
+              />
+              <div class="text-caption text-medium-emphasis mb-2">
+                Si no lo tildás, entrás como cajero.
+              </div>
+              <v-text-field
+                v-if="loginAsAdmin"
+                v-model="erpPassword"
+                ref="adminPasswordRef"
+                label="Contrasena de administrador"
                 type="password"
                 variant="outlined"
                 density="comfortable"
@@ -123,9 +144,12 @@ const route = useRoute();
 
 const email = ref('');
 const firebasePassword = ref('');
+const loginAsAdmin = ref(false);
+const erpPassword = ref('');
 const error = ref('');
 const loading = ref(false);
-const usernameRef = ref(null);
+const emailRef = ref(null);
+const adminPasswordRef = ref(null);
 const desktopBridge = typeof window !== 'undefined' ? window.desktopBridge || null : null;
 const appVersion = ref('');
 const checkingUpdate = ref(false);
@@ -141,7 +165,9 @@ const showUpdatePanel = computed(() =>
 const appVersionLabel = computed(() => (appVersion.value ? `v${appVersion.value}` : 'Version desconocida'));
 
 const focusUsername = () => {
-  const input = usernameRef.value?.$el?.querySelector('input');
+  const input = loginAsAdmin.value
+    ? adminPasswordRef.value?.$el?.querySelector('input')
+    : emailRef.value?.$el?.querySelector('input');
   if (input) input.focus();
 };
 
@@ -153,7 +179,9 @@ const submit = async () => {
   try {
     await auth.login({
       email: email.value,
-      firebasePassword: firebasePassword.value
+      firebasePassword: firebasePassword.value,
+      loginAsAdmin: loginAsAdmin.value,
+      erpPassword: erpPassword.value
     });
 
     const redirect =
@@ -269,6 +297,7 @@ onMounted(() => {
   auth.loadLoginHints();
   email.value = auth.firebaseEmail || '';
   firebasePassword.value = '';
+  erpPassword.value = '';
   focusUsername();
 
   if (showUpdatePanel.value) {

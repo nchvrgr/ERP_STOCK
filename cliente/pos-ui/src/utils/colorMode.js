@@ -1,3 +1,5 @@
+import { applyPaletteVariables, getThemeNameForMode } from '../theme/palette';
+
 export const POS_COLOR_MODE_STORAGE_KEY = 'pos-color-mode';
 export const POS_COLOR_MODE_LIGHT = 'light';
 export const POS_COLOR_MODE_DARK = 'dark';
@@ -10,7 +12,7 @@ export const getStoredColorMode = () => {
 };
 
 export const getThemeName = (mode) => (
-  mode === POS_COLOR_MODE_DARK ? 'posNightTheme' : 'posTheme'
+  getThemeNameForMode(mode)
 );
 
 export const applyColorMode = (mode, theme) => {
@@ -23,6 +25,7 @@ export const applyColorMode = (mode, theme) => {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-pos-theme', nextMode);
     document.documentElement.style.colorScheme = nextMode;
+    applyPaletteVariables(nextMode, document.documentElement);
   }
 
   if (theme?.global?.name) {

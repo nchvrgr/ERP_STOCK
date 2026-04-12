@@ -8,6 +8,11 @@ public sealed class Sha256PasswordHasher : IPasswordHasher
 {
     private const string Prefix = "sha256:";
 
+    public string Hash(string plainText)
+    {
+        return $"{Prefix}{ComputeSha256(plainText ?? string.Empty)}";
+    }
+
     public bool Verify(string plainText, string passwordHash)
     {
         if (string.IsNullOrWhiteSpace(passwordHash) || !passwordHash.StartsWith(Prefix, StringComparison.Ordinal))
@@ -16,7 +21,7 @@ public sealed class Sha256PasswordHasher : IPasswordHasher
         }
 
         var expected = passwordHash.Substring(Prefix.Length);
-        var computed = ComputeSha256(plainText);
+        var computed = ComputeSha256(plainText ?? string.Empty);
         return string.Equals(expected, computed, StringComparison.OrdinalIgnoreCase);
     }
 
