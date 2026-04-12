@@ -119,6 +119,8 @@ public sealed class CategoriaPrecioRepository : ICategoriaPrecioRepository
                     ProductPricingMode.Categoria,
                     newMargin,
                     product.IsActive,
+                    product.IsCombo,
+                    product.ComboItemsJson,
                     nowUtc);
             }
         }

@@ -10,6 +10,7 @@ public interface IRepositorioProductos
         string? search,
         Guid? categoriaId,
         bool? activo,
+        bool? isCombo,
         CancellationToken cancellationToken = default);
 
     Task<ProductoDetalleDto?> GetByIdAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken = default);

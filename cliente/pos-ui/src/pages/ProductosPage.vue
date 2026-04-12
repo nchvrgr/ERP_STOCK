@@ -2,6 +2,7 @@
   <div class="productos-page">
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="productos">Productos</v-tab>
+      <v-tab value="combos">Combo</v-tab>
       <v-tab value="proveedores">Proveedores</v-tab>
       <v-tab value="listas-precio">Categorías</v-tab>
     </v-tabs>
@@ -95,6 +96,49 @@
                         @click="promptDelete('producto', item)"
                       />
                     </div>
+                  </template>
+                </v-data-table>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <v-window-item value="combos" class="productos-window-item">
+        <div class="d-flex align-center flex-wrap gap-3 mb-4">
+          <v-btn color="primary" size="large" variant="elevated" class="text-none product-primary-action" prepend-icon="mdi-plus" @click="openNewComboDialog">
+            Nuevo combo
+          </v-btn>
+        </div>
+        <v-row dense>
+          <v-col cols="12">
+            <v-card class="pos-card pa-4 productos-list-card">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <div class="text-h6">Combos</div>
+              </div>
+              <div class="products-table-shell mt-3">
+                <v-data-table
+                  :headers="comboHeaders"
+                  :items="combos"
+                  :loading="comboLoading"
+                  :items-per-page="10"
+                  item-key="id"
+                  class="products-table"
+                  density="compact"
+                >
+                  <template v-slot:[`item.precioVenta`]='{ item }'>
+                    {{ formatMoney(item.precioVenta) }}
+                  </template>
+                  <template v-slot:[`item.actions`]='{ item }'>
+                    <v-btn
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      class="text-none"
+                      @click="openEditCombo(item)"
+                    >
+                      Editar combo
+                    </v-btn>
                   </template>
                 </v-data-table>
               </div>
@@ -614,6 +658,88 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="comboDialog" persistent width="860">
+      <v-card class="pa-4">
+        <div class="text-h6">{{ comboEditorMode === 'edit' ? 'Editar combo' : 'Nuevo combo' }}</div>
+        <div class="text-caption text-medium-emphasis">Definí los productos que lo componen y el precio final.</div>
+
+        <v-row dense class="mt-3">
+          <v-col cols="12" md="8">
+            <v-text-field v-model="comboForm.name" label="Nombre" variant="outlined" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model="comboForm.sku"
+              label="SKU"
+              variant="outlined"
+              density="comfortable"
+              inputmode="numeric"
+              @update:model-value="onComboSkuInput"
+            />
+          </v-col>
+        </v-row>
+
+        <v-row dense>
+          <v-col cols="12" md="8">
+            <v-autocomplete
+              v-model="comboSelectedProductId"
+              :items="comboProductOptions"
+              item-title="name"
+              item-value="id"
+              label="Agregar producto"
+              variant="outlined"
+              density="comfortable"
+              clearable
+            />
+          </v-col>
+          <v-col cols="12" md="2">
+            <v-text-field
+              v-model.number="comboSelectedCantidad"
+              label="Cantidad"
+              type="number"
+              min="1"
+              step="1"
+              variant="outlined"
+              density="comfortable"
+            />
+          </v-col>
+          <v-col cols="12" md="2" class="d-flex align-center">
+            <v-btn color="primary" class="text-none" @click="addComboItem">Agregar</v-btn>
+          </v-col>
+        </v-row>
+
+        <v-data-table
+          class="mt-2"
+          :headers="comboItemHeaders"
+          :items="comboForm.items"
+          density="compact"
+          item-key="productoId"
+        >
+          <template v-slot:[`item.subtotal`]='{ item }'>
+            {{ formatMoney(Number(item.precioVenta || 0) * Number(item.cantidad || 0)) }}
+          </template>
+          <template v-slot:[`item.actions`]='{ item }'>
+            <v-btn icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="removeComboItem(item.productoId)" />
+          </template>
+        </v-data-table>
+
+        <v-row dense class="mt-2">
+          <v-col cols="12" md="6">
+            <div class="text-caption text-medium-emphasis">Total base (suma de productos)</div>
+            <div class="text-h6">{{ formatMoney(comboBaseTotal) }}</div>
+          </v-col>
+          <v-col cols="12" md="6">
+            <MoneyField v-model="comboForm.precioVenta" label="Precio final del combo" variant="outlined" density="comfortable" :step="100" />
+          </v-col>
+        </v-row>
+
+        <v-card-actions class="justify-end px-0 pt-4">
+          <v-btn variant="text" @click="closeComboDialog">Cancelar</v-btn>
+          <v-btn color="primary" :loading="comboSaving" @click="saveCombo">{{ comboEditorMode === 'edit' ? 'Guardar cambios' : 'Guardar combo' }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top end" timeout="1700">
       <div class="d-flex align-center gap-2">
         <v-icon>{{ snackbar.icon }}</v-icon>
@@ -640,8 +766,11 @@ const theme = useTheme();
 const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
 
 const products = ref([]);
+const combos = ref([]);
 const loading = ref(false);
+const comboLoading = ref(false);
 const saving = ref(false);
+const comboSaving = ref(false);
 const barcodeLoading = ref(false);
 
 const search = ref('');
@@ -679,6 +808,19 @@ const form = reactive({
 
 const stockConfig = reactive({
   stockMinimo: ''
+});
+
+const comboDialog = ref(false);
+const comboEditorMode = ref('new');
+const comboSelectedProductId = ref('');
+const comboSelectedCantidad = ref(1);
+const comboProductOptions = ref([]);
+const comboForm = reactive({
+  id: '',
+  name: '',
+  sku: '',
+  precioVenta: '',
+  items: []
 });
 
 const errors = reactive({
@@ -721,6 +863,22 @@ const headers = [
   { title: 'Precio base', value: 'precioBase' },
   { title: 'Precio venta', value: 'precioVenta' },
   { title: 'Estado', value: 'isActive' },
+  { title: '', value: 'actions', sortable: false, align: 'end' }
+];
+
+const comboHeaders = [
+  { title: 'Nombre', value: 'name' },
+  { title: 'SKU', value: 'sku' },
+  { title: 'Precio', value: 'precioVenta', align: 'end' },
+  { title: '', value: 'actions', sortable: false, align: 'end' }
+];
+
+const comboItemHeaders = [
+  { title: 'Producto', value: 'name' },
+  { title: 'SKU', value: 'sku' },
+  { title: 'Cantidad', value: 'cantidad', align: 'end' },
+  { title: 'Precio', value: 'precioVenta', align: 'end' },
+  { title: 'Subtotal', value: 'subtotal', align: 'end' },
   { title: '', value: 'actions', sortable: false, align: 'end' }
 ];
 
@@ -819,6 +977,10 @@ const precioVentaCalculado = computed(() => {
   if (Number.isNaN(margen) || margen < 0) return base;
   return base * (1 + margen / 100);
 });
+
+const comboBaseTotal = computed(() =>
+  comboForm.items.reduce((acc, item) => acc + (Number(item.precioVenta || 0) * Number(item.cantidad || 0)), 0)
+);
 
 const shortId = (value) => {
   if (!value) return 'n/a';
@@ -953,6 +1115,7 @@ const loadProducts = async () => {
     const params = new URLSearchParams();
     if (search.value.trim()) params.set('search', search.value.trim());
     if (activoFilter.value !== 'all') params.set('activo', activoFilter.value);
+    params.set('combo', 'false');
 
     const { response, data } = await getJson(`/api/v1/productos?${params.toString()}`);
     if (!response.ok) {
@@ -965,6 +1128,188 @@ const loadProducts = async () => {
     flash('error', err?.message || 'No se pudieron cargar los productos.');
   } finally {
     loading.value = false;
+  }
+};
+
+const loadCombos = async () => {
+  comboLoading.value = true;
+  try {
+    const params = new URLSearchParams();
+    params.set('combo', 'true');
+    params.set('activo', 'true');
+    const { response, data } = await getJson(`/api/v1/productos?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+    combos.value = (data || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron cargar los combos.');
+  } finally {
+    comboLoading.value = false;
+  }
+};
+
+const loadComboProducts = async () => {
+  try {
+    const params = new URLSearchParams();
+    params.set('combo', 'false');
+    params.set('activo', 'true');
+    const { response, data } = await getJson(`/api/v1/productos?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+    comboProductOptions.value = data || [];
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron cargar productos para combo.');
+  }
+};
+
+const resetComboForm = () => {
+  comboForm.id = '';
+  comboForm.name = '';
+  comboForm.sku = '';
+  comboForm.precioVenta = '';
+  comboForm.items = [];
+  comboSelectedProductId.value = '';
+  comboSelectedCantidad.value = 1;
+  comboEditorMode.value = 'new';
+};
+
+const onComboSkuInput = (value) => {
+  comboForm.sku = String(value || '').replace(/\D+/g, '');
+};
+
+const openNewComboDialog = async () => {
+  resetComboForm();
+  await loadComboProducts();
+  comboDialog.value = true;
+};
+
+const openEditCombo = async (row) => {
+  const combo = resolveTableRow(row);
+  if (!combo?.id) return;
+
+  comboSaving.value = true;
+  try {
+    await loadComboProducts();
+    const { response, data } = await getJson(`/api/v1/productos/${combo.id}`);
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    comboForm.id = data.id;
+    comboForm.name = data.name || '';
+    comboForm.sku = data.sku || '';
+    comboForm.precioVenta = data.precioVenta ?? '';
+
+    const items = Array.isArray(data.comboItems) ? data.comboItems : [];
+    comboForm.items = items.map((item) => {
+      const product = comboProductOptions.value.find((p) => p.id === item.productoId);
+      return {
+        productoId: item.productoId,
+        name: product?.name || item.name || 'Producto',
+        sku: product?.sku || item.sku || '',
+        precioVenta: Number(product?.precioVenta || 0),
+        cantidad: Number(item.cantidad || 0)
+      };
+    }).filter((item) => item.productoId && item.cantidad > 0);
+
+    comboEditorMode.value = 'edit';
+    comboDialog.value = true;
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo cargar el combo.');
+  } finally {
+    comboSaving.value = false;
+  }
+};
+
+const closeComboDialog = () => {
+  comboDialog.value = false;
+  resetComboForm();
+};
+
+const addComboItem = () => {
+  const product = comboProductOptions.value.find((p) => p.id === comboSelectedProductId.value);
+  const cantidad = Number(comboSelectedCantidad.value || 0);
+  if (!product || cantidad <= 0) return;
+
+  const existing = comboForm.items.find((x) => x.productoId === product.id);
+  if (existing) {
+    existing.cantidad = Number(existing.cantidad) + cantidad;
+  } else {
+    comboForm.items.push({
+      productoId: product.id,
+      name: product.name,
+      sku: product.sku,
+      precioVenta: Number(product.precioVenta || 0),
+      cantidad
+    });
+  }
+
+  comboForm.precioVenta = Number(comboForm.precioVenta || 0) > 0
+    ? comboForm.precioVenta
+    : comboBaseTotal.value.toFixed(2);
+  comboSelectedProductId.value = '';
+  comboSelectedCantidad.value = 1;
+};
+
+const removeComboItem = (productoId) => {
+  comboForm.items = comboForm.items.filter((x) => x.productoId !== productoId);
+};
+
+const saveCombo = async () => {
+  if (comboSaving.value) return;
+  if (!comboForm.name.trim()) {
+    flash('error', 'El nombre del combo es obligatorio.');
+    return;
+  }
+  if (!/^\d+$/.test(comboForm.sku.trim())) {
+    flash('error', 'El SKU del combo debe ser numerico.');
+    return;
+  }
+  if (!comboForm.items.length) {
+    flash('error', 'Agregá productos al combo.');
+    return;
+  }
+
+  comboSaving.value = true;
+  try {
+    const baseTotal = Number(comboBaseTotal.value || 0);
+    const precioFinal = Number(comboForm.precioVenta || baseTotal);
+    const payload = {
+      name: comboForm.name.trim(),
+      sku: comboForm.sku.trim(),
+      proveedorId: null,
+      categoriaId: null,
+      isActive: true,
+      precioBase: baseTotal,
+      precioVenta: precioFinal,
+      pricingMode: 'MANUAL',
+      margenGananciaPct: null,
+      isCombo: true,
+      comboItems: comboForm.items.map((x) => ({ productoId: x.productoId, cantidad: Number(x.cantidad) }))
+    };
+
+    const isEdit = comboEditorMode.value === 'edit' && comboForm.id;
+    const result = isEdit
+      ? await requestJson(`/api/v1/productos/${comboForm.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      })
+      : await postJson('/api/v1/productos', payload);
+
+    const { response, data } = result;
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    flash('success', isEdit ? 'Combo actualizado' : 'Combo creado');
+    closeComboDialog();
+    await loadCombos();
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo guardar el combo.');
+  } finally {
+    comboSaving.value = false;
   }
 };
 
@@ -1614,6 +1959,10 @@ const confirmDelete = async () => {
 };
 
 const syncTabFromRoute = (value) => {
+  if (value === 'combos') {
+    tab.value = 'combos';
+    return;
+  }
   if (value === 'proveedores') {
     tab.value = 'proveedores';
     return;
@@ -1667,6 +2016,9 @@ watch(
 watch(
   () => tab.value,
   (value) => {
+    if (value === 'combos') {
+      loadCombos();
+    }
     const nextQuery = { ...route.query, tab: value };
     router.replace({ path: '/productos', query: nextQuery });
   }
@@ -1704,6 +2056,7 @@ watch(
 onMounted(() => {
   syncTabFromRoute(route.query.tab);
   loadProducts();
+  loadCombos();
   loadProveedores();
   loadCategorias();
   searchProveedores('');

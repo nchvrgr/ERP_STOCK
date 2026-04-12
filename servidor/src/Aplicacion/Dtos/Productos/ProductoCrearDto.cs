@@ -10,7 +10,9 @@ public sealed record ProductoCrearDto(
     decimal? PrecioBase = null,
     decimal? PrecioVenta = null,
     string? PricingMode = null,
-    decimal? MargenGananciaPct = null);
+    decimal? MargenGananciaPct = null,
+    bool? IsCombo = null,
+    IReadOnlyList<ProductoComboItemDto>? ComboItems = null);
 
 
 

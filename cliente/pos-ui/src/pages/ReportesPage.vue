@@ -42,6 +42,27 @@
       </v-card>
 
       <v-row dense class="mb-4">
+        <v-col cols="12" md="4">
+          <v-card class="pos-card pa-4">
+            <div class="text-caption text-medium-emphasis">Ingreso total (rango)</div>
+            <div class="text-h6">{{ formatMoney(resumenVentas.totalIngresos) }}</div>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="4">
+          <v-card class="pos-card pa-4">
+            <div class="text-caption text-medium-emphasis">Ingreso facturado</div>
+            <div class="text-h6">{{ formatMoney(resumenVentas.totalFacturado) }}</div>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="4">
+          <v-card class="pos-card pa-4">
+            <div class="text-caption text-medium-emphasis">Ingreso cotizado</div>
+            <div class="text-h6">{{ formatMoney(resumenVentas.totalCotizado) }}</div>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <v-row dense class="mb-4">
         <v-col cols="12" md="6">
           <v-card class="pos-card pa-4">
             <div class="d-flex align-center justify-space-between">
@@ -245,6 +266,11 @@ const ventasChart = ref(null);
 const mediosChart = ref(null);
 const topProductos = ref([]);
 const inmovilizado = ref([]);
+const resumenVentas = reactive({
+  totalIngresos: 0,
+  totalFacturado: 0,
+  totalCotizado: 0
+});
 
 const snackbar = ref({
   show: false,
@@ -447,17 +473,23 @@ const loadReports = async () => {
   try {
     const query = buildQuery();
 
-    const [ventasResp, mediosResp, topResp, inmResp] = await Promise.all([
+    const [resumenResp, ventasResp, mediosResp, topResp, inmResp] = await Promise.all([
+      getJson(`/api/v1/reportes/resumen-ventas?${query}`),
       getJson(`/api/v1/reportes/ventas-por-dia?${query}`),
       getJson(`/api/v1/reportes/medios-pago?${query}`),
       getJson(`/api/v1/reportes/top-productos?${query}&top=10`),
       getJson(`/api/v1/reportes/stock-inmovilizado?${query}`)
     ]);
 
+    if (!resumenResp.response.ok) throw new Error(extractProblemMessage(resumenResp.data));
     if (!ventasResp.response.ok) throw new Error(extractProblemMessage(ventasResp.data));
     if (!mediosResp.response.ok) throw new Error(extractProblemMessage(mediosResp.data));
     if (!topResp.response.ok) throw new Error(extractProblemMessage(topResp.data));
     if (!inmResp.response.ok) throw new Error(extractProblemMessage(inmResp.data));
+
+    resumenVentas.totalIngresos = Number(resumenResp.data?.totalIngresos || 0);
+    resumenVentas.totalFacturado = Number(resumenResp.data?.totalFacturado || 0);
+    resumenVentas.totalCotizado = Number(resumenResp.data?.totalNoFacturado || 0);
 
     ventasChart.value = ventasResp.data;
     mediosChart.value = mediosResp.data;

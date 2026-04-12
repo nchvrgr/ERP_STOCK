@@ -1053,7 +1053,7 @@ const needsMotivoCierre = computed(() => Math.abs(diferenciaCierre.value) > 0.00
 
 const canConfirm = computed(() => {
   if (!canEdit.value || !items.value.length) return false;
-  if (totalNeto.value <= 0) return false;
+  if (totalNeto.value < 0) return false;
   if (Math.abs(diferenciaPagos.value) > 0.0001) return false;
   if (facturacionSeleccion.value === null) return false;
   return true;

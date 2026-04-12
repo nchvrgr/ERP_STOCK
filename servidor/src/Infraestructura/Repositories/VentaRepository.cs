@@ -4,16 +4,26 @@ using Servidor.Aplicacion.Dtos.Ventas;
 using Servidor.Aplicacion.Dtos.Precios;
 using Servidor.Aplicacion.Dtos.Stock;
 using Servidor.Aplicacion.Dtos.Caja;
+using Servidor.Aplicacion.Dtos.Productos;
 using Servidor.Dominio.Entities;
 using Servidor.Dominio.Enums;
 using Servidor.Dominio.Exceptions;
 using Servidor.Infraestructura.Persistence;
+using System.Text.Json;
 
 namespace Servidor.Infraestructura.Repositories;
 
 public sealed class VentaRepository : IVentaRepository
 {
     private readonly PosDbContext _dbContext;
+    private sealed record ProductStockDefinition(Guid ProductoId, bool IsCombo, string? ComboItemsJson);
+    private sealed record StockDemandItem(Guid ProductoId, decimal Cantidad);
+
+    private static readonly JsonSerializerOptions ComboJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public VentaRepository(PosDbContext dbContext)
     {
@@ -203,6 +213,8 @@ public sealed class VentaRepository : IVentaRepository
                     p.Sku,
                     p.PrecioBase,
                     p.PrecioVenta,
+                    p.IsCombo,
+                    p.ComboItemsJson,
                     Codigo = pc != null && pc.Codigo == normalizedCode ? pc.Codigo : p.Sku,
                     Prioridad = p.Sku == normalizedCode ? 0 : 1
                 })
@@ -223,6 +235,8 @@ public sealed class VentaRepository : IVentaRepository
             sucursalId,
             product.Id,
             product.Name,
+            product.IsCombo,
+            product.ComboItemsJson,
             cantidadSolicitada,
             cancellationToken);
 
@@ -297,7 +311,7 @@ public sealed class VentaRepository : IVentaRepository
 
         var product = await _dbContext.Productos.AsNoTracking()
             .Where(p => p.TenantId == tenantId && p.Id == productId && p.IsActive)
-            .Select(p => new { p.Id, p.Name, p.Sku, p.PrecioBase, p.PrecioVenta })
+            .Select(p => new { p.Id, p.Name, p.Sku, p.PrecioBase, p.PrecioVenta, p.IsCombo, p.ComboItemsJson })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (product is null)
@@ -316,6 +330,8 @@ public sealed class VentaRepository : IVentaRepository
             sucursalId,
             product.Id,
             product.Name,
+            product.IsCombo,
+            product.ComboItemsJson,
             cantidadSolicitada,
             cancellationToken);
 
@@ -548,7 +564,21 @@ public sealed class VentaRepository : IVentaRepository
                 });
         }
 
-        var productIds = items.Select(i => i.ProductoId).Distinct().ToList();
+        var productInfos = await _dbContext.Productos.AsNoTracking()
+            .Where(p => p.TenantId == tenantId && items.Select(i => i.ProductoId).Contains(p.Id))
+            .Select(p => new { p.Id, p.IsCombo, p.ComboItemsJson })
+            .ToListAsync(cancellationToken);
+
+        var stockDefinitions = productInfos
+            .Select(p => new ProductStockDefinition(p.Id, p.IsCombo, p.ComboItemsJson))
+            .ToList();
+        var stockDemands = items
+            .Select(i => new StockDemandItem(i.ProductoId, i.Cantidad))
+            .ToList();
+
+        var requirements = BuildStockRequirements(stockDefinitions, stockDemands);
+        var productIds = requirements.Keys.ToList();
+
         var saldos = await _dbContext.StockSaldos
             .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && productIds.Contains(s.ProductoId))
             .ToListAsync(cancellationToken);
@@ -556,15 +586,15 @@ public sealed class VentaRepository : IVentaRepository
         var saldoByProduct = saldos.ToDictionary(s => s.ProductoId, s => s);
         var stockCambios = new List<StockSaldoChangeDto>();
 
-        foreach (var item in items)
+        foreach (var requirement in requirements)
         {
-            if (!saldoByProduct.TryGetValue(item.ProductoId, out var saldo))
+            if (!saldoByProduct.TryGetValue(requirement.Key, out var saldo))
             {
                 throw new ConflictException("Stock insuficiente.");
             }
 
             var before = saldo.CantidadActual;
-            var after = before - item.Cantidad;
+            var after = before - requirement.Value;
             if (after < 0)
             {
                 throw new ConflictException("Stock insuficiente.");
@@ -587,10 +617,10 @@ public sealed class VentaRepository : IVentaRepository
         _dbContext.StockMovimientos.Add(movimiento);
 
         var movimientoItems = new List<StockMovimientoItem>();
-        foreach (var item in items)
+        foreach (var requirement in requirements)
         {
-            var saldo = saldoByProduct[item.ProductoId];
-            var before = saldo.CantidadActual + item.Cantidad;
+            var saldo = saldoByProduct[requirement.Key];
+            var before = saldo.CantidadActual + requirement.Value;
             var after = saldo.CantidadActual;
 
             var itemId = Guid.NewGuid();
@@ -598,15 +628,15 @@ public sealed class VentaRepository : IVentaRepository
                 itemId,
                 tenantId,
                 movimientoId,
-                item.ProductoId,
-                item.Cantidad,
+                requirement.Key,
+                requirement.Value,
                 false,
                 nowUtc));
 
             stockCambios.Add(new StockSaldoChangeDto(
                 movimientoId,
                 itemId,
-                item.ProductoId,
+                requirement.Key,
                 before,
                 after));
         }
@@ -724,7 +754,20 @@ public sealed class VentaRepository : IVentaRepository
             .Where(p => p.TenantId == tenantId && p.VentaId == ventaId)
             .ToListAsync(cancellationToken);
 
-        var productIds = items.Select(i => i.ProductoId).Distinct().ToList();
+        var productInfos = await _dbContext.Productos.AsNoTracking()
+            .Where(p => p.TenantId == tenantId && items.Select(i => i.ProductoId).Contains(p.Id))
+            .Select(p => new { p.Id, p.IsCombo, p.ComboItemsJson })
+            .ToListAsync(cancellationToken);
+
+        var stockDefinitions = productInfos
+            .Select(p => new ProductStockDefinition(p.Id, p.IsCombo, p.ComboItemsJson))
+            .ToList();
+        var stockDemands = items
+            .Select(i => new StockDemandItem(i.ProductoId, i.Cantidad))
+            .ToList();
+
+        var requirements = BuildStockRequirements(stockDefinitions, stockDemands);
+        var productIds = requirements.Keys.ToList();
         var saldos = await _dbContext.StockSaldos
             .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && productIds.Contains(s.ProductoId))
             .ToListAsync(cancellationToken);
@@ -764,11 +807,11 @@ public sealed class VentaRepository : IVentaRepository
 
         var movimientoItems = new List<StockMovimientoItem>();
         var stockCambios = new List<StockSaldoChangeDto>();
-        foreach (var item in items)
+        foreach (var requirement in requirements)
         {
-            var saldo = saldoByProduct[item.ProductoId];
+            var saldo = saldoByProduct[requirement.Key];
             var before = saldo.CantidadActual;
-            var after = before + item.Cantidad;
+            var after = before + requirement.Value;
             saldo.SetCantidad(after, nowUtc);
 
             var itemId = Guid.NewGuid();
@@ -776,15 +819,15 @@ public sealed class VentaRepository : IVentaRepository
                 itemId,
                 tenantId,
                 movimientoId,
-                item.ProductoId,
-                item.Cantidad,
+                requirement.Key,
+                requirement.Value,
                 true,
                 nowUtc));
 
             stockCambios.Add(new StockSaldoChangeDto(
                 movimientoId,
                 itemId,
-                item.ProductoId,
+                requirement.Key,
                 before,
                 after));
         }
@@ -914,22 +957,101 @@ public sealed class VentaRepository : IVentaRepository
         Guid sucursalId,
         Guid productoId,
         string nombreProducto,
+        bool esCombo,
+        string? comboItemsJson,
         decimal cantidadSolicitada,
         CancellationToken cancellationToken)
     {
-        var disponible = await _dbContext.StockSaldos.AsNoTracking()
-            .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && s.ProductoId == productoId)
-            .Select(s => s.CantidadActual)
-            .FirstOrDefaultAsync(cancellationToken);
+        var requirements = BuildStockRequirements(
+            new[] { new ProductStockDefinition(productoId, esCombo, comboItemsJson) },
+            new[] { new StockDemandItem(productoId, cantidadSolicitada) });
 
-        if (cantidadSolicitada <= disponible)
+        foreach (var requirement in requirements)
         {
-            return;
+            var disponible = await _dbContext.StockSaldos.AsNoTracking()
+                .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && s.ProductoId == requirement.Key)
+                .Select(s => s.CantidadActual)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (requirement.Value <= disponible)
+            {
+                continue;
+            }
+
+            var faltante = requirement.Value - disponible;
+            throw new ConflictException(
+                $"Stock insuficiente para {nombreProducto}. Disponible: {disponible}. Solicitado: {requirement.Value}. Faltante: {faltante}.");
+        }
+    }
+
+    private static IReadOnlyDictionary<Guid, decimal> BuildStockRequirements(
+        IEnumerable<ProductStockDefinition> products,
+        IEnumerable<StockDemandItem> items)
+    {
+        var productMap = products.ToDictionary(
+            p => p.ProductoId,
+            p => new
+            {
+                p.IsCombo,
+                p.ComboItemsJson
+            });
+
+        var requirements = new Dictionary<Guid, decimal>();
+
+        foreach (var item in items)
+        {
+            var productId = item.ProductoId;
+            var quantity = item.Cantidad;
+
+            if (!productMap.TryGetValue(productId, out var productInfo))
+            {
+                continue;
+            }
+
+            if (!productInfo.IsCombo)
+            {
+                requirements[productId] = requirements.TryGetValue(productId, out var current)
+                    ? current + quantity
+                    : quantity;
+                continue;
+            }
+
+            var comboItems = DeserializeComboItems(productInfo.ComboItemsJson);
+            if (comboItems is null || comboItems.Count == 0)
+            {
+                requirements[productId] = requirements.TryGetValue(productId, out var currentCombo)
+                    ? currentCombo + quantity
+                    : quantity;
+                continue;
+            }
+
+            foreach (var comboItem in comboItems)
+            {
+                var requiredQuantity = comboItem.Cantidad * quantity;
+                requirements[comboItem.ProductoId] = requirements.TryGetValue(comboItem.ProductoId, out var currentRequirement)
+                    ? currentRequirement + requiredQuantity
+                    : requiredQuantity;
+            }
         }
 
-        var faltante = cantidadSolicitada - disponible;
-        throw new ConflictException(
-            $"Stock insuficiente para {nombreProducto}. Disponible: {disponible}. Solicitado: {cantidadSolicitada}. Faltante: {faltante}.");
+        return requirements;
+    }
+
+    private static IReadOnlyCollection<ProductoComboItemDto>? DeserializeComboItems(string? comboItemsJson)
+    {
+        if (string.IsNullOrWhiteSpace(comboItemsJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProductoComboItemDto>>(comboItemsJson, ComboJsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 

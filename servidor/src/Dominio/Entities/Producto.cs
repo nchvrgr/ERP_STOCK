@@ -22,7 +22,9 @@ public sealed class Producto : EntityBase
         decimal precioVenta = 1m,
         ProductPricingMode pricingMode = ProductPricingMode.FijoPct,
         decimal? margenGananciaPct = null,
-        bool isActive = true)
+        bool isActive = true,
+        bool isCombo = false,
+        string? comboItemsJson = null)
         : base(id, tenantId, createdAtUtc)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.", nameof(name));
@@ -41,6 +43,8 @@ public sealed class Producto : EntityBase
         PricingMode = pricingMode;
         MargenGananciaPct = margenGananciaPct;
         IsActive = isActive;
+        IsCombo = isCombo;
+        ComboItemsJson = comboItemsJson;
     }
 
     public Producto(
@@ -82,6 +86,8 @@ public sealed class Producto : EntityBase
     public ProductPricingMode PricingMode { get; private set; }
     public decimal? MargenGananciaPct { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsCombo { get; private set; }
+    public string? ComboItemsJson { get; private set; }
 
     public void Update(
         string name,
@@ -94,6 +100,8 @@ public sealed class Producto : EntityBase
         ProductPricingMode pricingMode,
         decimal? margenGananciaPct,
         bool isActive,
+        bool isCombo,
+        string? comboItemsJson,
         DateTimeOffset updatedAtUtc)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.", nameof(name));
@@ -112,6 +120,15 @@ public sealed class Producto : EntityBase
         PricingMode = pricingMode;
         MargenGananciaPct = margenGananciaPct;
         IsActive = isActive;
+        IsCombo = isCombo;
+        ComboItemsJson = comboItemsJson;
+        MarkUpdated(updatedAtUtc);
+    }
+
+    public void SetComboDefinition(bool isCombo, string? comboItemsJson, DateTimeOffset updatedAtUtc)
+    {
+        IsCombo = isCombo;
+        ComboItemsJson = comboItemsJson;
         MarkUpdated(updatedAtUtc);
     }
 

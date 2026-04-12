@@ -10,7 +10,9 @@ public sealed record ProductoActualizarDto(
     decimal? PrecioBase,
     decimal? PrecioVenta,
     string? PricingMode = null,
-    decimal? MargenGananciaPct = null);
+    decimal? MargenGananciaPct = null,
+    bool? IsCombo = null,
+    IReadOnlyList<ProductoComboItemDto>? ComboItems = null);
 
 
 

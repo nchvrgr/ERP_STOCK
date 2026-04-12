@@ -6,12 +6,18 @@ using Servidor.Dominio.Entities;
 using Servidor.Dominio.Enums;
 using Servidor.Dominio.Exceptions;
 using Servidor.Infraestructura.Persistence;
+using System.Text.Json;
 
 namespace Servidor.Infraestructura.Repositories;
 
 public sealed class RepositorioProductos : IRepositorioProductos
 {
     private readonly PosDbContext _dbContext;
+    private static readonly JsonSerializerOptions ComboJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public RepositorioProductos(PosDbContext dbContext)
     {
@@ -23,6 +29,7 @@ public sealed class RepositorioProductos : IRepositorioProductos
         string? search,
         Guid? categoriaId,
         bool? activo,
+        bool? isCombo,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.Productos.AsNoTracking()
@@ -36,6 +43,11 @@ public sealed class RepositorioProductos : IRepositorioProductos
         if (activo.HasValue)
         {
             query = query.Where(p => p.IsActive == activo.Value);
+        }
+
+        if (isCombo.HasValue)
+        {
+            query = query.Where(p => p.IsCombo == isCombo.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -77,7 +89,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
                     p.PrecioVenta,
                     p.PricingMode,
                     p.MargenGananciaPct,
-                    p.IsActive
+                    p.IsActive,
+                    p.IsCombo
                 })
             .ToListAsync(cancellationToken);
 
@@ -104,7 +117,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
                 r.PrecioVenta,
                 r.PricingMode.ToString().ToUpperInvariant(),
                 r.MargenGananciaPct,
-                r.IsActive);
+                r.IsActive,
+                r.IsCombo);
         }).ToList();
 
         return list;
@@ -128,7 +142,9 @@ public sealed class RepositorioProductos : IRepositorioProductos
                     Product = p,
                     Categoria = c != null ? c.Name : null,
                     Marca = m != null ? m.Name : null,
-                    Proveedor = pr != null ? pr.Name : null
+                    Proveedor = pr != null ? pr.Name : null,
+                    p.IsCombo,
+                    p.ComboItemsJson
                 })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -142,6 +158,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
             .OrderBy(c => c.Codigo)
             .Select(c => new ProductoCodigoDto(c.Id, c.Codigo))
             .ToListAsync(cancellationToken);
+
+        var comboItems = DeserializeComboItems(product.ComboItemsJson);
 
         return new ProductoDetalleDto(
             product.Product.Id,
@@ -158,6 +176,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
             product.Product.PricingMode.ToString().ToUpperInvariant(),
             product.Product.MargenGananciaPct,
             product.Product.IsActive,
+                product.IsCombo,
+                comboItems,
             codes);
     }
 
@@ -242,6 +262,10 @@ public sealed class RepositorioProductos : IRepositorioProductos
             request.PrecioVenta,
             cancellationToken);
 
+        var comboItemsJson = request.IsCombo == true
+            ? SerializeComboItems(request.ComboItems)
+            : null;
+
         var product = new Producto(
             Guid.NewGuid(),
             tenantId,
@@ -255,7 +279,9 @@ public sealed class RepositorioProductos : IRepositorioProductos
             pricing.PrecioVenta,
             pricingMode,
             pricing.MargenGananciaPct,
-            request.IsActive ?? true);
+            request.IsActive ?? true,
+            request.IsCombo == true,
+            comboItemsJson);
 
         _dbContext.Productos.Add(product);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -380,6 +406,10 @@ public sealed class RepositorioProductos : IRepositorioProductos
             requestedPrecioVenta,
             cancellationToken);
 
+        var comboItemsJson = request.IsCombo == true
+            ? SerializeComboItems(request.ComboItems)
+            : null;
+
         product.Update(
             newName,
             newSku,
@@ -391,6 +421,8 @@ public sealed class RepositorioProductos : IRepositorioProductos
             newPricingMode,
             pricing.MargenGananciaPct,
             newIsActive,
+            request.IsCombo == true,
+            comboItemsJson,
             nowUtc);
 
         if (request.ProveedorId.HasValue)
@@ -816,6 +848,33 @@ public sealed class RepositorioProductos : IRepositorioProductos
             .ToListAsync(cancellationToken);
 
         return rows;
+    }
+
+    private static string? SerializeComboItems(IReadOnlyList<ProductoComboItemDto>? comboItems)
+    {
+        if (comboItems is null || comboItems.Count == 0)
+        {
+            return null;
+        }
+
+        return JsonSerializer.Serialize(comboItems, ComboJsonOptions);
+    }
+
+    private static IReadOnlyCollection<ProductoComboItemDto>? DeserializeComboItems(string? comboItemsJson)
+    {
+        if (string.IsNullOrWhiteSpace(comboItemsJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProductoComboItemDto>>(comboItemsJson, ComboJsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static ProductPricingMode ParsePricingMode(string? value, ProductPricingMode fallback)

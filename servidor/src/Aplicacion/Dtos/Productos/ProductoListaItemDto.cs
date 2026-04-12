@@ -15,7 +15,12 @@ public sealed record ProductoListaItemDto(
     decimal PrecioVenta,
     string PricingMode,
     decimal? MargenGananciaPct,
-    bool IsActive);
+    bool IsActive,
+    bool IsCombo = false);
+
+public sealed record ProductoComboItemDto(
+    Guid ProductoId,
+    decimal Cantidad);
 
 
 

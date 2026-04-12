@@ -27,9 +27,10 @@ public sealed class ProductosController : ControllerBase
         [FromQuery] string? search,
         [FromQuery] Guid? categoriaId,
         [FromQuery] bool? activo,
+        [FromQuery] bool? combo,
         CancellationToken cancellationToken)
     {
-        var resultados = await _servicioProductos.BuscarAsync(search, categoriaId, activo, cancellationToken);
+        var resultados = await _servicioProductos.BuscarAsync(search, categoriaId, activo, combo, cancellationToken);
         return Ok(resultados);
     }
 

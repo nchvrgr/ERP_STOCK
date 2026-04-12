@@ -26,10 +26,11 @@ public sealed class ServicioProductos
         string? search,
         Guid? categoriaId,
         bool? activo,
+        bool? isCombo,
         CancellationToken cancellationToken)
     {
         var idTenant = AsegurarTenant();
-        return await _repositorioProductos.SearchAsync(idTenant, search, categoriaId, activo, cancellationToken);
+        return await _repositorioProductos.SearchAsync(idTenant, search, categoriaId, activo, isCombo, cancellationToken);
     }
 
     public async Task<ProductoDetalleDto> ObtenerPorIdAsync(Guid productId, CancellationToken cancellationToken)
@@ -116,7 +117,39 @@ public sealed class ServicioProductos
                 });
         }
 
-        if (!request.ProveedorId.HasValue || request.ProveedorId.Value == Guid.Empty)
+        if (request.IsCombo == true)
+        {
+            if (request.ComboItems is null || request.ComboItems.Count == 0)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "El combo debe incluir productos." }
+                    });
+            }
+
+            if (!request.PrecioBase.HasValue)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["precioBase"] = new[] { "El combo debe informar el total base." }
+                    });
+            }
+
+            if (!request.PrecioVenta.HasValue)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["precioVenta"] = new[] { "El combo debe informar el precio final." }
+                    });
+            }
+        }
+        else if (!request.ProveedorId.HasValue || request.ProveedorId.Value == Guid.Empty)
         {
             throw new ValidationException(
                 "Validacion fallida.",
@@ -154,6 +187,11 @@ public sealed class ServicioProductos
                 {
                     ["margenGananciaPct"] = new[] { "El margen no puede ser negativo." }
                 });
+        }
+
+        if (request.IsCombo == true)
+        {
+            await ValidarComboItemsAsync(request.ComboItems, null, cancellationToken);
         }
 
         var idTenant = AsegurarTenant();
@@ -215,7 +253,9 @@ public sealed class ServicioProductos
             || request.PrecioBase is not null
             || request.PrecioVenta is not null
             || request.PricingMode is not null
-            || request.MargenGananciaPct is not null;
+            || request.MargenGananciaPct is not null
+            || request.IsCombo.HasValue
+            || request.ComboItems is not null;
 
         if (!hasAnyChange)
         {
@@ -277,6 +317,39 @@ public sealed class ServicioProductos
                 });
         }
 
+        if (request.IsCombo == true)
+        {
+            if (request.ComboItems is null || request.ComboItems.Count == 0)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "El combo debe incluir productos." }
+                    });
+            }
+
+            if (!request.PrecioBase.HasValue)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["precioBase"] = new[] { "El combo debe informar el total base." }
+                    });
+            }
+
+            if (!request.PrecioVenta.HasValue)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["precioVenta"] = new[] { "El combo debe informar el precio final." }
+                    });
+            }
+        }
+
         if (request.ProveedorId.HasValue && request.ProveedorId.Value == Guid.Empty)
         {
             throw new ValidationException(
@@ -315,6 +388,11 @@ public sealed class ServicioProductos
                 {
                     ["margenGananciaPct"] = new[] { "El margen no puede ser negativo." }
                 });
+        }
+
+        if (request.IsCombo == true)
+        {
+            await ValidarComboItemsAsync(request.ComboItems, productId, cancellationToken);
         }
 
         var idTenant = AsegurarTenant();
@@ -616,6 +694,79 @@ public sealed class ServicioProductos
         }
 
         return !string.IsNullOrWhiteSpace(sku);
+    }
+
+    private async Task ValidarComboItemsAsync(
+        IReadOnlyList<ProductoComboItemDto>? comboItems,
+        Guid? currentProductId,
+        CancellationToken cancellationToken)
+    {
+        if (comboItems is null || comboItems.Count == 0)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["comboItems"] = new[] { "El combo debe incluir productos." }
+                });
+        }
+
+        var idTenant = AsegurarTenant();
+        var seen = new HashSet<Guid>();
+
+        foreach (var comboItem in comboItems)
+        {
+            if (comboItem.ProductoId == Guid.Empty || comboItem.Cantidad <= 0)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "Los productos del combo deben ser validos y con cantidad mayor a cero." }
+                    });
+            }
+
+            if (!seen.Add(comboItem.ProductoId))
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "El combo no puede repetir productos." }
+                    });
+            }
+
+            if (currentProductId.HasValue && comboItem.ProductoId == currentProductId.Value)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "El combo no puede incluirse a si mismo." }
+                    });
+            }
+
+            var producto = await _repositorioProductos.GetByIdAsync(idTenant, comboItem.ProductoId, cancellationToken);
+            if (producto is null)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "Uno de los productos del combo no existe." }
+                    });
+            }
+
+            if (producto.IsCombo)
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["comboItems"] = new[] { "Un combo no puede contener otro combo." }
+                    });
+            }
+        }
     }
 }
 

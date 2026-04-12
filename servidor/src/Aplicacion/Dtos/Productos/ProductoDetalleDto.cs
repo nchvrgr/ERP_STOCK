@@ -15,7 +15,9 @@ public sealed record ProductoDetalleDto(
     string PricingMode,
     decimal? MargenGananciaPct,
     bool IsActive,
-    IReadOnlyCollection<ProductoCodigoDto> Codes);
+    bool IsCombo = false,
+    IReadOnlyCollection<ProductoComboItemDto>? ComboItems = null,
+    IReadOnlyCollection<ProductoCodigoDto>? Codes = null);
 
 
 

@@ -21,8 +21,44 @@ public static class DatabaseBootstrapper
 
         await EnsureCajaSchemaAsync(dbContext, cancellationToken);
         await EnsureEmpresaDatosSchemaAsync(dbContext, cancellationToken);
+        await EnsureProductoComboSchemaAsync(dbContext, cancellationToken);
 
         await SeedCoreDataAsync(dbContext, cancellationToken);
+    }
+
+    private static async Task EnsureProductoComboSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(dbContext, "productos", "IsCombo", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE productos ADD COLUMN IsCombo INTEGER NOT NULL DEFAULT 0;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE productos ADD COLUMN \"IsCombo\" boolean NOT NULL DEFAULT FALSE;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "productos", "ComboItemsJson", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE productos ADD COLUMN ComboItemsJson TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE productos ADD COLUMN \"ComboItemsJson\" character varying(4000) NULL;",
+                    cancellationToken);
+            }
+        }
     }
 
     private static async Task EnsureCajaSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)
