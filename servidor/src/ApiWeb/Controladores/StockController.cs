@@ -34,6 +34,18 @@ public sealed class StockController : ControllerBase
         return CreatedAtAction(nameof(ObtenerMovimientos), new { }, movimiento);
     }
 
+    [Authorize(Policy = "PERM_USUARIO_ADMIN")]
+    [HttpPost("movimientos/{id:guid}/revertir")]
+    [ProducesResponseType(typeof(StockMovimientoDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<StockMovimientoDto>> RevertirMovimiento(
+        Guid id,
+        [FromBody] StockMovimientoRevertRequestDto solicitud,
+        CancellationToken cancellationToken)
+    {
+        var movimiento = await _servicioStock.RevertirMovimientoAsync(id, solicitud, cancellationToken);
+        return Ok(movimiento);
+    }
+
     [Authorize(Policy = "PERM_STOCK_AJUSTAR")]
     [HttpGet("saldos")]
     [ProducesResponseType(typeof(IReadOnlyList<StockSaldoDto>), StatusCodes.Status200OK)]

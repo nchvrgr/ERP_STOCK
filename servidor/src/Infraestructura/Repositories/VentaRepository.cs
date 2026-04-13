@@ -966,6 +966,14 @@ public sealed class VentaRepository : IVentaRepository
             new[] { new ProductStockDefinition(productoId, esCombo, comboItemsJson) },
             new[] { new StockDemandItem(productoId, cantidadSolicitada) });
 
+        var componentNames = requirements.Count > 1 || esCombo
+            ? await _dbContext.Productos.AsNoTracking()
+                .Where(p => p.TenantId == tenantId && requirements.Keys.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => $"{p.Name} ({p.Sku})", cancellationToken)
+            : new Dictionary<Guid, string>();
+
+        var faltantes = new List<string>();
+
         foreach (var requirement in requirements)
         {
             var disponible = await _dbContext.StockSaldos.AsNoTracking()
@@ -979,8 +987,20 @@ public sealed class VentaRepository : IVentaRepository
             }
 
             var faltante = requirement.Value - disponible;
+            var missingProductLabel = requirement.Key == productoId && !esCombo
+                ? nombreProducto
+                : componentNames.TryGetValue(requirement.Key, out var componentLabel)
+                    ? componentLabel
+                    : "producto componente";
+            faltantes.Add($"{missingProductLabel} [Disponible: {disponible}. Solicitado: {requirement.Value}. Faltante: {faltante}.]");
+        }
+
+        if (faltantes.Count > 0)
+        {
             throw new ConflictException(
-                $"Stock insuficiente para {nombreProducto}. Disponible: {disponible}. Solicitado: {requirement.Value}. Faltante: {faltante}.");
+                esCombo
+                    ? $"Stock insuficiente para armar el combo {nombreProducto}. Faltantes: {string.Join(" | ", faltantes)}."
+                    : $"Stock insuficiente para {faltantes[0]}");
         }
     }
 

@@ -78,7 +78,7 @@ public sealed class StockRepository : IStockRepository
         CancellationToken cancellationToken = default)
     {
         var productsQuery = _dbContext.Productos.AsNoTracking()
-            .Where(p => p.TenantId == tenantId);
+            .Where(p => p.TenantId == tenantId && !p.IsCombo);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -220,7 +220,7 @@ public sealed class StockRepository : IStockRepository
                     on new { c.ProductoId, c.TenantId, c.SucursalId }
                     equals new { s.ProductoId, s.TenantId, s.SucursalId } into saldoJoin
                 from saldo in saldoJoin.DefaultIfEmpty()
-                where c.TenantId == tenantId && c.SucursalId == sucursalId && p.IsActive
+                where c.TenantId == tenantId && c.SucursalId == sucursalId && p.IsActive && !p.IsCombo
                 select new
                 {
                     p.Id,
@@ -296,7 +296,7 @@ public sealed class StockRepository : IStockRepository
                     on new { c.ProductoId, c.TenantId, c.SucursalId }
                     equals new { s.ProductoId, s.TenantId, s.SucursalId } into saldoJoin
                 from saldo in saldoJoin.DefaultIfEmpty()
-                where c.TenantId == tenantId && c.SucursalId == sucursalId && p.IsActive
+                where c.TenantId == tenantId && c.SucursalId == sucursalId && p.IsActive && !p.IsCombo
                 select new
                 {
                     p.Id,
@@ -376,7 +376,7 @@ public sealed class StockRepository : IStockRepository
                 join pr in _dbContext.Proveedores.AsNoTracking().Where(pr => pr.TenantId == tenantId)
                     on pp.ProveedorId equals pr.Id into prov
                 from pr in prov.DefaultIfEmpty()
-                where p.TenantId == tenantId && productoIds.Contains(p.Id)
+                where p.TenantId == tenantId && productoIds.Contains(p.Id) && !p.IsCombo
                 select new
                 {
                     p.Id,

@@ -752,7 +752,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="dialogStockAjuste" width="560">
+    <v-dialog v-model="dialogStockAjuste" width="560" persistent>
       <v-card>
         <v-card-title>Ajuste de stock requerido</v-card-title>
         <v-card-text>
@@ -796,14 +796,14 @@
               />
             </v-col>
           </v-row>
-          <MoneyField
-            v-model="stockAjuste.cantidadAjuste"
+          <v-text-field
+            v-model.number="stockAjuste.cantidadAjuste"
             label="Cantidad a ajustar (ingreso)"
             variant="outlined"
             density="comfortable"
-            :step="1"
-            numeric
-            clear-zero-on-focus
+            type="number"
+            min="1"
+            step="1"
             class="mb-2"
           />
           <v-text-field
@@ -814,7 +814,7 @@
           />
         </v-card-text>
         <v-card-actions class="justify-end">
-          <v-btn variant="text" :disabled="stockAjusteLoading" @click="dialogStockAjuste = false">Cancelar</v-btn>
+          <v-btn variant="text" :disabled="stockAjusteLoading" @click="cancelarAjusteStockActual">Cancelar</v-btn>
           <v-btn color="primary" :loading="stockAjusteLoading" @click="registrarAjusteYAgregarProducto">
             Ajustar y agregar
           </v-btn>
@@ -985,6 +985,9 @@ const stockAjuste = reactive({
   cantidadAjuste: 1,
   motivo: 'Ajuste por faltante detectado en venta'
 });
+const stockAjustesPendientes = ref([]);
+const stockAjusteProductoOriginal = ref(null);
+const stockAjusteDebeReintentarOriginal = ref(false);
 
 const headers = [
   { title: 'Producto', value: 'nombre' },
@@ -1296,6 +1299,7 @@ const resetVentaWorkspace = () => {
   scanInput.value = '';
   dialogPagos.value = false;
   dialogStock.value = false;
+  resetStockAjusteFlow();
   clearVentaId();
   refreshDisplayVentaNumero();
 };
@@ -1330,6 +1334,26 @@ const resetNuevaCajaForm = () => {
     nombre: '',
     defaultMontoInicial: ''
   };
+};
+
+const resetStockAjusteState = () => {
+  stockAjuste.productoId = '';
+  stockAjuste.nombre = '';
+  stockAjuste.sku = '';
+  stockAjuste.disponible = 0;
+  stockAjuste.solicitado = 0;
+  stockAjuste.faltante = 1;
+  stockAjuste.cantidadAjuste = 1;
+  stockAjuste.motivo = 'Ajuste por faltante detectado en venta';
+};
+
+const resetStockAjusteFlow = () => {
+  dialogStockAjuste.value = false;
+  stockAjusteLoading.value = false;
+  stockAjustesPendientes.value = [];
+  stockAjusteProductoOriginal.value = null;
+  stockAjusteDebeReintentarOriginal.value = false;
+  resetStockAjusteState();
 };
 
 const scanFlash = ref('');
@@ -1422,6 +1446,45 @@ const parseNumberFromStockMessage = (label, message) => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
+const extractMissingProductCodeFromStockMessage = (message) => {
+  const normalized = String(message || '');
+  if (!normalized) return '';
+
+  const comboMatch = normalized.match(/Falta\s+.+\(([^()]+)\)\s*\./i);
+  if (comboMatch?.[1]) {
+    return comboMatch[1].trim();
+  }
+
+  const directMatch = normalized.match(/Stock insuficiente para\s+.+\(([^()]+)\)\s*\./i);
+  if (directMatch?.[1]) {
+    return directMatch[1].trim();
+  }
+
+  return '';
+};
+
+const extractMissingProductsFromStockMessage = (message) => {
+  const normalized = String(message || '');
+  if (!normalized) return [];
+
+  const source = normalized.includes('Faltantes:') ? normalized.split('Faltantes:')[1] : normalized;
+  const regex = /([^|[\]]+?)\s*\(([^()]+)\)\s*\[\s*Disponible:\s*([0-9]+(?:[.,][0-9]+)?)\.\s*Solicitado:\s*([0-9]+(?:[.,][0-9]+)?)\.\s*Faltante:\s*([0-9]+(?:[.,][0-9]+)?)\.\s*\]/gi;
+  const results = [];
+
+  for (const match of source.matchAll(regex)) {
+    const [, nombre, code, disponible, solicitado, faltante] = match;
+    results.push({
+      nombre: nombre.trim(),
+      code: code.trim(),
+      disponible: Number(disponible.replace(',', '.')),
+      solicitado: Number(solicitado.replace(',', '.')),
+      faltante: Number(faltante.replace(',', '.'))
+    });
+  }
+
+  return results.filter((item) => item.code);
+};
+
 const resolveProductoByCode = async (code) => {
   const normalized = String(code || '').trim();
   if (!normalized) return null;
@@ -1437,7 +1500,7 @@ const resolveProductoByCode = async (code) => {
   return data.find((p) => String(p.sku || '').trim() === normalized) || data[0] || null;
 };
 
-const openStockAjusteDialog = ({ producto, message }) => {
+const openStockAjusteDialog = ({ producto, message, disponibleOverride = null, solicitadoOverride = null, faltanteOverride = null }) => {
   if (!producto?.id) {
     flash('error', message || 'Stock insuficiente.');
     return;
@@ -1445,9 +1508,9 @@ const openStockAjusteDialog = ({ producto, message }) => {
 
   const enCarrito = items.value.find((item) => item.productoId === producto.id);
   const solicitadoFallback = (enCarrito?.cantidad || 0) + 1;
-  const disponible = parseNumberFromStockMessage('Disponible', message) ?? 0;
-  const solicitado = parseNumberFromStockMessage('Solicitado', message) ?? solicitadoFallback;
-  const faltante = Math.max(parseNumberFromStockMessage('Faltante', message) ?? (solicitado - disponible), 1);
+  const disponible = disponibleOverride ?? parseNumberFromStockMessage('Disponible', message) ?? 0;
+  const solicitado = solicitadoOverride ?? parseNumberFromStockMessage('Solicitado', message) ?? solicitadoFallback;
+  const faltante = Math.max(faltanteOverride ?? parseNumberFromStockMessage('Faltante', message) ?? (solicitado - disponible), 1);
 
   stockAjuste.productoId = producto.id;
   stockAjuste.nombre = producto.name || producto.nombre || 'Producto';
@@ -1460,23 +1523,109 @@ const openStockAjusteDialog = ({ producto, message }) => {
   dialogStockAjuste.value = true;
 };
 
+const presentarSiguienteAjusteStock = () => {
+  const siguiente = stockAjustesPendientes.value.shift();
+  if (!siguiente?.producto?.id) {
+    dialogStockAjuste.value = false;
+    resetStockAjusteState();
+    return false;
+  }
+
+  openStockAjusteDialog({
+    producto: siguiente.producto,
+    message: siguiente.message,
+    disponibleOverride: siguiente.disponible,
+    solicitadoOverride: siguiente.solicitado,
+    faltanteOverride: siguiente.faltante
+  });
+  return true;
+};
+
+const finalizarFlujoAjusteStock = async () => {
+  dialogStockAjuste.value = false;
+  const productoOriginal = stockAjusteDebeReintentarOriginal.value ? stockAjusteProductoOriginal.value : null;
+  resetStockAjusteFlow();
+
+  if (productoOriginal?.id) {
+    await onProductoSeleccionado(productoOriginal);
+    return;
+  }
+
+  focusScan();
+};
+
+const avanzarFlujoAjusteStock = async ({ adjusted }) => {
+  if (!adjusted) {
+    stockAjusteDebeReintentarOriginal.value = false;
+  }
+
+  if (presentarSiguienteAjusteStock()) {
+    return;
+  }
+
+  await finalizarFlujoAjusteStock();
+};
+
+const cancelarAjusteStockActual = async () => {
+  if (stockAjusteLoading.value) return;
+  await avanzarFlujoAjusteStock({ adjusted: false });
+};
+
 const handleStockInsuficiente = async ({ producto, code, message }) => {
   if (!canAjustarStock.value) {
     flash('error', message || 'Stock insuficiente.');
     return;
   }
 
-  let productoResolvido = producto || null;
-  if (!productoResolvido && code) {
-    productoResolvido = await resolveProductoByCode(code);
+  let productoOriginal = producto || null;
+  if (!productoOriginal?.id && code) {
+    productoOriginal = await resolveProductoByCode(code);
   }
 
-  if (!productoResolvido?.id) {
+  const faltantes = extractMissingProductsFromStockMessage(message);
+  const pendientes = [];
+
+  for (const faltante of faltantes) {
+    const productoFaltante = await resolveProductoByCode(faltante.code);
+    if (!productoFaltante?.id) continue;
+    pendientes.push({
+      producto: productoFaltante,
+      disponible: faltante.disponible,
+      solicitado: faltante.solicitado,
+      faltante: faltante.faltante,
+      message
+    });
+  }
+
+  if (!pendientes.length) {
+    const missingProductCode = extractMissingProductCodeFromStockMessage(message);
+    let productoResolvido = null;
+    if (missingProductCode) {
+      productoResolvido = await resolveProductoByCode(missingProductCode);
+    }
+    if (!productoResolvido && code) {
+      productoResolvido = await resolveProductoByCode(code);
+    }
+    if (!productoResolvido?.id && producto?.id) {
+      productoResolvido = producto;
+    }
+    if (productoResolvido?.id) {
+      pendientes.push({
+        producto: productoResolvido,
+        message
+      });
+    }
+  }
+
+  if (!pendientes.length) {
     flash('error', message || 'Stock insuficiente.');
     return;
   }
 
-  openStockAjusteDialog({ producto: productoResolvido, message });
+  stockAjustesPendientes.value = pendientes;
+  stockAjusteProductoOriginal.value = productoOriginal;
+  stockAjusteDebeReintentarOriginal.value = true;
+  presentarSiguienteAjusteStock();
 };
 
 const registrarAjusteYAgregarProducto = async () => {
@@ -1510,12 +1659,9 @@ const registrarAjusteYAgregarProducto = async () => {
     }
 
     dialogStockAjuste.value = false;
+    stockAjusteLoading.value = false;
     flash('success', 'Ajuste de stock registrado.');
-    await onProductoSeleccionado({
-      id: stockAjuste.productoId,
-      name: stockAjuste.nombre,
-      sku: stockAjuste.sku
-    });
+    await avanzarFlujoAjusteStock({ adjusted: true });
   } catch (err) {
     flash('error', err?.message || 'No se pudo registrar el ajuste de stock.');
   } finally {

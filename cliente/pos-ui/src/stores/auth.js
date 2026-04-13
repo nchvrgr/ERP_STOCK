@@ -19,6 +19,7 @@ const ACTIVE_SUBSCRIPTION_STATUS = 'active';
 let firebaseBootstrapPromise = null;
 let stopFirebaseAuthListener = null;
 let stopSubscriptionListener = null;
+let cashierSessionRefreshPromise = null;
 
 const normalizeArray = (value) => {
   if (!value) return [];
@@ -127,6 +128,9 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     hasPermission(permission) {
+      if (this.roles.includes('ADMIN')) {
+        return true;
+      }
       if (!permission) return false;
       const normalized = permission.startsWith('PERM_')
         ? permission.slice(5)
@@ -324,6 +328,38 @@ export const useAuthStore = defineStore('auth', {
         throw new Error(this.accessMessage);
       }
     },
+    async refreshCashierBackendSession() {
+      if (!this.firebaseEmail) {
+        return;
+      }
+
+      if (!cashierSessionRefreshPromise) {
+        cashierSessionRefreshPromise = (async () => {
+          const request = {
+            firebaseEmail: this.firebaseEmail.trim(),
+            enterAsAdmin: false,
+            erpPassword: null,
+            tenantId: null,
+            sucursalId: null
+          };
+
+          const { response, data } = await postJson('/api/v1/auth/login', request);
+          if (!response.ok || !data?.token) {
+            this.clearBackendSession();
+            throw new Error(data?.detail || data?.title || 'No se pudo renovar la sesion de cajero.');
+          }
+
+          this.erpUsername = 'cajero';
+          this.setSession(data.token, data.expiresAt || '');
+        })();
+      }
+
+      try {
+        await cashierSessionRefreshPromise;
+      } finally {
+        cashierSessionRefreshPromise = null;
+      }
+    },
     async initializeFirebaseSession() {
       if (!firebaseBootstrapPromise) {
         firebaseBootstrapPromise = (async () => {
@@ -343,6 +379,9 @@ export const useAuthStore = defineStore('auth', {
               try {
                 await this.refreshSubscriptionStatus(user.uid);
                 this.startSubscriptionListener(user.uid);
+                if (this.subscriptionStatus === ACTIVE_SUBSCRIPTION_STATUS && this.erpUsername === 'cajero') {
+                  await this.refreshCashierBackendSession();
+                }
               } catch {
                 this.applySubscriptionStatus('inactive', buildSubscriptionConnectivityMessage());
               }
@@ -358,6 +397,10 @@ export const useAuthStore = defineStore('auth', {
             });
           });
         })();
+      }
+
+      if (firebaseAuth.currentUser && this.subscriptionStatus === ACTIVE_SUBSCRIPTION_STATUS && this.erpUsername === 'cajero') {
+        await this.refreshCashierBackendSession();
       }
 
       return firebaseBootstrapPromise;
@@ -378,8 +421,15 @@ export const useAuthStore = defineStore('auth', {
     async login({ email, firebasePassword, loginAsAdmin, erpPassword }) {
       this.setAccessMessage('');
       this.saveLoginHints({ firebaseEmail: email || '' });
-      await this.signInWithFirebase(email || '', firebasePassword || '');
       this.erpUsername = loginAsAdmin ? 'admin' : 'cajero';
+      this.saveToStorage();
+      try {
+        await this.signInWithFirebase(email || '', firebasePassword || '');
+      } catch (error) {
+        this.erpUsername = '';
+        this.saveToStorage();
+        throw error;
+      }
 
       const request = {
         firebaseEmail: (this.firebaseEmail || email || '').trim(),

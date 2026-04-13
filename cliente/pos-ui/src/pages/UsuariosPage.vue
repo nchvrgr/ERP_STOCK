@@ -71,7 +71,7 @@ import { useAuthStore } from '../stores/auth';
 import { requestJson } from '../services/apiClient';
 
 const auth = useAuthStore();
-const canManageUsers = computed(() => auth.hasPermission('PERM_USUARIO_ADMIN'));
+const canManageUsers = computed(() => auth.erpUsername === 'admin' || auth.roles.includes('ADMIN') || auth.hasPermission('PERM_USUARIO_ADMIN'));
 const saving = ref(false);
 
 const snackbar = ref({
