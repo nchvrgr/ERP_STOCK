@@ -460,6 +460,50 @@ public sealed class StockService
         return await _repositorioMovimientosStock.SearchAsync(tenantId, sucursalId, productoId, ventaNumero, facturada, desde, hasta, cancellationToken);
     }
 
+    public async Task<StockMovimientoDto> RevertirMovimientoAsync(
+        Guid movimientoId,
+        StockMovimientoRevertRequestDto? request,
+        CancellationToken cancellationToken)
+    {
+        if (movimientoId == Guid.Empty)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["movimientoId"] = new[] { "El movimiento es obligatorio." }
+                });
+        }
+
+        var tenantId = AsegurarTenant();
+        var sucursalId = AsegurarSucursal();
+        var motivo = string.IsNullOrWhiteSpace(request?.Motivo)
+            ? "Reversion administrativa"
+            : request!.Motivo!.Trim();
+
+        var result = await _repositorioMovimientosStock.RevertAsync(
+            tenantId,
+            sucursalId,
+            movimientoId,
+            motivo,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
+
+        foreach (var cambio in result.Cambios)
+        {
+            await _servicioAuditoria.LogAsync(
+                "StockSaldo",
+                $"{cambio.ProductoId}:{sucursalId}",
+                AuditAction.Adjust,
+                JsonSerializer.Serialize(new { cantidadActual = cambio.SaldoAntes }),
+                JsonSerializer.Serialize(new { cantidadActual = cambio.SaldoDespues }),
+                JsonSerializer.Serialize(new { movimientoId = cambio.MovimientoId, itemId = cambio.MovimientoItemId, revertidoDesde = movimientoId }),
+                cancellationToken);
+        }
+
+        return result.Movimiento;
+    }
+
     private Guid AsegurarTenant()
     {
         if (_contextoSolicitud.TenantId == Guid.Empty)

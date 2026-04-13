@@ -13,6 +13,7 @@
             <div>
               <div class="text-subtitle-1 drawer-brand-title">Viñedos de la Villa</div>
               <div class="text-caption drawer-brand-subtitle">Gestión comercial</div>
+              <div class="text-caption drawer-brand-role">Rol: {{ sessionRoleLabel }}</div>
             </div>
           </div>
         </div>
@@ -142,17 +143,19 @@ const menuItems = [
     title: 'Reportes',
     icon: 'mdi-chart-areaspline',
     to: '/reportes',
-    permission: 'PERM_REPORTES_VER'
+    access: () => isAdminSession.value || auth.hasPermission('PERM_REPORTES_VER')
   },
   {
     title: 'Administrador',
     icon: 'mdi-account',
     to: '/usuarios',
-    permission: 'PERM_USUARIO_ADMIN'
+    access: () => isAdminSession.value || auth.hasPermission('PERM_USUARIO_ADMIN')
   }
 ];
 
 const hasAnyRole = (roles) => roles.some((role) => auth.roles.includes(role));
+const isAdminSession = computed(() => auth.erpUsername === 'admin' || hasAnyRole(['ADMIN']));
+const sessionRoleLabel = computed(() => (isAdminSession.value ? 'Administrador' : 'Cajero'));
 
 const visibleItems = computed(() =>
   menuItems.filter((item) => {
@@ -271,6 +274,11 @@ const logout = () => {
 
 .drawer-brand-subtitle {
   color: var(--pos-ink-muted);
+}
+
+.drawer-brand-role {
+  color: var(--pos-ink-muted);
+  font-weight: 600;
 }
 
 .theme-toggle {

@@ -679,34 +679,30 @@
           </v-col>
         </v-row>
 
-        <v-row dense>
-          <v-col cols="12" md="8">
-            <v-autocomplete
-              v-model="comboSelectedProductId"
-              :items="comboProductOptions"
-              item-title="name"
-              item-value="id"
-              label="Agregar producto"
-              variant="outlined"
-              density="comfortable"
-              clearable
-            />
-          </v-col>
-          <v-col cols="12" md="2">
-            <v-text-field
-              v-model.number="comboSelectedCantidad"
-              label="Cantidad"
-              type="number"
-              min="1"
-              step="1"
-              variant="outlined"
-              density="comfortable"
-            />
-          </v-col>
-          <v-col cols="12" md="2" class="d-flex align-center">
-            <v-btn color="primary" class="text-none" @click="addComboItem">Agregar</v-btn>
-          </v-col>
-        </v-row>
+        <div class="combo-add-row">
+          <v-autocomplete
+            v-model="comboSelectedProductId"
+            :items="comboProductOptions"
+            item-title="label"
+            item-value="id"
+            label="Agregar producto"
+            variant="outlined"
+            density="comfortable"
+            clearable
+            class="combo-add-row__product"
+          />
+          <v-text-field
+            v-model.number="comboSelectedCantidad"
+            label="Cantidad"
+            type="number"
+            min="1"
+            step="1"
+            variant="outlined"
+            density="comfortable"
+            class="combo-add-row__qty"
+          />
+          <v-btn color="primary" class="text-none combo-add-row__action" @click="addComboItem">Agregar</v-btn>
+        </div>
 
         <v-data-table
           class="mt-2"
@@ -1158,7 +1154,10 @@ const loadComboProducts = async () => {
     if (!response.ok) {
       throw new Error(extractProblemMessage(data));
     }
-    comboProductOptions.value = data || [];
+    comboProductOptions.value = (data || []).map((product) => ({
+      ...product,
+      label: `${product.name || 'Producto'} (${product.sku || 'sin sku'})`
+    }));
   } catch (err) {
     flash('error', err?.message || 'No se pudieron cargar productos para combo.');
   }
@@ -2241,6 +2240,29 @@ onMounted(() => {
   min-height: 44px;
   padding-inline: 20px;
   font-weight: 700;
+}
+
+.combo-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.combo-add-row__product,
+.combo-add-row__qty {
+  min-width: 0;
+}
+
+.combo-add-row__action {
+  min-height: 46px;
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .combo-add-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 </style>

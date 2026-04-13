@@ -225,7 +225,8 @@ public static class DatabaseBootstrapper
             SeedData.SeedTimestamp));
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await EnsureCashierRolePermissionsAsync(dbContext, cancellationToken);
+        await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleAdminId, cancellationToken);
+        await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleCajeroId, cancellationToken);
     }
 
     private static async Task UpgradeDesktopSeedDataAsync(PosDbContext dbContext, CancellationToken cancellationToken)
@@ -241,14 +242,16 @@ public static class DatabaseBootstrapper
         if (!string.Equals(admin.PasswordHash, SeedData.LegacyAdminPasswordHash, StringComparison.OrdinalIgnoreCase))
         {
             await EnsureCashierUserAsync(dbContext, cancellationToken);
-            await EnsureCashierRolePermissionsAsync(dbContext, cancellationToken);
+            await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleAdminId, cancellationToken);
+            await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleCajeroId, cancellationToken);
             return;
         }
 
         dbContext.Entry(admin).Property(nameof(User.PasswordHash)).CurrentValue = SeedData.AdminPasswordHash;
         await dbContext.SaveChangesAsync(cancellationToken);
         await EnsureCashierUserAsync(dbContext, cancellationToken);
-        await EnsureCashierRolePermissionsAsync(dbContext, cancellationToken);
+        await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleAdminId, cancellationToken);
+        await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleCajeroId, cancellationToken);
     }
 
     private static async Task EnsureCashierUserAsync(PosDbContext dbContext, CancellationToken cancellationToken)
@@ -295,16 +298,19 @@ public static class DatabaseBootstrapper
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task EnsureCashierRolePermissionsAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    private static async Task EnsureSeedRolePermissionsAsync(
+        PosDbContext dbContext,
+        Guid roleId,
+        CancellationToken cancellationToken)
     {
         var requiredPermissionIds = SeedData.RolePermissions
-            .Where(x => x.RoleId == SeedData.RoleCajeroId)
+            .Where(x => x.RoleId == roleId)
             .Select(x => x.PermissionId)
             .Distinct()
             .ToHashSet();
 
         var existingPermissionIds = await dbContext.RolPermisos
-            .Where(rp => rp.RoleId == SeedData.RoleCajeroId)
+            .Where(rp => rp.RoleId == roleId)
             .Select(rp => rp.PermissionId)
             .ToListAsync(cancellationToken);
 
@@ -323,7 +329,7 @@ public static class DatabaseBootstrapper
             dbContext.RolPermisos.Add(new RolePermission(
                 Guid.NewGuid(),
                 SeedData.TenantId,
-                SeedData.RoleCajeroId,
+                roleId,
                 permissionId,
                 now));
         }

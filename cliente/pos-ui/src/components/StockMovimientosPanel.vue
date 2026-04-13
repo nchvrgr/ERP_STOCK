@@ -116,6 +116,28 @@
             <div class="movement-panel__details">
               <div class="movement-panel__actions">
                 <v-btn
+                  v-if="canCancelVenta(mov)"
+                  size="small"
+                  variant="tonal"
+                  color="error"
+                  class="text-none"
+                  :loading="actionLoading && pendingAction?.movimientoId === mov.id && pendingAction?.type === 'venta'"
+                  @click="openPendingAction('venta', mov)"
+                >
+                  Cancelar venta
+                </v-btn>
+                <v-btn
+                  v-if="canRevertStockMovement(mov)"
+                  size="small"
+                  variant="tonal"
+                  color="warning"
+                  class="text-none"
+                  :loading="actionLoading && pendingAction?.movimientoId === mov.id && pendingAction?.type === 'ajuste'"
+                  @click="openPendingAction('ajuste', mov)"
+                >
+                  Revertir ajuste
+                </v-btn>
+                <v-btn
                   v-if="mov.ventaNumero"
                   size="small"
                   variant="tonal"
@@ -148,21 +170,45 @@
     <div v-if="!movLoading && !movimientos.length" class="text-caption text-medium-emphasis mt-4">
       No hay movimientos para los filtros elegidos.
     </div>
+
+    <v-dialog v-model="actionDialog" width="520">
+      <v-card>
+        <v-card-title>{{ pendingActionTitle }}</v-card-title>
+        <v-card-text>
+          {{ pendingActionText }}
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="actionLoading" @click="closePendingAction">Cancelar</v-btn>
+          <v-btn
+            :color="pendingAction?.type === 'venta' ? 'error' : 'warning'"
+            :loading="actionLoading"
+            @click="confirmPendingAction"
+          >
+            Confirmar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-card>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
-import { getJson } from '../services/apiClient';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { getJson, postJson } from '../services/apiClient';
 import { getTicketWindowStyles } from '../theme/printStyles';
 import { formatMoney } from '../utils/currency';
+import { useAuthStore } from '../stores/auth';
 
+const auth = useAuthStore();
 const movimientos = ref([]);
 const movLoading = ref(false);
 const selectedProducto = ref(null);
 const productoLoading = ref(false);
 const productoOptions = ref([]);
 const printingVentaTicket = ref(false);
+const actionDialog = ref(false);
+const actionLoading = ref(false);
+const pendingAction = ref(null);
 
 const filters = reactive({
   ventaNumero: '',
@@ -176,6 +222,21 @@ const facturacionOptions = [
   { label: 'Facturadas', value: 'true' },
   { label: 'No facturadas', value: 'false' }
 ];
+
+const canAdministerMovements = computed(() => auth.hasPermission('PERM_USUARIO_ADMIN'));
+const pendingActionTitle = computed(() => {
+  if (pendingAction.value?.type === 'venta') return 'Cancelar venta';
+  if (pendingAction.value?.type === 'ajuste') return 'Revertir ajuste';
+  return 'Confirmar acción';
+});
+const pendingActionText = computed(() => {
+  if (!pendingAction.value) return '';
+  if (pendingAction.value.type === 'venta') {
+    return 'Se va a anular la venta y el stock volverá a disponible. Esta acción sólo está habilitada para administrador.';
+  }
+
+  return 'Se va a crear una reversa del ajuste seleccionado para devolver el stock a su estado anterior.';
+});
 
 const flash = (type, text) => {
   window.dispatchEvent(new CustomEvent('app-snackbar', { detail: { type, text } }));
@@ -206,6 +267,19 @@ const formatQuantity = (value) => {
   if (Number.isInteger(amount)) return amount;
   return amount.toFixed(2);
 };
+
+const isReversalMovement = (movimiento) =>
+  typeof movimiento?.motivo === 'string' && movimiento.motivo.startsWith('REVERSA ');
+
+const canCancelVenta = (movimiento) =>
+  canAdministerMovements.value
+  && movimiento?.tipo === 'SALIDA_VENTA'
+  && Boolean(movimiento?.ventaNumero);
+
+const canRevertStockMovement = (movimiento) =>
+  canAdministerMovements.value
+  && movimiento?.tipo === 'AJUSTE'
+  && !isReversalMovement(movimiento);
 
 const mapProductoResults = (items) =>
   (items || [])
@@ -346,6 +420,71 @@ const printVentaTicket = async (ventaNumero) => {
   }
 };
 
+const openPendingAction = (type, movimiento) => {
+  pendingAction.value = {
+    type,
+    movimientoId: movimiento.id,
+    ventaNumero: movimiento.ventaNumero || null,
+    motivo: movimiento.motivo || ''
+  };
+  actionDialog.value = true;
+};
+
+const closePendingAction = (force = false) => {
+  if (actionLoading.value && !force) return;
+  actionDialog.value = false;
+  pendingAction.value = null;
+};
+
+const cancelarVentaDesdeMovimiento = async (ventaNumero) => {
+  const { response: ticketResponse, data: ticketData } = await getJson(`/api/v1/ventas/numero/${ventaNumero}/ticket`);
+  if (!ticketResponse.ok || !ticketData?.venta?.id) {
+    throw new Error(extractProblemMessage(ticketData));
+  }
+
+  const ventaId = ticketData.venta.id;
+  const { response, data } = await postJson(`/api/v1/ventas/${ventaId}/anular`, {
+    motivo: 'Anulada desde movimientos de stock por correccion administrativa'
+  });
+
+  if (!response.ok) {
+    throw new Error(extractProblemMessage(data));
+  }
+};
+
+const revertirAjusteDesdeMovimiento = async (movimientoId) => {
+  const { response, data } = await postJson(`/api/v1/stock/movimientos/${movimientoId}/revertir`, {
+    motivo: 'Reversion administrativa desde caja'
+  });
+
+  if (!response.ok) {
+    throw new Error(extractProblemMessage(data));
+  }
+};
+
+const confirmPendingAction = async () => {
+  if (!pendingAction.value || actionLoading.value) return;
+
+  actionLoading.value = true;
+  try {
+    if (pendingAction.value.type === 'venta') {
+      await cancelarVentaDesdeMovimiento(pendingAction.value.ventaNumero);
+      flash('success', 'Venta cancelada y stock restaurado.');
+    } else {
+      await revertirAjusteDesdeMovimiento(pendingAction.value.movimientoId);
+      flash('success', 'Ajuste revertido.');
+    }
+
+    window.dispatchEvent(new CustomEvent('pos-caja-session-changed'));
+    await loadMovimientos();
+    closePendingAction(true);
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo completar la acción.');
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
 const loadMovimientos = async () => {
   movLoading.value = true;
   try {
@@ -445,6 +584,8 @@ onBeforeUnmount(() => {
 
 .movement-panel__actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 

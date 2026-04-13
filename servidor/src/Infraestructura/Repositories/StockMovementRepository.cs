@@ -10,6 +10,7 @@ namespace Servidor.Infraestructura.Repositories;
 
 public sealed class StockMovementRepository : IStockMovementRepository
 {
+    private const string ReversionPrefix = "REVERSA ";
     private readonly PosDbContext _dbContext;
 
     public StockMovementRepository(PosDbContext dbContext)
@@ -251,6 +252,164 @@ public sealed class StockMovementRepository : IStockMovementRepository
         }).ToList();
 
         return result;
+    }
+
+    public async Task<StockMovimientoRegisterResult> RevertAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid movimientoId,
+        string motivo,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var movimientoOriginal = await _dbContext.StockMovimientos
+            .FirstOrDefaultAsync(
+                m => m.TenantId == tenantId && m.SucursalId == sucursalId && m.Id == movimientoId,
+                cancellationToken);
+
+        if (movimientoOriginal is null)
+        {
+            throw new NotFoundException("Movimiento no encontrado.");
+        }
+
+        if (movimientoOriginal.Tipo != StockMovimientoTipo.Ajuste)
+        {
+            throw new ConflictException("Solo se pueden revertir ajustes de stock.");
+        }
+
+        if (movimientoOriginal.Motivo.StartsWith(ReversionPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException("No se puede revertir una reversa de stock.");
+        }
+
+        var existingReversePrefix = $"{ReversionPrefix}{movimientoOriginal.Id}";
+        var alreadyReverted = await _dbContext.StockMovimientos.AsNoTracking()
+            .AnyAsync(
+                m => m.TenantId == tenantId
+                    && m.SucursalId == sucursalId
+                    && m.Motivo.StartsWith(existingReversePrefix),
+                cancellationToken);
+
+        if (alreadyReverted)
+        {
+            throw new ConflictException("Este ajuste ya fue revertido.");
+        }
+
+        var originalItems = await _dbContext.StockMovimientoItems.AsNoTracking()
+            .Where(i => i.TenantId == tenantId && i.MovimientoId == movimientoId)
+            .ToListAsync(cancellationToken);
+
+        if (originalItems.Count == 0)
+        {
+            throw new ConflictException("El movimiento no tiene items para revertir.");
+        }
+
+        var productIds = originalItems.Select(i => i.ProductoId).Distinct().ToList();
+        var products = await _dbContext.Productos.AsNoTracking()
+            .Where(p => p.TenantId == tenantId && productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name, p.Sku })
+            .ToListAsync(cancellationToken);
+
+        var saldos = await _dbContext.StockSaldos
+            .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && productIds.Contains(s.ProductoId))
+            .ToListAsync(cancellationToken);
+
+        var saldoByProduct = saldos.ToDictionary(s => s.ProductoId, s => s);
+        var addedSaldo = false;
+        foreach (var productId in productIds)
+        {
+            if (saldoByProduct.ContainsKey(productId))
+            {
+                continue;
+            }
+
+            var saldo = new StockSaldo(Guid.NewGuid(), tenantId, productId, sucursalId, 0m, nowUtc);
+            _dbContext.StockSaldos.Add(saldo);
+            saldoByProduct[productId] = saldo;
+            addedSaldo = true;
+        }
+
+        if (addedSaldo)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var reversalId = Guid.NewGuid();
+        var reversal = new StockMovimiento(
+            reversalId,
+            tenantId,
+            sucursalId,
+            StockMovimientoTipo.Ajuste,
+            $"{existingReversePrefix} - {motivo}",
+            nowUtc,
+            nowUtc);
+
+        _dbContext.StockMovimientos.Add(reversal);
+
+        var itemEntities = new List<StockMovimientoItem>();
+        var itemDtos = new List<StockMovimientoItemDto>();
+        var cambios = new List<StockSaldoChangeDto>();
+
+        foreach (var originalItem in originalItems)
+        {
+            var saldo = saldoByProduct[originalItem.ProductoId];
+            var before = saldo.CantidadActual;
+            var delta = originalItem.EsIngreso ? -originalItem.Cantidad : originalItem.Cantidad;
+            var after = before + delta;
+
+            if (after < 0)
+            {
+                throw new ConflictException("No hay stock suficiente para revertir este ajuste.");
+            }
+
+            saldo.SetCantidad(after, nowUtc);
+
+            var itemId = Guid.NewGuid();
+            var reversedIngreso = !originalItem.EsIngreso;
+            itemEntities.Add(new StockMovimientoItem(
+                itemId,
+                tenantId,
+                reversalId,
+                originalItem.ProductoId,
+                originalItem.Cantidad,
+                reversedIngreso,
+                nowUtc));
+
+            var product = products.Single(p => p.Id == originalItem.ProductoId);
+            itemDtos.Add(new StockMovimientoItemDto(
+                itemId,
+                originalItem.ProductoId,
+                product.Name,
+                product.Sku,
+                originalItem.Cantidad,
+                reversedIngreso,
+                before,
+                after));
+
+            cambios.Add(new StockSaldoChangeDto(
+                reversalId,
+                itemId,
+                originalItem.ProductoId,
+                before,
+                after));
+        }
+
+        _dbContext.StockMovimientoItems.AddRange(itemEntities);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var dto = new StockMovimientoDto(
+            reversalId,
+            StockMovimientoTipo.Ajuste.ToString().ToUpperInvariant(),
+            reversal.Motivo,
+            nowUtc,
+            null,
+            null,
+            itemDtos);
+
+        return new StockMovimientoRegisterResult(dto, cambios);
     }
 }
 

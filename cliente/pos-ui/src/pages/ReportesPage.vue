@@ -246,7 +246,7 @@ import { formatMoney } from '../utils/currency';
 
 const auth = useAuthStore();
 const theme = useTheme();
-const canView = computed(() => auth.hasPermission('PERM_REPORTES_VER'));
+const canView = computed(() => auth.erpUsername === 'admin' || auth.roles.includes('ADMIN') || auth.hasPermission('PERM_REPORTES_VER'));
 const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
 const ventasLineColor = computed(() => 'var(--pos-chart-line)');
 const ventasPointColor = computed(() => 'var(--pos-chart-point)');

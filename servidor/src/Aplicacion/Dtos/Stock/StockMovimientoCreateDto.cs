@@ -10,4 +10,6 @@ public sealed record StockMovimientoItemCreateDto(
     decimal Cantidad,
     bool EsIngreso);
 
+public sealed record StockMovimientoRevertRequestDto(string? Motivo);
+
 

@@ -23,6 +23,14 @@ public interface IStockMovementRepository
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
         CancellationToken cancellationToken = default);
+
+    Task<StockMovimientoRegisterResult> RevertAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid movimientoId,
+        string motivo,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default);
 }
 
 
