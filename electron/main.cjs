@@ -8,7 +8,7 @@ const { checkForUpdatesOnDemand, installLatestUpdateOnDemand } = require('./upda
 
 const APP_PORT = 18450;
 const APP_URL = `http://127.0.0.1:${APP_PORT}`;
-const APP_NAME = 'Viñedos de la Villa';
+const APP_NAME = 'Viñedo de la Villa';
 const BOOT_LOG_FILE = path.join(os.tmpdir(), 'vinedos-electron-boot.log');
 
 function logBoot(message, error) {
@@ -70,10 +70,10 @@ function getBackendExecutable() {
 
 function getWindowIconPath() {
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app.asar', 'build', 'icons', 'app.png');
+    return path.join(process.resourcesPath, 'app.asar', 'build', 'icons', 'app.ico');
   }
 
-  return path.join(__dirname, '..', 'build', 'icons', 'app.png');
+  return path.join(__dirname, '..', 'build', 'icons', 'app.ico');
 }
 
 function getPreloadPath() {

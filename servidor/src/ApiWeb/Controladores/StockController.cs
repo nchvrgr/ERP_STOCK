@@ -73,6 +73,27 @@ public sealed class StockController : ControllerBase
         return Ok(resultado);
     }
 
+    [Authorize(Policy = "PERM_USUARIO_ADMIN")]
+    [HttpGet("facturas-pendientes")]
+    [ProducesResponseType(typeof(IReadOnlyList<FacturaPendienteDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<FacturaPendienteDto>>> ObtenerFacturasPendientes(
+        CancellationToken cancellationToken)
+    {
+        var resultado = await _servicioStock.ObtenerFacturasPendientesAsync(cancellationToken);
+        return Ok(resultado);
+    }
+
+    [Authorize(Policy = "PERM_USUARIO_ADMIN")]
+    [HttpDelete("facturas-pendientes/{movimientoId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> ResolverFacturaPendiente(
+        Guid movimientoId,
+        CancellationToken cancellationToken)
+    {
+        await _servicioStock.MarcarFacturaPendienteResueltaAsync(movimientoId, cancellationToken);
+        return NoContent();
+    }
+
     [Authorize(Policy = "PERM_STOCK_AJUSTAR")]
     [HttpGet("alertas")]
     [ProducesResponseType(typeof(IReadOnlyList<StockAlertaDto>), StatusCodes.Status200OK)]

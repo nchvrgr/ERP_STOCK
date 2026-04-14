@@ -165,7 +165,7 @@ public sealed class ServicioProductos
                 "Validacion fallida.",
                 new Dictionary<string, string[]>
                 {
-                    ["precioBase"] = new[] { "El precio base no puede ser negativo." }
+                    ["precioBase"] = new[] { "El precio costo no puede ser negativo." }
                 });
         }
 
@@ -366,7 +366,7 @@ public sealed class ServicioProductos
                 "Validacion fallida.",
                 new Dictionary<string, string[]>
                 {
-                    ["precioBase"] = new[] { "El precio base no puede ser negativo." }
+                    ["precioBase"] = new[] { "El precio costo no puede ser negativo." }
                 });
         }
 

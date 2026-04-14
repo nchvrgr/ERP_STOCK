@@ -25,6 +25,11 @@ public sealed class VentaConfiguration : IEntityTypeConfiguration<Venta>
         builder.Property(x => x.TotalNeto).HasColumnType("numeric(18,4)").HasDefaultValue(0m);
         builder.Property(x => x.TotalPagos).HasColumnType("numeric(18,4)").HasDefaultValue(0m);
         builder.Property(x => x.Facturada).HasColumnName("facturada").HasDefaultValue(false);
+        builder.Property(x => x.TipoFactura).HasColumnName("tipo_factura").HasMaxLength(5).HasDefaultValue("B").IsRequired();
+        builder.Property(x => x.ClienteNombre).HasColumnName("cliente_nombre").HasMaxLength(160);
+        builder.Property(x => x.ClienteCuit).HasColumnName("cliente_cuit").HasMaxLength(32);
+        builder.Property(x => x.ClienteDireccion).HasColumnName("cliente_direccion").HasMaxLength(240);
+        builder.Property(x => x.ClienteTelefono).HasColumnName("cliente_telefono").HasMaxLength(40);
 
         builder.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone").IsRequired();

@@ -5,7 +5,7 @@
         <v-col cols="12" sm="8" md="4">
           <v-card class="pos-card pa-6">
             <div class="text-h5">Ingresar</div>
-            <div class="text-caption text-medium-emphasis">Vinedos de la Villa</div>
+            <div class="text-caption text-medium-emphasis">Viñedo de la Villa</div>
 
             <v-alert
               v-if="displayMessage"
@@ -30,7 +30,7 @@
               />
               <v-text-field
                 v-model="firebasePassword"
-                label="Contrasena de suscripción"
+                label="Contraseña de suscripción"
                 type="password"
                 variant="outlined"
                 density="comfortable"
@@ -51,7 +51,7 @@
                 v-if="loginAsAdmin"
                 v-model="erpPassword"
                 ref="adminPasswordRef"
-                label="Contrasena de administrador"
+                label="Contraseña de administrador"
                 type="password"
                 variant="outlined"
                 density="comfortable"

@@ -11,7 +11,7 @@
           <div class="d-flex align-center gap-2">
             <img :src="brandMarkSrc" alt="" class="drawer-brand-mark" />
             <div>
-              <div class="text-subtitle-1 drawer-brand-title">Viñedos de la Villa</div>
+              <div class="text-subtitle-1 drawer-brand-title">Viñedo de la Villa</div>
               <div class="text-caption drawer-brand-subtitle">Gestión comercial</div>
               <div class="text-caption drawer-brand-role">Rol: {{ sessionRoleLabel }}</div>
             </div>
@@ -62,7 +62,41 @@
       />
       <div class="d-flex align-center gap-2">
         <div class="text-h6">{{ currentTitle }}</div>
-        <v-chip color="primary" variant="tonal" size="small">Local</v-chip>
+        <v-chip :color="cajaStatusColor" variant="tonal" size="small">Caja {{ cajaStatusLabel }}</v-chip>
+        <v-menu location="end" :close-on-content-click="false">
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              size="small"
+              variant="tonal"
+              color="primary"
+              class="text-none caja-help-btn"
+              aria-label="Información de caja"
+              title="Información de caja"
+            >
+              ?
+            </v-btn>
+          </template>
+          <v-card class="caja-info-popover pa-3">
+            <div class="text-caption text-medium-emphasis mb-2">Estado de caja</div>
+            <div class="d-flex align-center gap-2 caja-info-row">
+              <v-icon size="16">mdi-cash-register</v-icon>
+              <span>Caja: {{ cajaDisplay }}</span>
+            </div>
+            <div class="d-flex align-center gap-2 caja-info-row">
+              <v-icon size="16">mdi-account</v-icon>
+              <span>Cajero: {{ cajeroDisplay }}</span>
+            </div>
+            <div class="d-flex align-center gap-2 caja-info-row">
+              <v-icon size="16">mdi-weather-sunset</v-icon>
+              <span>Turno: {{ turnoDisplay }}</span>
+            </div>
+            <div class="d-flex align-center gap-2 caja-info-row">
+              <v-icon size="16">mdi-clock-outline</v-icon>
+              <span>Apertura: {{ aperturaDisplay }}</span>
+            </div>
+          </v-card>
+        </v-menu>
       </div>
       <v-spacer />
       <div class="d-flex align-center gap-3">
@@ -189,6 +223,71 @@ const currentTitle = computed(() => {
 
 const stockAlertMeta = computed(() => stockAlerts.chipMeta);
 
+const POS_CAJA_SESSION_KEY = 'pos-caja-session';
+
+const cajaInfo = ref({
+  estado: 'CERRADA',
+  numero: '',
+  nombre: '',
+  turno: '',
+  aperturaAt: ''
+});
+
+const cajaStatusLabel = computed(() => (cajaInfo.value.estado === 'ABIERTA' ? 'ABIERTA' : 'CERRADA'));
+const cajaStatusColor = computed(() => (cajaInfo.value.estado === 'ABIERTA' ? 'success' : 'error'));
+
+const formatTurno = (value) => {
+  if (!value) return 'n/a';
+  if (value === 'MANANA') return 'MAÑANA';
+  return value;
+};
+
+const formatDateTime = (value) => {
+  if (!value) return 'n/a';
+  try {
+    return new Date(value).toLocaleString('es-AR', { hour12: false });
+  } catch {
+    return value;
+  }
+};
+
+const cajaDisplay = computed(() => cajaInfo.value.numero || 'n/a');
+const cajeroDisplay = computed(() => cajaInfo.value.nombre || 'n/a');
+const turnoDisplay = computed(() => formatTurno(cajaInfo.value.turno));
+const aperturaDisplay = computed(() => formatDateTime(cajaInfo.value.aperturaAt));
+
+const syncCajaInfo = () => {
+  const raw = localStorage.getItem(POS_CAJA_SESSION_KEY);
+  if (!raw) {
+    cajaInfo.value = { estado: 'CERRADA', numero: '', nombre: '', turno: '', aperturaAt: '' };
+    return;
+  }
+
+  try {
+    const session = JSON.parse(raw);
+    if (session?.estado !== 'ABIERTA') {
+      cajaInfo.value = { estado: 'CERRADA', numero: '', nombre: '', turno: '', aperturaAt: '' };
+      return;
+    }
+
+    cajaInfo.value = {
+      estado: session.estado || 'CERRADA',
+      numero: session.cajaNumero || session.cajaId || '',
+      nombre: session.cajaNombre || 'n/a',
+      turno: session.turno || '',
+      aperturaAt: session.aperturaAt || ''
+    };
+  } catch {
+    cajaInfo.value = { estado: 'CERRADA', numero: '', nombre: '', turno: '', aperturaAt: '' };
+  }
+};
+
+const handleStorageEvent = (event) => {
+  if (event.key === POS_CAJA_SESSION_KEY) {
+    syncCajaInfo();
+  }
+};
+
 const isDarkMode = computed({
   get: () => theme.global.name.value === 'posNightTheme',
   set: (value) => {
@@ -219,11 +318,16 @@ watch(
 
 onMounted(() => {
   window.addEventListener('focus', refreshStockAlerts);
+  window.addEventListener('storage', handleStorageEvent);
+  window.addEventListener('pos-caja-session-changed', syncCajaInfo);
   refreshStockAlerts();
+  syncCajaInfo();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshStockAlerts);
+  window.removeEventListener('storage', handleStorageEvent);
+  window.removeEventListener('pos-caja-session-changed', syncCajaInfo);
 });
 
 const logout = () => {
@@ -306,6 +410,27 @@ const logout = () => {
 
 .theme-toggle-switch :deep(.v-label) {
   display: none;
+}
+
+.caja-help-btn {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-weight: 800;
+  padding: 0;
+}
+
+.caja-info-popover {
+  min-width: 280px;
+  border: 1px solid var(--pos-border);
+  background: var(--pos-card-soft);
+}
+
+.caja-info-row {
+  font-size: 0.84rem;
+  color: var(--pos-ink);
+  margin-top: 4px;
 }
 
 .stock-alert-dot {

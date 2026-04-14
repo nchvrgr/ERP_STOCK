@@ -907,7 +907,7 @@ public sealed class RepositorioProductos : IRepositorioProductos
                 "Validacion fallida.",
                 new Dictionary<string, string[]>
                 {
-                    ["precioBase"] = new[] { "El precio base no puede ser negativo." }
+                    ["precioBase"] = new[] { "El precio costo no puede ser negativo." }
                 });
         }
 

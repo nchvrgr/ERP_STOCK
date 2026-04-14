@@ -98,6 +98,14 @@
                 >
                   {{ mov.ventaFacturada ? 'Facturada' : 'No facturada' }}
                 </v-chip>
+                <v-chip
+                  v-if="mov.facturaPendiente"
+                  size="x-small"
+                  color="error"
+                  variant="tonal"
+                >
+                  Factura pendiente
+                </v-chip>
               </div>
               <div class="movement-summary__main">{{ mov.motivo || 'Sin motivo' }}</div>
               <div class="movement-summary__meta">
@@ -147,6 +155,18 @@
                 >
                   Imprimir ticket
                 </v-btn>
+              </div>
+
+              <div v-if="mov.ventaNumero && mov.ventaTipoFactura === 'A'" class="movement-factura-box">
+                <div class="text-caption movement-factura-box__title">Datos de facturación</div>
+                <div class="movement-factura-box__grid">
+                  <div><strong>Tipo:</strong> {{ mov.ventaTipoFactura || '-' }}</div>
+                  <div><strong>Total:</strong> {{ formatMoney(mov.ventaTotalNeto || 0) }}</div>
+                  <div><strong>Cliente:</strong> {{ mov.ventaClienteNombre || '-' }}</div>
+                  <div><strong>CUIT:</strong> {{ mov.ventaClienteCuit || '-' }}</div>
+                  <div><strong>Telefono:</strong> {{ mov.ventaClienteTelefono || '-' }}</div>
+                  <div><strong>Direccion:</strong> {{ mov.ventaClienteDireccion || '-' }}</div>
+                </div>
               </div>
 
               <div class="movement-items">
@@ -592,6 +612,25 @@ onBeforeUnmount(() => {
 .movement-items {
   display: grid;
   gap: 8px;
+}
+
+.movement-factura-box {
+  border: 1px solid color-mix(in srgb, var(--pos-accent-strong) 20%, var(--pos-border));
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--pos-accent-strong) 5%, var(--pos-card));
+}
+
+.movement-factura-box__title {
+  margin-bottom: 6px;
+  color: var(--pos-ink-muted);
+}
+
+.movement-factura-box__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 10px;
+  font-size: 0.8rem;
 }
 
 .movement-item-row {

@@ -8,6 +8,7 @@ public static class SeedData
     public static readonly DateTimeOffset SeedTimestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
     public const string AdminPasswordHash = "sha256:8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918";
     public const string CashierPasswordHash = "sha256:89e04b1495a72cb72e966a805afdb4eb13e3106fef0f0db24c55c0bcdc779b4d";
+    public const string PreviousAdminPasswordHash = "sha256:e6be3a8df7f9a0492e302d2a96d52408a264337253669621eeb413e2a89cc064";
     public const string LegacyAdminPasswordHash = "sha256:3eb3fe66b31e3b4d10fa70b5cad49c7112294af6ae4e476a1c405155d45aa121";
 
     public static readonly Guid TenantId = Guid.Parse("1f4f9f1a-2b7f-4d2c-8cf6-56d5b92f1a01");

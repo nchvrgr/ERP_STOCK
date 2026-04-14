@@ -104,7 +104,12 @@ public sealed class VentaRepository : IVentaRepository
             venta.TotalPagos,
             venta.CreatedAt,
             items,
-            venta.Facturada);
+            venta.Facturada,
+            venta.TipoFactura,
+            venta.ClienteNombre,
+            venta.ClienteCuit,
+            venta.ClienteDireccion,
+            venta.ClienteTelefono);
     }
 
     public async Task<VentaTicketDto?> GetTicketByNumeroAsync(
@@ -163,7 +168,12 @@ public sealed class VentaRepository : IVentaRepository
             venta.TotalPagos,
             venta.CreatedAt,
             items,
-            venta.Facturada);
+            venta.Facturada,
+            venta.TipoFactura,
+            venta.ClienteNombre,
+            venta.ClienteCuit,
+            venta.ClienteDireccion,
+            venta.ClienteTelefono);
 
         return new VentaTicketDto(ventaDto, pagos);
     }
@@ -603,6 +613,16 @@ public sealed class VentaRepository : IVentaRepository
             saldo.SetCantidad(after, nowUtc);
         }
 
+        var tipoFactura = request.Facturada!.Value
+            ? (string.IsNullOrWhiteSpace(request.TipoFactura) ? "B" : request.TipoFactura.Trim().ToUpperInvariant())
+            : "B";
+
+        var clienteNombre = request.Facturada!.Value ? request.Cliente?.Nombre : null;
+        var clienteCuit = request.Facturada!.Value ? request.Cliente?.Cuit : null;
+        var clienteDireccion = request.Facturada!.Value ? request.Cliente?.Direccion : null;
+        var clienteTelefono = request.Facturada!.Value ? request.Cliente?.Telefono : null;
+        var facturaPendiente = request.Facturada!.Value && string.Equals(tipoFactura, "A", StringComparison.OrdinalIgnoreCase);
+
         var movimientoId = Guid.NewGuid();
         var movimiento = new StockMovimiento(
             movimientoId,
@@ -612,7 +632,15 @@ public sealed class VentaRepository : IVentaRepository
             $"Venta {venta.Numero}",
             nowUtc,
             nowUtc,
-            venta.Numero);
+            venta.Numero,
+            request.Facturada!.Value,
+            tipoFactura,
+            clienteNombre,
+            clienteCuit,
+            clienteDireccion,
+            clienteTelefono,
+            totalNeto,
+            facturaPendiente);
 
         _dbContext.StockMovimientos.Add(movimiento);
 
@@ -643,7 +671,16 @@ public sealed class VentaRepository : IVentaRepository
 
         _dbContext.StockMovimientoItems.AddRange(movimientoItems);
 
-        venta.Confirmar(totalNeto, totalPagos, request.Facturada!.Value, nowUtc);
+        venta.Confirmar(
+            totalNeto,
+            totalPagos,
+            request.Facturada!.Value,
+            tipoFactura,
+            clienteNombre,
+            clienteCuit,
+            clienteDireccion,
+            clienteTelefono,
+            nowUtc);
 
         var pagos = new List<VentaPago>();
         var pagosDto = new List<VentaPagoDto>();

@@ -24,6 +24,18 @@ public interface IStockMovementRepository
         DateTimeOffset? hasta,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<FacturaPendienteDto>> GetFacturasPendientesAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> MarcarFacturaPendienteResueltaAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid movimientoId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default);
+
     Task<StockMovimientoRegisterResult> RevertAsync(
         Guid tenantId,
         Guid sucursalId,

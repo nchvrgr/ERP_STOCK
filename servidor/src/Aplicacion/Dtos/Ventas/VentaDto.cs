@@ -11,7 +11,12 @@ public sealed record VentaDto(
     decimal TotalPagos,
     DateTimeOffset CreatedAt,
     IReadOnlyCollection<VentaItemDto> Items,
-    bool Facturada = false);
+    bool Facturada = false,
+    string? TipoFactura = null,
+    string? ClienteNombre = null,
+    string? ClienteCuit = null,
+    string? ClienteDireccion = null,
+    string? ClienteTelefono = null);
 
 public sealed record VentaTicketDto(
     VentaDto Venta,

@@ -41,6 +41,7 @@ public sealed record StockInmovilizadoItemDto(
     Guid ProductoId,
     string Nombre,
     string Sku,
+    decimal CantidadVendidaPeriodo,
     decimal StockActual,
     DateTimeOffset? UltimoMovimiento,
     int DiasSinMovimiento);

@@ -20,6 +20,14 @@ public sealed class StockMovimientoConfiguration : IEntityTypeConfiguration<Stoc
         builder.Property(x => x.Motivo).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Fecha).HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(x => x.VentaNumero).HasColumnType("bigint");
+        builder.Property(x => x.VentaFacturada);
+        builder.Property(x => x.VentaTipoFactura).HasMaxLength(5);
+        builder.Property(x => x.VentaClienteNombre).HasMaxLength(160);
+        builder.Property(x => x.VentaClienteCuit).HasMaxLength(32);
+        builder.Property(x => x.VentaClienteDireccion).HasMaxLength(240);
+        builder.Property(x => x.VentaClienteTelefono).HasMaxLength(40);
+        builder.Property(x => x.VentaTotalNeto).HasColumnType("numeric(18,4)");
+        builder.Property(x => x.FacturaPendiente).HasDefaultValue(false);
 
         builder.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone").IsRequired();

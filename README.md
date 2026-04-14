@@ -186,16 +186,16 @@ Update opcional:
 
 ```powershell
 $env:ERP_STOCK_UPDATE_TEST_MODE='optional'
-$env:ERP_STOCK_UPDATE_TEST_ASSET_PATH=(Resolve-Path '.\release\Viñedos de la Villa Setup 1.0.0.exe')
-.\release\win-unpacked\Viñedos de la Villa.exe
+$env:ERP_STOCK_UPDATE_TEST_ASSET_PATH=(Resolve-Path '.\release\Viñedo de la Villa Setup 1.0.0.exe')
+.\release\win-unpacked\Viñedo de la Villa.exe
 ```
 
 Update obligatorio:
 
 ```powershell
 $env:ERP_STOCK_UPDATE_TEST_MODE='mandatory'
-$env:ERP_STOCK_UPDATE_TEST_ASSET_PATH=(Resolve-Path '.\release\Viñedos de la Villa Setup 1.0.0.exe')
-.\release\win-unpacked\Viñedos de la Villa.exe
+$env:ERP_STOCK_UPDATE_TEST_ASSET_PATH=(Resolve-Path '.\release\Viñedo de la Villa Setup 1.0.0.exe')
+.\release\win-unpacked\Viñedo de la Villa.exe
 ```
 
 Variables disponibles:

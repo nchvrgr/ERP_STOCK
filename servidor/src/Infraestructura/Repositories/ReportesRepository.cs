@@ -136,6 +136,7 @@ public sealed class ReportesRepository : IReportesRepository
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
         int top,
+        string ordenTop,
         CancellationToken cancellationToken = default)
     {
         var raw = await (
@@ -165,12 +166,13 @@ public sealed class ReportesRepository : IReportesRepository
                 g.Key.Name,
                 g.Key.Sku,
                 g.Sum(x => x.Cantidad),
-                g.Sum(x => x.Cantidad * x.PrecioUnitario)))
-            .OrderByDescending(x => x.Total)
-            .Take(top)
-            .ToList();
+                g.Sum(x => x.Cantidad * x.PrecioUnitario)));
 
-        return result;
+        var ordered = string.Equals(ordenTop, "cantidad", StringComparison.OrdinalIgnoreCase)
+            ? result.OrderByDescending(x => x.Cantidad).ThenByDescending(x => x.Total)
+            : result.OrderByDescending(x => x.Total).ThenByDescending(x => x.Cantidad);
+
+        return ordered.Take(top).ToList();
     }
 
     public async Task<IReadOnlyList<RotacionStockItemDto>> GetRotacionStockAsync(
@@ -219,6 +221,8 @@ public sealed class ReportesRepository : IReportesRepository
         Guid sucursalId,
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
+        int minDiasSinMovimiento,
+        decimal maxCantidadVendida,
         CancellationToken cancellationToken = default)
     {
         var ventasItemsQuery =
@@ -298,9 +302,9 @@ public sealed class ReportesRepository : IReportesRepository
 
         var nowUtc = DateTimeOffset.UtcNow;
         var result = productos
-            .Where(p => !vendidosByProducto.TryGetValue(p.Id, out var qty) || qty <= 0)
             .Select(p =>
             {
+                var qtyVendida = vendidosByProducto.TryGetValue(p.Id, out var qty) ? qty : 0m;
                 var ultimo = lastMovimientos.TryGetValue(p.Id, out var mov) ? mov : null;
                 var stock = saldosByProducto.TryGetValue(p.Id, out var st) ? st : 0m;
                 var baseDate = ultimo ?? p.CreatedAt;
@@ -309,10 +313,17 @@ public sealed class ReportesRepository : IReportesRepository
                     p.Id,
                     p.Name,
                     p.Sku,
+                    qtyVendida,
                     stock,
                     ultimo,
                     diasSinMovimiento);
             })
+            .Where(x => x.CantidadVendidaPeriodo <= maxCantidadVendida)
+            .Select(p =>
+            {
+                return p;
+            })
+            .Where(x => x.DiasSinMovimiento >= minDiasSinMovimiento)
             .ToList();
 
         return result;

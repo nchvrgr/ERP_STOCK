@@ -258,11 +258,11 @@ public sealed class ImportacionProductosService
             {
                 if (!TryParseDecimal(precioRaw, out var parsedPrecio))
                 {
-                    errors.Add("Precio base invalido.");
+                    errors.Add("Precio costo invalido.");
                 }
                 else if (parsedPrecio < 0)
                 {
-                    errors.Add("Precio base no puede ser negativo.");
+                    errors.Add("Precio costo no puede ser negativo.");
                 }
                 else
                 {

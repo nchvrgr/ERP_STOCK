@@ -93,7 +93,7 @@
                         variant="text"
                         color="error"
                         class="delete-row-action"
-                        @click="promptDelete('producto', item)"
+                        @click="promptDelete('combo', item)"
                       />
                     </div>
                   </template>
@@ -130,15 +130,25 @@
                     {{ formatMoney(item.precioVenta) }}
                   </template>
                   <template v-slot:[`item.actions`]='{ item }'>
-                    <v-btn
-                      size="small"
-                      variant="tonal"
-                      color="primary"
-                      class="text-none"
-                      @click="openEditCombo(item)"
-                    >
-                      Editar combo
-                    </v-btn>
+                    <div class="table-actions">
+                      <v-btn
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        class="text-none"
+                        @click="openEditCombo(item)"
+                      >
+                        Editar combo
+                      </v-btn>
+                      <v-btn
+                        size="small"
+                        icon="mdi-delete-outline"
+                        variant="text"
+                        color="error"
+                        class="delete-row-action"
+                        @click="promptDelete('producto', item)"
+                      />
+                    </div>
                   </template>
                 </v-data-table>
               </div>
@@ -412,7 +422,7 @@
             <v-col cols="12" md="4">
               <MoneyField
                 v-model="form.precioBase"
-                label="Precio base"
+                label="Precio costo"
                 variant="outlined"
                 density="comfortable"
                 :error-messages="errors.precioBase"
@@ -721,7 +731,7 @@
 
         <v-row dense class="mt-2">
           <v-col cols="12" md="6">
-            <div class="text-caption text-medium-emphasis">Total base (suma de productos)</div>
+            <div class="text-caption text-medium-emphasis">Total costo (suma de productos)</div>
             <div class="text-h6">{{ formatMoney(comboBaseTotal) }}</div>
           </v-col>
           <v-col cols="12" md="6">
@@ -732,6 +742,51 @@
         <v-card-actions class="justify-end px-0 pt-4">
           <v-btn variant="text" @click="closeComboDialog">Cancelar</v-btn>
           <v-btn color="primary" :loading="comboSaving" @click="saveCombo">{{ comboEditorMode === 'edit' ? 'Guardar cambios' : 'Guardar combo' }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="comboPriceUpdateDialog" width="860">
+      <v-card>
+        <v-card-title>Actualizar precios de combos</v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-3">
+            Se detectaron combos que incluyen este producto. Podes actualizar su precio final con la nueva referencia.
+          </div>
+          <v-data-table
+            :headers="comboPriceUpdateHeaders"
+            :items="comboPriceUpdateItems"
+            item-key="id"
+            density="compact"
+          >
+            <template v-slot:[`item.aplicar`]="{ item }">
+              <v-checkbox
+                :model-value="item.aplicar"
+                hide-details
+                color="primary"
+                @update:model-value="(value) => (item.aplicar = value)"
+              />
+            </template>
+            <template v-slot:[`item.precioVentaActual`]="{ item }">
+              {{ formatMoney(item.precioVentaActual) }}
+            </template>
+            <template v-slot:[`item.precioVentaSugerido`]="{ item }">
+              {{ formatMoney(item.precioVentaSugerido) }}
+            </template>
+            <template v-slot:[`item.precioVentaObjetivo`]="{ item }">
+              <MoneyField
+                v-model="item.precioVentaObjetivo"
+                variant="outlined"
+                density="compact"
+                hide-details
+                :step="100"
+              />
+            </template>
+          </v-data-table>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="comboPriceUpdateLoading" @click="cancelComboPriceUpdates">Omitir</v-btn>
+          <v-btn color="primary" :loading="comboPriceUpdateLoading" @click="applyComboPriceUpdates">Actualizar seleccionados</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -753,6 +808,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { buildApiUrl, getJson, postJson, requestJson } from '../services/apiClient';
 import { formatMoney } from '../utils/currency';
+
+const roundMoney = (amount) => Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
 
 const tab = ref('productos');
 const route = useRoute();
@@ -811,6 +868,10 @@ const comboEditorMode = ref('new');
 const comboSelectedProductId = ref('');
 const comboSelectedCantidad = ref(1);
 const comboProductOptions = ref([]);
+const comboPriceUpdateDialog = ref(false);
+const comboPriceUpdateLoading = ref(false);
+const comboPriceUpdateItems = ref([]);
+const originalPrecioVenta = ref(null);
 const comboForm = reactive({
   id: '',
   name: '',
@@ -847,6 +908,7 @@ const snackbar = ref({
 
 const deleteEntityLabels = {
   producto: 'el producto',
+  combo: 'el combo',
   proveedor: 'el proveedor',
   categoria: 'la categoría'
 };
@@ -856,7 +918,7 @@ const headers = [
   { title: 'SKU', value: 'sku' },
   { title: 'Categoria', value: 'categoria' },
   { title: 'Proveedor', value: 'proveedor' },
-  { title: 'Precio base', value: 'precioBase' },
+  { title: 'Precio costo', value: 'precioBase' },
   { title: 'Precio venta', value: 'precioVenta' },
   { title: 'Estado', value: 'isActive' },
   { title: '', value: 'actions', sortable: false, align: 'end' }
@@ -876,6 +938,15 @@ const comboItemHeaders = [
   { title: 'Precio', value: 'precioVenta', align: 'end' },
   { title: 'Subtotal', value: 'subtotal', align: 'end' },
   { title: '', value: 'actions', sortable: false, align: 'end' }
+];
+
+const comboPriceUpdateHeaders = [
+  { title: 'Aplicar', value: 'aplicar', sortable: false, width: 90 },
+  { title: 'Combo', value: 'name' },
+  { title: 'SKU', value: 'sku' },
+  { title: 'Precio actual', value: 'precioVentaActual', align: 'end' },
+  { title: 'Precio sugerido', value: 'precioVentaSugerido', align: 'end' },
+  { title: 'Precio objetivo', value: 'precioVentaObjetivo', sortable: false, align: 'end' }
 ];
 
 const pricingModeItems = [
@@ -941,6 +1012,9 @@ const categoriaErrors = reactive({
 
 const deleteDialogText = computed(() => {
   if (!deleteTarget.value) return '';
+  if (deleteTarget.value.type === 'combo') {
+    return `Vas a dar de baja ${deleteEntityLabels[deleteTarget.value.type]} "${deleteTarget.value.name}". Esta acción no se puede deshacer.`;
+  }
   return `Vas a eliminar ${deleteEntityLabels[deleteTarget.value.type]} "${deleteTarget.value.name}". Esta acción no se puede deshacer.`;
 });
 
@@ -1031,7 +1105,7 @@ const validateField = (field) => {
     if (form.precioBase === '') {
       errors.precioBase = '';
     } else if (Number(form.precioBase) < 0 || Number.isNaN(Number(form.precioBase))) {
-      errors.precioBase = 'Precio base invalido.';
+      errors.precioBase = 'Precio costo invalido.';
     } else {
       errors.precioBase = '';
     }
@@ -1385,6 +1459,7 @@ const openEditProduct = async (row) => {
     form.isActive = data.isActive ?? true;
     const base = Number(data.precioBase ?? 0);
     const venta = Number(data.precioVenta ?? base);
+    originalPrecioVenta.value = venta;
     const margen = base > 0 ? ((venta / base) - 1) * 100 : 0;
     form.precioBase = base ? base.toString() : '';
     form.pricingMode = data.pricingMode || 'FIJO_PCT';
@@ -1423,8 +1498,112 @@ const resetForm = () => {
   form.precioVentaManual = '';
   form.stockInicial = '';
   form.isActive = true;
+  originalPrecioVenta.value = null;
   stockConfig.stockMinimo = '0';
   clearErrors();
+};
+
+const cancelComboPriceUpdates = () => {
+  comboPriceUpdateDialog.value = false;
+  comboPriceUpdateItems.value = [];
+};
+
+const loadComboPriceUpdateCandidates = async (productoId, nuevoPrecioVenta) => {
+  const productsResp = await getJson('/api/v1/productos?combo=false&activo=true');
+  if (!productsResp.response.ok) {
+    throw new Error(extractProblemMessage(productsResp.data));
+  }
+
+  const productPriceMap = new Map((productsResp.data || []).map((product) => [
+    product.id,
+    Number(product.precioVenta || 0)
+  ]));
+  productPriceMap.set(productoId, Number(nuevoPrecioVenta || 0));
+
+  const combosResp = await getJson('/api/v1/productos?combo=true&activo=true');
+  if (!combosResp.response.ok) {
+    throw new Error(extractProblemMessage(combosResp.data));
+  }
+
+  const combos = combosResp.data || [];
+  const impacted = [];
+
+  for (const combo of combos) {
+    const detailResp = await getJson(`/api/v1/productos/${combo.id}`);
+    if (!detailResp.response.ok) {
+      continue;
+    }
+
+    const detail = detailResp.data || {};
+    const items = Array.isArray(detail.comboItems) ? detail.comboItems : [];
+    if (!items.some((entry) => entry.productoId === productoId)) {
+      continue;
+    }
+
+    const precioBaseSugerido = roundMoney(items.reduce((acc, entry) => {
+      const price = Number(productPriceMap.get(entry.productoId) || 0);
+      return acc + (price * Number(entry.cantidad || 0));
+    }, 0));
+
+    const precioVentaActual = Number(detail.precioVenta || 0);
+    const precioVentaSugerido = Math.max(0, roundMoney(precioVentaActual + (precioBaseSugerido - Number(detail.precioBase || 0))));
+
+    if (Math.abs(precioVentaSugerido - precioVentaActual) < 0.01) {
+      continue;
+    }
+
+    impacted.push({
+      id: detail.id,
+      name: detail.name || combo.name || 'Combo',
+      sku: detail.sku || combo.sku || '-',
+      precioVentaActual,
+      precioVentaSugerido,
+      precioVentaObjetivo: precioVentaSugerido,
+      precioBaseSugerido,
+      comboItems: items,
+      aplicar: true
+    });
+  }
+
+  comboPriceUpdateItems.value = impacted;
+  comboPriceUpdateDialog.value = impacted.length > 0;
+};
+
+const applyComboPriceUpdates = async () => {
+  const selected = comboPriceUpdateItems.value.filter((item) => item.aplicar);
+  if (!selected.length) {
+    cancelComboPriceUpdates();
+    return;
+  }
+
+  comboPriceUpdateLoading.value = true;
+  try {
+    for (const combo of selected) {
+      const payload = {
+        precioBase: combo.precioBaseSugerido,
+        precioVenta: Math.max(0, Number(combo.precioVentaObjetivo ?? combo.precioVentaSugerido ?? 0)),
+        pricingMode: 'MANUAL',
+        isCombo: true,
+        comboItems: combo.comboItems
+      };
+
+      const { response, data } = await requestJson(`/api/v1/productos/${combo.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        throw new Error(extractProblemMessage(data));
+      }
+    }
+
+    await loadCombos();
+    flash('success', 'Precios de combos actualizados');
+    cancelComboPriceUpdates();
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron actualizar los combos.');
+  } finally {
+    comboPriceUpdateLoading.value = false;
+  }
 };
 
 const onSkuInput = (value) => {
@@ -1550,6 +1729,14 @@ const saveProduct = async () => {
     await saveStockConfig(form.id);
     flash('success', 'Producto actualizado');
     await loadProducts();
+    const precioVentaActualizado = Number(precioVenta ?? precioVentaCalculado.value ?? 0);
+    if (
+      Number.isFinite(precioVentaActualizado)
+      && Number.isFinite(Number(originalPrecioVenta.value))
+      && Math.abs(precioVentaActualizado - Number(originalPrecioVenta.value)) >= 0.01
+    ) {
+      await loadComboPriceUpdateCandidates(form.id, precioVentaActualizado);
+    }
     closeProductEditor();
   } catch (err) {
     flash('error', err?.message || 'No se pudo guardar el producto.');
@@ -1912,26 +2099,37 @@ const confirmDelete = async () => {
   const target = deleteTarget.value;
   const endpointMap = {
     producto: `/api/v1/productos/${target.id}`,
+    combo: `/api/v1/productos/${target.id}`,
     proveedor: `/api/v1/proveedores/${target.id}`,
     categoria: `/api/v1/categorias-precio/${target.id}`
   };
   const successMap = {
     producto: 'Producto eliminado',
+    combo: 'Combo dado de baja',
     proveedor: 'Proveedor eliminado',
     categoria: 'Categoría eliminada'
   };
 
   deleteLoading.value = true;
   try {
-    const { response, data } = await requestJson(endpointMap[target.type], {
-      method: 'DELETE'
-    });
+    const requestInit = target.type === 'combo'
+      ? {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: false })
+      }
+      : {
+        method: 'DELETE'
+      };
+
+    const { response, data } = await requestJson(endpointMap[target.type], requestInit);
     if (!response.ok) {
       throw new Error(extractProblemMessage(data));
     }
 
     if (target.type === 'producto') {
       await loadProducts();
+    } else if (target.type === 'combo') {
+      await loadCombos();
     } else if (target.type === 'proveedor') {
       await loadProveedores();
       await searchProveedores(proveedorLookupSearch.value);

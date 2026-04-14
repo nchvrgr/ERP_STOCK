@@ -7,7 +7,26 @@ public sealed record StockMovimientoDto(
     DateTimeOffset Fecha,
     long? VentaNumero,
     bool? VentaFacturada,
+    string? VentaTipoFactura,
+    string? VentaClienteNombre,
+    string? VentaClienteCuit,
+    string? VentaClienteDireccion,
+    string? VentaClienteTelefono,
+    decimal? VentaTotalNeto,
+    bool FacturaPendiente,
     IReadOnlyCollection<StockMovimientoItemDto> Items);
+
+public sealed record FacturaPendienteDto(
+    Guid MovimientoId,
+    DateTimeOffset Fecha,
+    long? VentaNumero,
+    string? TipoFactura,
+    string? ClienteNombre,
+    string? ClienteCuit,
+    string? ClienteDireccion,
+    string? ClienteTelefono,
+    decimal? MontoTotal,
+    string Motivo);
 
 public sealed record StockMovimientoItemDto(
     Guid Id,

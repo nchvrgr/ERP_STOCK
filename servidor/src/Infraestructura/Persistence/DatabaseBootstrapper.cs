@@ -22,6 +22,8 @@ public static class DatabaseBootstrapper
         await EnsureCajaSchemaAsync(dbContext, cancellationToken);
         await EnsureEmpresaDatosSchemaAsync(dbContext, cancellationToken);
         await EnsureProductoComboSchemaAsync(dbContext, cancellationToken);
+        await EnsureVentaFacturaSchemaAsync(dbContext, cancellationToken);
+        await EnsureStockMovimientoFacturaSchemaAsync(dbContext, cancellationToken);
 
         await SeedCoreDataAsync(dbContext, cancellationToken);
     }
@@ -127,6 +129,220 @@ public static class DatabaseBootstrapper
             {
                 await dbContext.Database.ExecuteSqlRawAsync(
                     "ALTER TABLE empresa_datos ADD COLUMN \"RemitoSecuencia\" integer NOT NULL DEFAULT 0;",
+                    cancellationToken);
+            }
+        }
+    }
+
+    private static async Task EnsureVentaFacturaSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(dbContext, "ventas", "tipo_factura", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN tipo_factura TEXT NOT NULL DEFAULT 'B';",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN \"tipo_factura\" character varying(5) NOT NULL DEFAULT 'B';",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "ventas", "cliente_nombre", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN cliente_nombre TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN \"cliente_nombre\" character varying(160) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "ventas", "cliente_cuit", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN cliente_cuit TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN \"cliente_cuit\" character varying(32) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "ventas", "cliente_direccion", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN cliente_direccion TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN \"cliente_direccion\" character varying(240) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "ventas", "cliente_telefono", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN cliente_telefono TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ventas ADD COLUMN \"cliente_telefono\" character varying(40) NULL;",
+                    cancellationToken);
+            }
+        }
+    }
+
+    private static async Task EnsureStockMovimientoFacturaSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaFacturada", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaFacturada INTEGER NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaFacturada\" boolean NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaTipoFactura", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaTipoFactura TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaTipoFactura\" character varying(5) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaClienteNombre", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaClienteNombre TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaClienteNombre\" character varying(160) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaClienteCuit", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaClienteCuit TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaClienteCuit\" character varying(32) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaClienteDireccion", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaClienteDireccion TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaClienteDireccion\" character varying(240) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaClienteTelefono", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaClienteTelefono TEXT NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaClienteTelefono\" character varying(40) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "VentaTotalNeto", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN VentaTotalNeto NUMERIC NULL;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"VentaTotalNeto\" numeric(18,4) NULL;",
+                    cancellationToken);
+            }
+        }
+
+        if (!await ColumnExistsAsync(dbContext, "stock_movimientos", "FacturaPendiente", cancellationToken))
+        {
+            if (dbContext.Database.IsSqlite())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN FacturaPendiente INTEGER NOT NULL DEFAULT 0;",
+                    cancellationToken);
+            }
+            else
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE stock_movimientos ADD COLUMN \"FacturaPendiente\" boolean NOT NULL DEFAULT FALSE;",
                     cancellationToken);
             }
         }
@@ -239,7 +455,11 @@ public static class DatabaseBootstrapper
             return;
         }
 
-        if (!string.Equals(admin.PasswordHash, SeedData.LegacyAdminPasswordHash, StringComparison.OrdinalIgnoreCase))
+        var mustUpgradeAdminPassword =
+            string.Equals(admin.PasswordHash, SeedData.LegacyAdminPasswordHash, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(admin.PasswordHash, SeedData.PreviousAdminPasswordHash, StringComparison.OrdinalIgnoreCase);
+
+        if (!mustUpgradeAdminPassword)
         {
             await EnsureCashierUserAsync(dbContext, cancellationToken);
             await EnsureSeedRolePermissionsAsync(dbContext, SeedData.RoleAdminId, cancellationToken);

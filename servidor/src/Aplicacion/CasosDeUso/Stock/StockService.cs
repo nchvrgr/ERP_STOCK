@@ -460,6 +460,41 @@ public sealed class StockService
         return await _repositorioMovimientosStock.SearchAsync(tenantId, sucursalId, productoId, ventaNumero, facturada, desde, hasta, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<FacturaPendienteDto>> ObtenerFacturasPendientesAsync(CancellationToken cancellationToken)
+    {
+        var tenantId = AsegurarTenant();
+        var sucursalId = AsegurarSucursal();
+        return await _repositorioMovimientosStock.GetFacturasPendientesAsync(tenantId, sucursalId, cancellationToken);
+    }
+
+    public async Task MarcarFacturaPendienteResueltaAsync(Guid movimientoId, CancellationToken cancellationToken)
+    {
+        if (movimientoId == Guid.Empty)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["movimientoId"] = new[] { "El movimiento es obligatorio." }
+                });
+        }
+
+        var tenantId = AsegurarTenant();
+        var sucursalId = AsegurarSucursal();
+
+        var ok = await _repositorioMovimientosStock.MarcarFacturaPendienteResueltaAsync(
+            tenantId,
+            sucursalId,
+            movimientoId,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
+
+        if (!ok)
+        {
+            throw new NotFoundException("Movimiento no encontrado.");
+        }
+    }
+
     public async Task<StockMovimientoDto> RevertirMovimientoAsync(
         Guid movimientoId,
         StockMovimientoRevertRequestDto? request,

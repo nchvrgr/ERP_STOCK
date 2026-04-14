@@ -2,7 +2,7 @@
   "name": "vinedos-de-la-villa",
   "version": "1.0.3",
   "private": true,
-  "description": "Vinedos de la Villa desktop installer",
+  "description": "Viñedo de la Villa desktop installer",
   "author": "Codex",
   "main": "electron/main.cjs",
   "scripts": {
@@ -21,8 +21,8 @@
   },
   "build": {
     "appId": "com.erpstock.desktop",
-    "productName": "Vinedos de la Villa",
-    "artifactName": "Vinedos.de.la.Villa.Setup.${ext}",
+    "productName": "Viñedo de la Villa",
+    "artifactName": "Viñedo.de.la.Villa.Setup.${ext}",
     "directories": {
       "output": "release"
     },
@@ -50,7 +50,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "Vinedos.de.la.Villa.Setup.${ext}",
+      "artifactName": "Viñedo.de.la.Villa.Setup.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
@@ -58,7 +58,7 @@
       "installerIcon": "build/icons/app.ico",
       "uninstallerIcon": "build/icons/app.ico",
       "installerHeaderIcon": "build/icons/app.ico",
-      "shortcutName": "Vinedos de la Villa",
+      "shortcutName": "Viñedo de la Villa",
       "include": "build/installer.nsh"
     }
   }

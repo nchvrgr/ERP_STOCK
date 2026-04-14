@@ -31,6 +31,7 @@ public interface IReportesRepository
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
         int top,
+        string ordenTop,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RotacionStockItemDto>> GetRotacionStockAsync(
@@ -45,6 +46,8 @@ public interface IReportesRepository
         Guid sucursalId,
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
+        int minDiasSinMovimiento,
+        decimal maxCantidadVendida,
         CancellationToken cancellationToken = default);
 }
 

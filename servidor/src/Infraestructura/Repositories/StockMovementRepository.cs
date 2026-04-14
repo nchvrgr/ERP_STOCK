@@ -134,6 +134,13 @@ public sealed class StockMovementRepository : IStockMovementRepository
             nowUtc,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
             itemDtos);
 
         return new StockMovimientoRegisterResult(dto, cambios);
@@ -245,9 +252,16 @@ public sealed class StockMovementRepository : IStockMovementRepository
                 m.Motivo,
                 m.Fecha,
                 m.VentaNumero,
-                m.VentaNumero.HasValue && facturadaByNumero.TryGetValue(m.VentaNumero.Value, out var ventaFacturada)
+                m.VentaFacturada ?? (m.VentaNumero.HasValue && facturadaByNumero.TryGetValue(m.VentaNumero.Value, out var ventaFacturada)
                     ? ventaFacturada
-                    : null,
+                    : null),
+                m.VentaTipoFactura,
+                m.VentaClienteNombre,
+                m.VentaClienteCuit,
+                m.VentaClienteDireccion,
+                m.VentaClienteTelefono,
+                m.VentaTotalNeto,
+                m.FacturaPendiente,
                 list);
         }).ToList();
 
@@ -407,9 +421,70 @@ public sealed class StockMovementRepository : IStockMovementRepository
             nowUtc,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
             itemDtos);
 
         return new StockMovimientoRegisterResult(dto, cambios);
+    }
+
+    public async Task<IReadOnlyList<FacturaPendienteDto>> GetFacturasPendientesAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _dbContext.StockMovimientos.AsNoTracking()
+            .Where(m => m.TenantId == tenantId
+                && m.SucursalId == sucursalId
+                && m.FacturaPendiente
+                && m.VentaFacturada == true
+                && m.VentaTipoFactura == "A")
+            .Select(m => new FacturaPendienteDto(
+                m.Id,
+                m.Fecha,
+                m.VentaNumero,
+                m.VentaTipoFactura,
+                m.VentaClienteNombre,
+                m.VentaClienteCuit,
+                m.VentaClienteDireccion,
+                m.VentaClienteTelefono,
+                m.VentaTotalNeto,
+                m.Motivo))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .OrderByDescending(m => m.Fecha)
+            .ToList();
+    }
+
+    public async Task<bool> MarcarFacturaPendienteResueltaAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid movimientoId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var movimiento = await _dbContext.StockMovimientos
+            .FirstOrDefaultAsync(m => m.TenantId == tenantId && m.SucursalId == sucursalId && m.Id == movimientoId, cancellationToken);
+
+        if (movimiento is null)
+        {
+            return false;
+        }
+
+        if (!movimiento.FacturaPendiente)
+        {
+            return true;
+        }
+
+        movimiento.MarcarFacturaPendienteResuelta(nowUtc);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }
 

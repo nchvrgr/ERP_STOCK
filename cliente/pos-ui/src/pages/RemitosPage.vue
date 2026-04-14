@@ -68,6 +68,18 @@
             </template>
           </v-autocomplete>
         </v-col>
+        <v-col cols="12" md="4" class="d-flex align-center">
+          <v-btn
+            color="secondary"
+            variant="tonal"
+            class="text-none"
+            prepend-icon="mdi-currency-usd"
+            :disabled="!selectedProductoId"
+            @click="openActualizarPrecioDialog(selectedProductoId)"
+          >
+            Actualizar precio
+          </v-btn>
+        </v-col>
       </v-row>
 
       <div v-if="recentAddMessage" class="remitos-add-feedback">
@@ -101,6 +113,28 @@
         <template v-slot:[`item.name`]="{ item }">
           <span>{{ getTableItemData(item).name }}</span>
         </template>
+        <template v-slot:[`item.precioBase`]="{ item }">
+          <MoneyField
+            :model-value="getTableItemData(item).precioBase"
+            variant="outlined"
+            density="compact"
+            hide-details
+            :step="100"
+            :show-stepper="false"
+            @update:model-value="(value) => updatePrecioItem(getTableItemData(item).productoId, 'precioBase', value)"
+          />
+        </template>
+        <template v-slot:[`item.precioVenta`]="{ item }">
+          <MoneyField
+            :model-value="getTableItemData(item).precioVenta"
+            variant="outlined"
+            density="compact"
+            hide-details
+            :step="100"
+            :show-stepper="false"
+            @update:model-value="(value) => updatePrecioItem(getTableItemData(item).productoId, 'precioVenta', value)"
+          />
+        </template>
         <template v-slot:[`item.cantidad`]="{ item }">
           <div class="quantity-stepper">
             <v-btn
@@ -132,7 +166,16 @@
           </div>
         </template>
         <template v-slot:[`item.actions`]="{ item }">
-          <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="removeItem(getTableItemData(item).productoId)" />
+          <div class="d-flex align-center justify-end ga-1">
+            <v-btn
+              icon="mdi-currency-usd"
+              size="small"
+              variant="text"
+              color="primary"
+              @click="openActualizarPrecioDialog(getTableItemData(item).productoId)"
+            />
+            <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="removeItem(getTableItemData(item).productoId)" />
+          </div>
         </template>
       </v-data-table>
 
@@ -161,6 +204,52 @@
         <span>{{ snackbar.text }}</span>
       </div>
     </v-snackbar>
+
+    <v-dialog v-model="comboPriceUpdateDialog" width="860">
+      <v-card>
+        <v-card-title>Actualizar precios de combos</v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-3">
+            Se detectaron combos que incluyen productos con precio modificado. Podes actualizar su precio final.
+          </div>
+          <v-data-table
+            :headers="comboPriceUpdateHeaders"
+            :items="comboPriceUpdateItems"
+            item-key="id"
+            density="compact"
+          >
+            <template v-slot:[`item.aplicar`]="{ item }">
+              <v-checkbox
+                :model-value="item.aplicar"
+                hide-details
+                color="primary"
+                @update:model-value="(value) => (item.aplicar = value)"
+              />
+            </template>
+            <template v-slot:[`item.precioVentaActual`]="{ item }">
+              {{ formatMoney(item.precioVentaActual) }}
+            </template>
+            <template v-slot:[`item.precioVentaSugerido`]="{ item }">
+              {{ formatMoney(item.precioVentaSugerido) }}
+            </template>
+            <template v-slot:[`item.precioVentaObjetivo`]="{ item }">
+              <MoneyField
+                v-model="item.precioVentaObjetivo"
+                variant="outlined"
+                density="compact"
+                hide-details
+                :step="100"
+                :show-stepper="false"
+              />
+            </template>
+          </v-data-table>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="comboPriceUpdateLoading" @click="cancelComboPriceUpdates">Omitir</v-btn>
+          <v-btn color="primary" :loading="comboPriceUpdateLoading" @click="applyComboPriceUpdates">Actualizar seleccionados</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-dialog v-model="createDialog" persistent width="760">
       <v-card class="pa-4">
@@ -233,11 +322,12 @@
               <v-col cols="12" md="4">
                 <MoneyField
                   v-model="createForm.precioBase"
-                  label="Precio base"
+                  label="Precio costo"
                   variant="outlined"
                   density="comfortable"
                   :error-messages="createErrors.precioBase"
                   :step="100"
+                  :show-stepper="false"
                   @blur="validateCreateField('precioBase')"
                 />
               </v-col>
@@ -289,6 +379,7 @@
                   density="comfortable"
                   :error-messages="createErrors.precioVentaManual"
                   :step="100"
+                  :show-stepper="false"
                   @blur="validateCreateField('precioVentaManual')"
                 />
               </v-col>
@@ -429,6 +520,51 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="actualizarPrecioDialog" persistent width="520">
+      <v-card>
+        <v-card-title>Actualizar precio del producto</v-card-title>
+        <v-card-text>
+          <v-text-field
+            :model-value="actualizarPrecioForm.nombre"
+            label="Producto"
+            variant="outlined"
+            density="comfortable"
+            readonly
+            class="mb-2"
+          />
+          <v-text-field
+            :model-value="actualizarPrecioForm.sku"
+            label="SKU"
+            variant="outlined"
+            density="comfortable"
+            readonly
+            class="mb-2"
+          />
+          <MoneyField
+            v-model="actualizarPrecioForm.precioBase"
+            label="Precio costo"
+            variant="outlined"
+            density="comfortable"
+            :step="100"
+            :show-stepper="false"
+            class="mb-2"
+          />
+          <MoneyField
+            v-model="actualizarPrecioForm.precioVenta"
+            label="Precio venta"
+            variant="outlined"
+            density="comfortable"
+            :step="100"
+            :show-stepper="false"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="actualizarPrecioLoading" @click="closeActualizarPrecioDialog">Cancelar</v-btn>
+          <v-btn color="primary" :loading="actualizarPrecioLoading" @click="saveActualizarPrecio">Guardar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -438,6 +574,8 @@ import { useTheme } from 'vuetify';
 import MoneyField from '../components/MoneyField.vue';
 import { getJson, postJson, requestJson } from '../services/apiClient';
 import { formatMoney } from '../utils/currency';
+
+const roundMoney = (amount) => Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
 
 const theme = useTheme();
 const isNightMode = computed(() => theme.global.name.value === 'posNightTheme');
@@ -461,8 +599,24 @@ const ignoreAutocompleteSearchEvents = ref(false);
 const cantidadModalDialog = ref(false);
 const cantidadModalProducto = ref(null);
 const cantidadModalQuantity = ref(1);
+const actualizarPrecioDialog = ref(false);
+const actualizarPrecioLoading = ref(false);
+const comboPriceUpdateDialog = ref(false);
+const comboPriceUpdateLoading = ref(false);
+const comboPriceUpdateItems = ref([]);
+const actualizarPrecioForm = reactive({
+  productoId: '',
+  nombre: '',
+  sku: '',
+  precioBase: '',
+  pricingMode: 'FIJO_PCT',
+  margenGananciaPct: null,
+  precioVenta: '',
+  precioVentaOriginal: 0
+});
 const items = ref([]);
-const remitoDraftStorageKey = 'vinedos-remito-ingreso-draft';
+const remitoDraftStorageKey = 'viñedos-remito-ingreso-draft';
+const legacyRemitoDraftStorageKey = 'vinedos-remito-ingreso-draft';
 const createDialog = ref(false);
 const creatingProduct = ref(false);
 const recentlyAddedProductId = ref('');
@@ -520,8 +674,19 @@ const headers = [
   { title: 'Producto', value: 'name' },
   { title: 'Proveedor', value: 'proveedor' },
   { title: 'SKU', value: 'sku' },
+  { title: 'Costo', value: 'precioBase', align: 'end' },
+  { title: 'Venta', value: 'precioVenta', align: 'end' },
   { title: 'Cantidad', value: 'cantidad', width: 180, align: 'center' },
   { title: '', value: 'actions', sortable: false, align: 'end', width: 80 }
+];
+
+const comboPriceUpdateHeaders = [
+  { title: 'Aplicar', value: 'aplicar', sortable: false, width: 90 },
+  { title: 'Combo', value: 'name' },
+  { title: 'SKU', value: 'sku' },
+  { title: 'Precio actual', value: 'precioVentaActual', align: 'end' },
+  { title: 'Precio sugerido', value: 'precioVentaSugerido', align: 'end' },
+  { title: 'Precio objetivo', value: 'precioVentaObjetivo', sortable: false, align: 'end' }
 ];
 
 const pricingModeItems = [
@@ -587,6 +752,119 @@ const extractProblemMessage = (data) => {
   return data.detail || data.title || 'Error inesperado.';
 };
 
+const cancelComboPriceUpdates = () => {
+  comboPriceUpdateDialog.value = false;
+  comboPriceUpdateItems.value = [];
+};
+
+const buildComboPriceUpdateCandidates = async (productoId, nuevoPrecioVenta) => {
+  const productsResp = await getJson('/api/v1/productos?combo=false&activo=true');
+  if (!productsResp.response.ok) {
+    throw new Error(extractProblemMessage(productsResp.data));
+  }
+
+  const productPriceMap = new Map((productsResp.data || []).map((product) => [
+    product.id,
+    Number(product.precioVenta || 0)
+  ]));
+  productPriceMap.set(productoId, Number(nuevoPrecioVenta || 0));
+
+  const combosResp = await getJson('/api/v1/productos?combo=true&activo=true');
+  if (!combosResp.response.ok) {
+    throw new Error(extractProblemMessage(combosResp.data));
+  }
+
+  const impacted = [];
+  for (const combo of (combosResp.data || [])) {
+    const detailResp = await getJson(`/api/v1/productos/${combo.id}`);
+    if (!detailResp.response.ok) {
+      continue;
+    }
+
+    const detail = detailResp.data || {};
+    const itemsCombo = Array.isArray(detail.comboItems) ? detail.comboItems : [];
+    if (!itemsCombo.some((entry) => entry.productoId === productoId)) {
+      continue;
+    }
+
+    const precioBaseSugerido = roundMoney(itemsCombo.reduce((acc, entry) => {
+      const price = Number(productPriceMap.get(entry.productoId) || 0);
+      return acc + (price * Number(entry.cantidad || 0));
+    }, 0));
+
+    const precioVentaActual = Number(detail.precioVenta || 0);
+    const precioVentaSugerido = Math.max(0, roundMoney(precioVentaActual + (precioBaseSugerido - Number(detail.precioBase || 0))));
+
+    if (Math.abs(precioVentaSugerido - precioVentaActual) < 0.01) {
+      continue;
+    }
+
+    impacted.push({
+      id: detail.id,
+      name: detail.name || combo.name || 'Combo',
+      sku: detail.sku || combo.sku || '-',
+      precioVentaActual,
+      precioVentaSugerido,
+      precioVentaObjetivo: precioVentaSugerido,
+      precioBaseSugerido,
+      comboItems: itemsCombo,
+      aplicar: true
+    });
+  }
+
+  return impacted;
+};
+
+const openComboPriceUpdateDialog = (candidates) => {
+  if (!Array.isArray(candidates) || !candidates.length) return;
+
+  const byId = new Map(comboPriceUpdateItems.value.map((item) => [item.id, item]));
+  for (const candidate of candidates) {
+    if (!byId.has(candidate.id)) {
+      byId.set(candidate.id, candidate);
+    }
+  }
+
+  comboPriceUpdateItems.value = Array.from(byId.values());
+  comboPriceUpdateDialog.value = true;
+};
+
+const applyComboPriceUpdates = async () => {
+  const selected = comboPriceUpdateItems.value.filter((item) => item.aplicar);
+  if (!selected.length) {
+    cancelComboPriceUpdates();
+    return;
+  }
+
+  comboPriceUpdateLoading.value = true;
+  try {
+    for (const combo of selected) {
+      const payload = {
+        precioBase: combo.precioBaseSugerido,
+        precioVenta: Math.max(0, Number(combo.precioVentaObjetivo ?? combo.precioVentaSugerido ?? 0)),
+        pricingMode: 'MANUAL',
+        isCombo: true,
+        comboItems: combo.comboItems
+      };
+
+      const { response, data } = await requestJson(`/api/v1/productos/${combo.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        throw new Error(extractProblemMessage(data));
+      }
+    }
+
+    flash('success', 'Precios de combos actualizados');
+    cancelComboPriceUpdates();
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron actualizar los combos.');
+  } finally {
+    comboPriceUpdateLoading.value = false;
+  }
+};
+
 const loadProveedores = async () => {
   loadingProveedores.value = true;
   try {
@@ -609,6 +887,7 @@ const loadProductos = async (search = '') => {
   try {
     const params = new URLSearchParams();
     params.set('activo', 'true');
+    params.set('combo', 'false');
     if (search.trim()) {
       params.set('search', search.trim());
     }
@@ -719,6 +998,101 @@ const closeCantidadModal = () => {
   cantidadModalQuantity.value = 1;
 };
 
+const closeActualizarPrecioDialog = () => {
+  actualizarPrecioDialog.value = false;
+  actualizarPrecioForm.productoId = '';
+  actualizarPrecioForm.nombre = '';
+  actualizarPrecioForm.sku = '';
+  actualizarPrecioForm.precioBase = '';
+  actualizarPrecioForm.pricingMode = 'FIJO_PCT';
+  actualizarPrecioForm.margenGananciaPct = null;
+  actualizarPrecioForm.precioVenta = '';
+  actualizarPrecioForm.precioVentaOriginal = 0;
+};
+
+const openActualizarPrecioDialog = async (productoId) => {
+  if (!productoId) return;
+
+  actualizarPrecioLoading.value = true;
+  try {
+    const { response, data } = await getJson(`/api/v1/productos/${productoId}`);
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    actualizarPrecioForm.productoId = data.id;
+    actualizarPrecioForm.nombre = data.name || '';
+    actualizarPrecioForm.sku = data.sku || '';
+    actualizarPrecioForm.precioBase = Number(data.precioBase || 0).toString();
+    actualizarPrecioForm.pricingMode = data.pricingMode || 'FIJO_PCT';
+    actualizarPrecioForm.margenGananciaPct = data.margenGananciaPct;
+    actualizarPrecioForm.precioVenta = Number(data.precioVenta || 0).toString();
+    actualizarPrecioForm.precioVentaOriginal = Number(data.precioVenta || 0);
+    actualizarPrecioDialog.value = true;
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo cargar el producto.');
+  } finally {
+    actualizarPrecioLoading.value = false;
+  }
+};
+
+const saveActualizarPrecio = async () => {
+  if (!actualizarPrecioForm.productoId || actualizarPrecioLoading.value) return;
+
+  const precioBase = Number(actualizarPrecioForm.precioBase);
+  if (Number.isNaN(precioBase) || precioBase < 0) {
+    flash('error', 'El precio costo debe ser valido.');
+    return;
+  }
+
+  actualizarPrecioLoading.value = true;
+  try {
+    const precioVenta = Number(actualizarPrecioForm.precioVenta);
+    if (Number.isNaN(precioVenta) || precioVenta < 0) {
+      flash('error', 'El precio venta debe ser valido.');
+      return;
+    }
+
+    const payload = {
+      precioBase,
+      precioVenta,
+      pricingMode: actualizarPrecioForm.pricingMode,
+      margenGananciaPct: actualizarPrecioForm.pricingMode === 'FIJO_PCT'
+        ? Number(actualizarPrecioForm.margenGananciaPct || 0)
+        : null
+    };
+
+    const { response, data } = await requestJson(`/api/v1/productos/${actualizarPrecioForm.productoId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    await loadProductos(productSearch.value || '');
+    items.value = items.value.map((item) => item.productoId === actualizarPrecioForm.productoId
+      ? {
+        ...item,
+        precioBase,
+        precioVenta
+      }
+      : item);
+
+    if (Math.abs(precioVenta - Number(actualizarPrecioForm.precioVentaOriginal || 0)) >= 0.01) {
+      const candidates = await buildComboPriceUpdateCandidates(actualizarPrecioForm.productoId, precioVenta);
+      openComboPriceUpdateDialog(candidates);
+    }
+
+    flash('success', 'Precio actualizado');
+    closeActualizarPrecioDialog();
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo actualizar el precio.');
+  } finally {
+    actualizarPrecioLoading.value = false;
+  }
+};
+
 const addProducto = async (producto, qty = 1) => {
   if (!producto) return;
   addingItem.value = true;
@@ -727,12 +1101,16 @@ const addProducto = async (producto, qty = 1) => {
     const existing = items.value.find((i) => i.productoId === producto.id);
     if (existing) {
       existing.cantidad = Math.max(1, Number.parseInt(existing.cantidad, 10) || 1) + normalizedQty;
+      existing.precioBase = Number(producto.precioBase || existing.precioBase || 0);
+      existing.precioVenta = Number(producto.precioVenta || existing.precioVenta || 0);
     } else {
       items.value.push({
         productoId: producto.id,
         name: producto.name,
         proveedor: producto.proveedor || '',
         sku: producto.sku,
+        precioBase: Number(producto.precioBase || 0),
+        precioVenta: Number(producto.precioVenta || 0),
         cantidad: normalizedQty
       });
     }
@@ -772,6 +1150,14 @@ const confirmarAgregarProducto = async () => {
 const removeItem = (productId) => {
   clearRecentAddFeedback();
   items.value = items.value.filter((i) => i.productoId !== productId);
+};
+
+const updatePrecioItem = (productId, field, value) => {
+  const item = items.value.find((i) => i.productoId === productId);
+  if (!item) return;
+
+  const nextValue = Number(value);
+  item[field] = Number.isFinite(nextValue) && nextValue >= 0 ? nextValue : 0;
 };
 
 const incrementCantidad = (productId) => {
@@ -907,7 +1293,7 @@ const validateCreateField = (field) => {
     if (createForm.precioBase === '') {
       createErrors.precioBase = '';
     } else if (Number(createForm.precioBase) < 0 || Number.isNaN(Number(createForm.precioBase))) {
-      createErrors.precioBase = 'Precio base invalido.';
+      createErrors.precioBase = 'Precio costo invalido.';
     } else {
       createErrors.precioBase = '';
     }
@@ -1144,6 +1530,53 @@ const confirmarIngreso = async () => {
 
   saving.value = true;
   try {
+    const productosConPrecio = items.value
+      .map((item) => ({
+        productoId: item.productoId,
+        precioBase: Number(item.precioBase),
+        precioVenta: Number(item.precioVenta)
+      }))
+      .filter((item) => item.productoId);
+
+    const precioVentaActualByProducto = new Map(
+      (productos.value || []).map((p) => [p.id, Number(p.precioVenta || 0)])
+    );
+    const comboCandidatesById = new Map();
+
+    for (const producto of productosConPrecio) {
+      if (Number.isNaN(producto.precioBase) || producto.precioBase < 0) {
+        throw new Error('El precio costo debe ser valido.');
+      }
+
+      if (Number.isNaN(producto.precioVenta) || producto.precioVenta < 0) {
+        throw new Error('El precio venta debe ser valido.');
+      }
+
+      const { response: precioResp, data: precioData } = await requestJson(`/api/v1/productos/${producto.productoId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          precioBase: producto.precioBase,
+          precioVenta: producto.precioVenta,
+          pricingMode: 'MANUAL',
+          margenGananciaPct: null
+        })
+      });
+
+      if (!precioResp.ok) {
+        throw new Error(extractProblemMessage(precioData));
+      }
+
+      const precioVentaActual = precioVentaActualByProducto.get(producto.productoId);
+      if (Number.isFinite(precioVentaActual) && Math.abs(producto.precioVenta - Number(precioVentaActual)) >= 0.01) {
+        const candidates = await buildComboPriceUpdateCandidates(producto.productoId, producto.precioVenta);
+        for (const candidate of candidates) {
+          if (!comboCandidatesById.has(candidate.id)) {
+            comboCandidatesById.set(candidate.id, candidate);
+          }
+        }
+      }
+    }
+
     const payload = {
       tipo: 'AJUSTE',
       motivo,
@@ -1160,6 +1593,7 @@ const confirmarIngreso = async () => {
     }
 
     flash('success', 'Ingreso de productos registrado.');
+    openComboPriceUpdateDialog(Array.from(comboCandidatesById.values()));
     clearForm();
     await loadProveedores();
   } catch (err) {
@@ -1177,6 +1611,8 @@ const saveDraft = () => {
       name: item.name,
       proveedor: item.proveedor || '',
       sku: item.sku,
+      precioBase: Number(item.precioBase || 0),
+      precioVenta: Number(item.precioVenta || 0),
       cantidad: Number(item.cantidad)
     }))
   };
@@ -1184,7 +1620,8 @@ const saveDraft = () => {
 };
 
 const restoreDraft = () => {
-  const raw = localStorage.getItem(remitoDraftStorageKey);
+  const raw = localStorage.getItem(remitoDraftStorageKey)
+    || localStorage.getItem(legacyRemitoDraftStorageKey);
   if (!raw) return;
 
   try {
@@ -1196,11 +1633,19 @@ const restoreDraft = () => {
           name: item.name,
           proveedor: item.proveedor || '',
           sku: item.sku,
+          precioBase: Number(item.precioBase || 0),
+          precioVenta: Number(item.precioVenta || 0),
           cantidad: Number(item.cantidad) > 0 ? Number(item.cantidad) : 1
         }))
       : [];
+
+    if (localStorage.getItem(legacyRemitoDraftStorageKey)) {
+      localStorage.removeItem(legacyRemitoDraftStorageKey);
+      saveDraft();
+    }
   } catch {
     localStorage.removeItem(remitoDraftStorageKey);
+    localStorage.removeItem(legacyRemitoDraftStorageKey);
   }
 };
 

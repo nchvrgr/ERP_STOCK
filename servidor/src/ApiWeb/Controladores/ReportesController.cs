@@ -59,9 +59,10 @@ public sealed class ReportesController : ControllerBase
         [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta,
         [FromQuery] int? top,
+        [FromQuery] string? ordenTop,
         CancellationToken cancellationToken)
     {
-        var resultado = await _servicio.ObtenerTopProductosAsync(desde, hasta, top, cancellationToken);
+        var resultado = await _servicio.ObtenerTopProductosAsync(desde, hasta, top, ordenTop, cancellationToken);
         return Ok(resultado);
     }
 
@@ -83,9 +84,11 @@ public sealed class ReportesController : ControllerBase
     public async Task<ActionResult<ReportTableDto<StockInmovilizadoItemDto>>> StockInmovilizado(
         [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta,
+        [FromQuery] int? minDiasSinMovimiento,
+        [FromQuery] decimal? maxCantidadVendida,
         CancellationToken cancellationToken)
     {
-        var resultado = await _servicio.ObtenerStockInmovilizadoAsync(desde, hasta, cancellationToken);
+        var resultado = await _servicio.ObtenerStockInmovilizadoAsync(desde, hasta, minDiasSinMovimiento, maxCantidadVendida, cancellationToken);
         return Ok(resultado);
     }
 }

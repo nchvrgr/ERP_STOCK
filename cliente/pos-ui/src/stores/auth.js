@@ -81,22 +81,22 @@ const toFirebaseErrorMessage = (error) => {
   const code = error?.code || '';
 
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-    return 'Email o contrasena de suscripcion invalidos.';
+    return 'Email o contraseña de suscripción inválidos.';
   }
 
   if (code === 'auth/user-not-found') {
-    return 'No existe un usuario de suscripcion con ese email.';
+    return 'No existe un usuario de suscripción con ese email.';
   }
 
   if (code === 'auth/invalid-email') {
-    return 'El email de suscripcion no es valido.';
+    return 'El email de suscripción no es válido.';
   }
 
   if (code === 'auth/too-many-requests') {
     return 'Demasiados intentos fallidos. Espera un momento e intenta de nuevo.';
   }
 
-  return 'No se pudo validar la suscripcion en Firebase.';
+  return 'No se pudo validar la suscripción en Firebase.';
 };
 
 export const useAuthStore = defineStore('auth', {

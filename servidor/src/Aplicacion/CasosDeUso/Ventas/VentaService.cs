@@ -437,6 +437,57 @@ public sealed class VentaService
                 .ToArray()
         };
 
+        if (normalized.Facturada == true)
+        {
+            var tipoFactura = string.IsNullOrWhiteSpace(normalized.TipoFactura)
+                ? "B"
+                : normalized.TipoFactura.Trim().ToUpperInvariant();
+
+            if (tipoFactura != "A" && tipoFactura != "B")
+            {
+                throw new ValidationException(
+                    "Validacion fallida.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["tipoFactura"] = new[] { "El tipo de factura debe ser A o B." }
+                    });
+            }
+
+            var cliente = normalized.Cliente;
+            if (tipoFactura == "A")
+            {
+                if (cliente is null || string.IsNullOrWhiteSpace(cliente.Nombre) || string.IsNullOrWhiteSpace(cliente.Cuit))
+                {
+                    throw new ValidationException(
+                        "Validacion fallida.",
+                        new Dictionary<string, string[]>
+                        {
+                            ["cliente"] = new[] { "Para Factura A se requiere nombre y CUIT del cliente." }
+                        });
+                }
+            }
+
+            normalized = normalized with
+            {
+                TipoFactura = tipoFactura,
+                Cliente = cliente is null
+                    ? null
+                    : new VentaClienteFacturaDto(
+                        cliente.Nombre?.Trim() ?? string.Empty,
+                        string.IsNullOrWhiteSpace(cliente.Cuit) ? null : cliente.Cuit.Trim(),
+                        string.IsNullOrWhiteSpace(cliente.Direccion) ? null : cliente.Direccion.Trim(),
+                        string.IsNullOrWhiteSpace(cliente.Telefono) ? null : cliente.Telefono.Trim())
+            };
+        }
+        else
+        {
+            normalized = normalized with
+            {
+                TipoFactura = null,
+                Cliente = null
+            };
+        }
+
         var result = await _repositorioVenta.ConfirmAsync(
             tenantId,
             sucursalId,

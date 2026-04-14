@@ -4,38 +4,53 @@
       <v-row dense class="pos-sales-shell" :class="{ 'is-locked': !cajaAbierta }">
         <v-col cols="12" md="8" class="pos-main-column">
           <v-card class="pos-card pa-4 mb-4 pos-session-card">
-            <div class="d-flex flex-wrap align-center gap-3">
+            <div class="d-flex flex-wrap align-center gap-3 mb-3">
               <div>
                 <div class="text-h6">Venta {{ ventaNumeroDisplay }}</div>
                 <div v-if="!cajaAbierta" class="text-caption text-medium-emphasis">
                   Ventas bloqueadas hasta abrir la caja
                 </div>
               </div>
-              <v-chip
-                class="status-chip"
-                :color="cajaStatus === 'ABIERTA' ? 'success' : 'error'"
-                variant="tonal"
-              >
-                Caja {{ cajaStatus }}
-              </v-chip>
-              <v-spacer />
-              <div class="d-flex flex-wrap align-center gap-3 text-caption text-medium-emphasis pos-session-meta">
-                <div class="d-flex align-center gap-1">
-                  <v-icon size="16">mdi-cash-register</v-icon>
-                  <span>Caja: {{ cajaDisplay }}</span>
-                </div>
-                <div class="d-flex align-center gap-1">
-                  <v-icon size="16">mdi-account</v-icon>
-                  <span>Cajero: {{ cajeroDisplay }}</span>
-                </div>
-                <div class="d-flex align-center gap-1">
-                  <v-icon size="16">mdi-weather-sunset</v-icon>
-                  <span>Turno: {{ turnoDisplay }}</span>
-                </div>
-                <div class="d-flex align-center gap-1">
-                  <v-icon size="16">mdi-clock-outline</v-icon>
-                  <span>Apertura: {{ aperturaDisplay }}</span>
-                </div>
+            </div>
+
+            <div class="pos-ventas-tabs mb-4">
+              <div class="d-flex align-center flex-wrap gap-2">
+                <v-tabs
+                  v-model="activeVentaTabId"
+                  color="primary"
+                  align-tabs="start"
+                  density="comfortable"
+                  class="pos-ventas-tabs-track"
+                >
+                  <v-tab
+                    v-for="(tabItem, index) in ventaTabs"
+                    :key="tabItem.id"
+                    :value="tabItem.id"
+                    class="text-none"
+                  >
+                    <div class="pos-ventas-tab-content">
+                      <span>{{ ventaTabTitle(tabItem, index) }}</span>
+                      <v-btn
+                        v-if="ventaTabs.length > 1"
+                        icon="mdi-close"
+                        size="x-small"
+                        variant="text"
+                        class="pos-ventas-tab-close"
+                        @click.stop="cerrarPestanaVenta(tabItem.id)"
+                      />
+                    </div>
+                  </v-tab>
+                </v-tabs>
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  class="text-none pos-new-sale-btn"
+                  @click="crearPestanaVenta"
+                >
+                  <v-icon start size="16">mdi-plus</v-icon>
+                  Nueva venta
+                </v-btn>
               </div>
             </div>
 
@@ -202,6 +217,17 @@
               Cobrar
             </v-btn>
             <v-btn
+              color="secondary"
+              variant="tonal"
+              class="text-none mt-3 pos-secondary-action"
+              block
+              :disabled="!items.length"
+              @click="generarCotizacionWhatsapp"
+            >
+              <v-icon start>mdi-whatsapp</v-icon>
+              Cotizacion (WhatsApp)
+            </v-btn>
+            <v-btn
               color="error"
               variant="tonal"
               class="text-none mt-3 pos-secondary-action"
@@ -365,6 +391,56 @@
             <v-btn :value="true" class="text-none pos-billing-option">Facturada</v-btn>
             <v-btn :value="false" class="text-none pos-billing-option">No facturada</v-btn>
           </v-btn-toggle>
+
+          <template v-if="facturacionSeleccion">
+            <v-btn-toggle
+              v-model="tipoFacturaSeleccion"
+              mandatory
+              divided
+              class="mb-3 pos-billing-toggle"
+              color="secondary"
+            >
+              <v-btn value="B" class="text-none pos-billing-option">Factura B</v-btn>
+              <v-btn value="A" class="text-none pos-billing-option">Factura A</v-btn>
+            </v-btn-toggle>
+
+            <v-row v-if="tipoFacturaSeleccion === 'A'" dense class="mb-2">
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="clienteFactura.nombre"
+                  label="Nombre cliente"
+                  variant="outlined"
+                  density="comfortable"
+                  required
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="clienteFactura.cuit"
+                  label="CUIT"
+                  variant="outlined"
+                  density="comfortable"
+                  required
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="clienteFactura.telefono"
+                  label="Telefono"
+                  variant="outlined"
+                  density="comfortable"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="clienteFactura.direccion"
+                  label="Direccion"
+                  variant="outlined"
+                  density="comfortable"
+                />
+              </v-col>
+            </v-row>
+          </template>
 
           <v-checkbox
             v-model="imprimirRecibo"
@@ -842,6 +918,7 @@ import { formatMoney, roundMoney } from '../utils/currency';
 const auth = useAuthStore();
 const POS_LAST_CAJA_KEY = 'pos-last-caja-id';
 const CREATE_NEW_CAJA_OPTION_ID = '__create_new_caja__';
+const POS_VENTAS_STATE_KEY = 'pos-ventas-state';
 
 const venta = ref(null);
 const items = ref([]);
@@ -872,6 +949,8 @@ const productoSeleccionado = ref(null);
 const POS_VENTA_KEY = 'pos-venta-id';
 const POS_VENTA_DRAFT_KEY = 'pos-venta-draft';
 const POS_SESSION_META_KEY = 'pos-session-meta';
+const ventaTabs = ref([{ id: 'venta-tab-1', ventaId: '' }]);
+const activeVentaTabId = ref('venta-tab-1');
 const displayVentaNumero = ref(null);
 const cajaNumero = ref('');
 const cajaNombre = ref('');
@@ -887,7 +966,14 @@ const snackbar = ref({
 });
 
 const pagos = ref([]);
-const facturacionSeleccion = ref(true);
+const facturacionSeleccion = ref(false);
+const tipoFacturaSeleccion = ref('B');
+const clienteFactura = reactive({
+  nombre: '',
+  cuit: '',
+  direccion: '',
+  telefono: ''
+});
 const imprimirRecibo = ref(false);
 const MAX_MEDIOS_PAGO = 2;
 const empresaMediosPago = ref(['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'APLICATIVO', 'OTRO']);
@@ -1006,9 +1092,88 @@ const createSessionMeta = (sessionId = '') => ({
 
 const sessionMeta = ref(createSessionMeta());
 
+const createVentaTabId = () => `venta-tab-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+const resolveCurrentTab = () => {
+  const byActive = ventaTabs.value.find((tab) => tab.id === activeVentaTabId.value);
+  if (byActive) return byActive;
+
+  const firstTab = ventaTabs.value[0] || null;
+  if (firstTab) {
+    activeVentaTabId.value = firstTab.id;
+  }
+  return firstTab;
+};
+
+const persistVentaTabs = () => {
+  localStorage.setItem(POS_VENTAS_STATE_KEY, JSON.stringify({
+    activeTabId: activeVentaTabId.value,
+    tabs: ventaTabs.value
+  }));
+};
+
+const syncLegacyVentaStorage = () => {
+  const currentVentaId = activeVentaTab.value?.ventaId || '';
+  if (currentVentaId) {
+    localStorage.setItem(POS_VENTA_KEY, currentVentaId);
+  } else {
+    localStorage.removeItem(POS_VENTA_KEY);
+  }
+};
+
+const loadVentaTabs = () => {
+  try {
+    const raw = localStorage.getItem(POS_VENTAS_STATE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const parsedTabs = Array.isArray(parsed?.tabs) ? parsed.tabs : [];
+    const tabs = parsedTabs
+      .map((item) => ({
+        id: String(item?.id || '').trim(),
+        ventaId: String(item?.ventaId || '').trim()
+      }))
+      .filter((item) => item.id);
+
+    if (!tabs.length) return;
+
+    ventaTabs.value = tabs;
+    activeVentaTabId.value = tabs.some((tab) => tab.id === parsed?.activeTabId)
+      ? parsed.activeTabId
+      : tabs[0].id;
+    syncLegacyVentaStorage();
+  } catch {
+    // Ignora estado local invalido.
+  }
+};
+
+const ventaTabTitle = (tabItem, index) => {
+  const hotkey = `F${index + 1}`;
+  return tabItem.ventaId ? `${hotkey} · Venta` : `${hotkey} · Nueva`;
+};
+
+const clearVentaStateOnly = () => {
+  venta.value = null;
+  items.value = [];
+  pricing.value = null;
+  discountPct.value = '0';
+  qtyEdits.value = {};
+  pagos.value = [];
+  facturacionSeleccion.value = false;
+  resetFacturaCliente();
+  imprimirRecibo.value = false;
+  productoSeleccionado.value = null;
+  productosEncontrados.value = [];
+  scanInput.value = '';
+  dialogPagos.value = false;
+  dialogStock.value = false;
+  resetStockAjusteFlow();
+};
+
 const ventaId = computed(() => venta.value?.id || '');
 const ventaEstado = computed(() => venta.value?.estado || 'SIN_VENTA');
 const canEdit = computed(() => ventaEstado.value === 'BORRADOR');
+const activeVentaTab = computed(() => ventaTabs.value.find((tab) => tab.id === activeVentaTabId.value) || null);
 const cajaAbierta = computed(() => cajaStatus.value === 'ABIERTA');
 const canScan = computed(() => cajaAbierta.value && (ventaEstado.value === 'BORRADOR' || ventaEstado.value === 'SIN_VENTA'));
 const cajaDisplay = computed(() => cajaNumero.value || 'n/a');
@@ -1059,6 +1224,9 @@ const canConfirm = computed(() => {
   if (totalNeto.value < 0) return false;
   if (Math.abs(diferenciaPagos.value) > 0.0001) return false;
   if (facturacionSeleccion.value === null) return false;
+  if (facturacionSeleccion.value === true && tipoFacturaSeleccion.value === 'A') {
+    if (!clienteFactura.nombre.trim() || !clienteFactura.cuit.trim()) return false;
+  }
   return true;
 });
 const canSaveAbrirCaja = computed(() => {
@@ -1143,7 +1311,12 @@ const loadCajaSession = () => {
 
 const saveVentaId = (id) => {
   if (!id) return;
-  localStorage.setItem(POS_VENTA_KEY, id);
+  const tab = resolveCurrentTab();
+  if (tab) {
+    tab.ventaId = id;
+  }
+  syncLegacyVentaStorage();
+  persistVentaTabs();
 };
 
 const normalizeDiscountPct = (value) => {
@@ -1211,7 +1384,12 @@ const clearVentaDraft = () => {
 };
 
 const clearVentaId = () => {
-  localStorage.removeItem(POS_VENTA_KEY);
+  const tab = resolveCurrentTab();
+  if (tab) {
+    tab.ventaId = '';
+  }
+  syncLegacyVentaStorage();
+  persistVentaTabs();
   clearVentaDraft();
 };
 
@@ -1286,22 +1464,96 @@ const advanceVentaNumber = () => {
 };
 
 const resetVentaWorkspace = () => {
-  venta.value = null;
-  items.value = [];
-  pricing.value = null;
-  discountPct.value = '0';
-  qtyEdits.value = {};
-  pagos.value = [];
-  facturacionSeleccion.value = true;
-  imprimirRecibo.value = false;
-  productoSeleccionado.value = null;
-  productosEncontrados.value = [];
-  scanInput.value = '';
-  dialogPagos.value = false;
-  dialogStock.value = false;
-  resetStockAjusteFlow();
-  clearVentaId();
+  ventaTabs.value = [{ id: 'venta-tab-1', ventaId: '' }];
+  activeVentaTabId.value = 'venta-tab-1';
+  clearVentaStateOnly();
+  localStorage.removeItem(POS_VENTA_KEY);
+  clearVentaDraft();
+  persistVentaTabs();
   refreshDisplayVentaNumero();
+};
+
+const switchToVentaTab = async (tabId) => {
+  const tabItem = ventaTabs.value.find((tab) => tab.id === tabId);
+  if (!tabItem) return;
+
+  activeVentaTabId.value = tabId;
+  syncLegacyVentaStorage();
+  persistVentaTabs();
+
+  if (!tabItem.ventaId) {
+    clearVentaStateOnly();
+    refreshDisplayVentaNumero();
+    focusScan();
+    return;
+  }
+
+  await restoreVenta(tabItem.ventaId);
+  focusScan();
+};
+
+const crearPestanaVenta = async () => {
+  const newTab = { id: createVentaTabId(), ventaId: '' };
+  ventaTabs.value.push(newTab);
+  await switchToVentaTab(newTab.id);
+};
+
+const cerrarPestanaVenta = async (tabId) => {
+  const index = ventaTabs.value.findIndex((tab) => tab.id === tabId);
+  if (index < 0) return;
+  if (ventaTabs.value.length === 1) {
+    flash('error', 'Debe quedar al menos una pestaña de venta abierta.');
+    return;
+  }
+
+  const wasActive = activeVentaTabId.value === tabId;
+  ventaTabs.value.splice(index, 1);
+
+  if (wasActive) {
+    const nextTab = ventaTabs.value[Math.max(0, index - 1)] || ventaTabs.value[0];
+    if (nextTab) {
+      await switchToVentaTab(nextTab.id);
+    }
+  } else {
+    persistVentaTabs();
+  }
+};
+
+const cerrarVentaActiva = async () => {
+  const currentTab = resolveCurrentTab();
+  if (!currentTab) {
+    clearVentaStateOnly();
+    clearVentaDraft();
+    persistVentaTabs();
+    refreshDisplayVentaNumero();
+    return;
+  }
+
+  if (ventaTabs.value.length > 1) {
+    await cerrarPestanaVenta(currentTab.id);
+    return;
+  }
+
+  currentTab.ventaId = '';
+  clearVentaStateOnly();
+  clearVentaDraft();
+  syncLegacyVentaStorage();
+  persistVentaTabs();
+  refreshDisplayVentaNumero();
+};
+
+const handleVentasHotkeys = (event) => {
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (!event.key?.startsWith('F')) return;
+
+  const number = Number(event.key.slice(1));
+  if (!Number.isInteger(number) || number < 1 || number > 9) return;
+
+  const tabItem = ventaTabs.value[number - 1];
+  if (!tabItem) return;
+
+  event.preventDefault();
+  switchToVentaTab(tabItem.id);
 };
 
 const resetCierreCajaForm = () => {
@@ -1794,7 +2046,8 @@ const createVenta = async () => {
     pricing.value = null;
     discountPct.value = '0';
     pagos.value = [];
-    facturacionSeleccion.value = true;
+    facturacionSeleccion.value = false;
+    resetFacturaCliente();
     imprimirRecibo.value = false;
     persistVentaDraft();
     flash('success', 'Venta creada');
@@ -1806,13 +2059,16 @@ const createVenta = async () => {
   }
 };
 
-const restoreVenta = async () => {
+const restoreVenta = async (forcedVentaId = '') => {
   if (!cajaSessionId.value) {
     resetVentaWorkspace();
     return;
   }
-  const savedId = localStorage.getItem(POS_VENTA_KEY);
-  if (!savedId) return;
+  const savedId = forcedVentaId || activeVentaTab.value?.ventaId || localStorage.getItem(POS_VENTA_KEY);
+  if (!savedId) {
+    clearVentaStateOnly();
+    return;
+  }
 
   try {
     const { response, data } = await getJson(`/api/v1/ventas/${savedId}`);
@@ -1856,6 +2112,7 @@ const restoreVenta = async () => {
     refreshDisplayVentaNumero();
   } catch {
     clearVentaId();
+    clearVentaStateOnly();
     refreshDisplayVentaNumero();
   }
 };
@@ -2248,6 +2505,14 @@ const syncPagosBase = () => {
   }
 };
 
+const resetFacturaCliente = () => {
+  tipoFacturaSeleccion.value = 'B';
+  clienteFactura.nombre = '';
+  clienteFactura.cuit = '';
+  clienteFactura.direccion = '';
+  clienteFactura.telefono = '';
+};
+
 watch(
   [pagos, totalNeto],
   () => {
@@ -2258,7 +2523,8 @@ watch(
 
 const openPagos = () => {
   dialogPagos.value = true;
-  facturacionSeleccion.value = true;
+  facturacionSeleccion.value = false;
+  resetFacturaCliente();
   imprimirRecibo.value = false;
   ensurePagoBase();
   syncPagosBase();
@@ -2275,6 +2541,12 @@ const openAbrirCajaDialog = async () => {
 
 const openCerrarCajaDialog = async () => {
   if (!cajaAbierta.value || !cajaSessionId.value || cierreResumenLoading.value) return;
+
+  const hasOpenVentas = ventaTabs.value.some((tab) => Boolean(tab.ventaId));
+  if (hasOpenVentas) {
+    flash('error', 'Antes de cerrar caja, cerra todas las ventas abiertas (pestañas F1-F9).');
+    return;
+  }
 
   dialogCerrarCaja.value = true;
   resetCierreCajaForm();
@@ -2439,13 +2711,28 @@ const confirmarVenta = async () => {
       flash('error', 'Selecciona si la venta es facturada o no facturada.');
       return;
     }
+    if (facturacionSeleccion.value === true && tipoFacturaSeleccion.value === 'A') {
+      if (!clienteFactura.nombre.trim() || !clienteFactura.cuit.trim()) {
+        flash('error', 'Para Factura A completa nombre y CUIT del cliente.');
+        return;
+      }
+    }
     loadCajaSession();
     const payload = {
       pagos: pagos.value
         .filter((line) => line.medioPago && line.monto > 0)
         .map((line) => ({ medioPago: line.medioPago, monto: roundMoney(line.monto) })),
       cajaSesionId: cajaSessionId.value || null,
-      facturada: facturacionSeleccion.value
+      facturada: facturacionSeleccion.value,
+      tipoFactura: facturacionSeleccion.value ? tipoFacturaSeleccion.value : null,
+      cliente: facturacionSeleccion.value && tipoFacturaSeleccion.value === 'A'
+        ? {
+            nombre: clienteFactura.nombre.trim(),
+            cuit: clienteFactura.cuit.trim(),
+            direccion: clienteFactura.direccion.trim() || null,
+            telefono: clienteFactura.telefono.trim() || null
+          }
+        : null
     };
 
     const { response, data } = await postJson(`/api/v1/ventas/${ventaId.value}/confirmar`, payload);
@@ -2475,21 +2762,38 @@ const confirmarVenta = async () => {
     }
     flash('success', 'Venta confirmada');
     advanceVentaNumber();
-    // limpiar para nueva venta
-    venta.value = null;
-    items.value = [];
-    qtyEdits.value = {};
-    pricing.value = null;
-    discountPct.value = '0';
+    await cerrarVentaActiva();
+    clearVentaStateOnly();
+    clearVentaDraft();
     cajaStatus.value = 'ABIERTA';
     dialogPagos.value = false;
     pagos.value = [];
-    facturacionSeleccion.value = true;
+    facturacionSeleccion.value = false;
+    resetFacturaCliente();
     imprimirRecibo.value = false;
     resetProductInput();
     focusScan();
   } catch (err) {
-    flash('error', err?.message || 'Error al confirmar venta.');
+    const message = String(err?.message || 'Error al confirmar venta.');
+    if (ventaIdActual && /no esta en borrador|no está en borrador|ya confirm/i.test(message)) {
+      const { response: ventaResponse, data: ventaData } = await getJson(`/api/v1/ventas/${ventaIdActual}`);
+      const estado = String(ventaData?.estado || ventaData?.Estado || '').toUpperCase();
+      if (ventaResponse.ok && estado === 'CONFIRMADA') {
+        flash('success', 'Venta confirmada');
+        await cerrarVentaActiva();
+        clearVentaStateOnly();
+        clearVentaDraft();
+        dialogPagos.value = false;
+        pagos.value = [];
+        facturacionSeleccion.value = false;
+        resetFacturaCliente();
+        imprimirRecibo.value = false;
+        resetProductInput();
+        focusScan();
+        return;
+      }
+    }
+    flash('error', message);
   } finally {
     confirmLoading.value = false;
   }
@@ -2546,6 +2850,11 @@ const printTicket = (ventaData, pagosData) => {
   const win = window.open('', '_blank', 'width=380,height=600');
   if (!win) return;
   const esFacturada = (ventaData.facturada ?? ventaData.Facturada) === true;
+  const tipoFactura = ventaData.tipoFactura ?? ventaData.TipoFactura ?? 'B';
+  const clienteNombre = ventaData.clienteNombre ?? ventaData.ClienteNombre ?? '';
+  const clienteCuit = ventaData.clienteCuit ?? ventaData.ClienteCuit ?? '';
+  const clienteDireccion = ventaData.clienteDireccion ?? ventaData.ClienteDireccion ?? '';
+  const clienteTelefono = ventaData.clienteTelefono ?? ventaData.ClienteTelefono ?? '';
 
   const itemsRows = (ventaData.items || [])
     .map((item) => {
@@ -2594,7 +2903,11 @@ const printTicket = (ventaData, pagosData) => {
         <h1>Ticket de venta</h1>
         <div>Venta Nro: ${ventaData.numero ?? ventaData.Numero ?? '-'}</div>
         <div>Fecha: ${formatDateTime(ventaData.createdAt)}</div>
-        <div>Facturacion: ${esFacturada ? 'FACTURADA' : 'NO FACTURADA'}</div>
+        <div>Facturacion: ${esFacturada ? `FACTURADA (${tipoFactura})` : 'NO FACTURADA'}</div>
+        ${esFacturada && tipoFactura === 'A' ? `<div>Cliente: ${clienteNombre || '-'}</div>` : ''}
+        ${esFacturada && tipoFactura === 'A' ? `<div>CUIT: ${clienteCuit || '-'}</div>` : ''}
+        ${esFacturada && tipoFactura === 'A' && clienteDireccion ? `<div>Direccion: ${clienteDireccion}</div>` : ''}
+        ${esFacturada && tipoFactura === 'A' && clienteTelefono ? `<div>Telefono: ${clienteTelefono}</div>` : ''}
         <table>
           <thead>
             <tr>
@@ -2642,6 +2955,42 @@ const openDesktopTicketPreview = async (html) => {
 const handleTicketPreviewMessage = (event) => {
   if (event?.data?.type !== 'pos-open-ticket-preview') return;
   openDesktopTicketPreview(event.data.html);
+};
+
+const buildCotizacionWhatsappText = () => {
+  const lines = items.value.map((item) => {
+    const subtotal = item.subtotal ?? (item.cantidad * item.precioUnitario);
+    return `- ${item.nombre} x${item.cantidad} = ${formatMoney(subtotal)}`;
+  });
+
+  return [
+    'Cotizacion - Viñedo de la Villa',
+    `Fecha: ${new Date().toLocaleString('es-AR', { hour12: false })}`,
+    '',
+    ...lines,
+    '',
+    `Total estimado: ${formatMoney(totalNeto.value)}`
+  ].join('\n');
+};
+
+const generarCotizacionWhatsapp = async () => {
+  if (!items.value.length) {
+    flash('error', 'Agrega productos para generar la cotizacion.');
+    return;
+  }
+
+  const message = buildCotizacionWhatsappText();
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(message);
+    }
+  } catch {
+    // Si falla clipboard, igual se abre WhatsApp.
+  }
+
+  const encoded = encodeURIComponent(message);
+  window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
+  flash('success', 'Cotizacion lista para enviar por WhatsApp.');
 };
 
 watch(dialogPagos, (open) => {
@@ -2706,6 +3055,11 @@ watch(dialogCerrarCaja, (open) => {
   }
 });
 
+watch(activeVentaTabId, (nextTabId) => {
+  if (!nextTabId) return;
+  switchToVentaTab(nextTabId);
+});
+
 const handleCajaSessionChanged = () => {
   loadCajaSession();
   if (!cajaSessionId.value) {
@@ -2715,23 +3069,26 @@ const handleCajaSessionChanged = () => {
     loadResumenCaja();
   }
   if (cajaSessionId.value) {
-    restoreVenta();
+    switchToVentaTab(activeVentaTabId.value);
     focusScan();
   }
 };
 
 onMounted(async () => {
+  loadVentaTabs();
   await loadEmpresaPagoConfig();
   loadCajaSession();
-  restoreVenta();
+  await switchToVentaTab(activeVentaTabId.value);
   focusScan();
   window.addEventListener('pos-caja-session-changed', handleCajaSessionChanged);
   window.addEventListener('message', handleTicketPreviewMessage);
+  window.addEventListener('keydown', handleVentasHotkeys);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('pos-caja-session-changed', handleCajaSessionChanged);
   window.removeEventListener('message', handleTicketPreviewMessage);
+  window.removeEventListener('keydown', handleVentasHotkeys);
 });
 </script>
 
@@ -2747,6 +3104,32 @@ onBeforeUnmount(() => {
 
 .pos-search {
   min-width: 280px;
+}
+
+.pos-ventas-tabs {
+  border: 1px solid var(--pos-border);
+  border-radius: 14px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--pos-card-soft) 88%, transparent);
+}
+
+.pos-ventas-tabs-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.pos-new-sale-btn {
+  margin-inline-start: auto;
+}
+
+.pos-ventas-tab-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pos-ventas-tab-close {
+  margin-inline-start: 2px;
 }
 
 .pos-main-column,
@@ -2929,10 +3312,6 @@ onBeforeUnmount(() => {
   background: var(--pos-primary-btn-bg) !important;
   color: var(--pos-primary-btn-text) !important;
   box-shadow: var(--pos-primary-btn-shadow);
-}
-
-.pos-session-meta {
-  justify-content: flex-end;
 }
 
 .pos-totals-card {

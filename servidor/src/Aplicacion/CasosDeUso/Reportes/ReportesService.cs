@@ -106,6 +106,7 @@ public sealed class ReportesService
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
         int? top,
+        string? ordenTop,
         CancellationToken cancellationToken)
     {
         (desde, hasta) = NormalizarRangoAUtc(desde, hasta);
@@ -125,7 +126,11 @@ public sealed class ReportesService
         var tenantId = AsegurarTenant();
         var sucursalId = AsegurarSucursal();
 
-        var datos = await _repositorio.GetTopProductosAsync(tenantId, sucursalId, desde, hasta, topFinal, cancellationToken);
+        var ordenNormalizado = string.Equals(ordenTop, "cantidad", StringComparison.OrdinalIgnoreCase)
+            ? "cantidad"
+            : "monto";
+
+        var datos = await _repositorio.GetTopProductosAsync(tenantId, sucursalId, desde, hasta, topFinal, ordenNormalizado, cancellationToken);
         return new ReportTableDto<TopProductoItemDto>(datos);
     }
 
@@ -147,6 +152,8 @@ public sealed class ReportesService
     public async Task<ReportTableDto<StockInmovilizadoItemDto>> ObtenerStockInmovilizadoAsync(
         DateTimeOffset? desde,
         DateTimeOffset? hasta,
+        int? minDiasSinMovimiento,
+        decimal? maxCantidadVendida,
         CancellationToken cancellationToken)
     {
         (desde, hasta) = NormalizarRangoAUtc(desde, hasta);
@@ -155,7 +162,29 @@ public sealed class ReportesService
         var tenantId = AsegurarTenant();
         var sucursalId = AsegurarSucursal();
 
-        var datos = await _repositorio.GetStockInmovilizadoAsync(tenantId, sucursalId, desde, hasta, cancellationToken);
+        var minDias = minDiasSinMovimiento ?? 30;
+        if (minDias < 1)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["minDiasSinMovimiento"] = new[] { "El minimo de dias debe ser mayor o igual a 1." }
+                });
+        }
+
+        var maxCantidad = maxCantidadVendida ?? 0m;
+        if (maxCantidad < 0)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["maxCantidadVendida"] = new[] { "La cantidad maxima vendida no puede ser negativa." }
+                });
+        }
+
+        var datos = await _repositorio.GetStockInmovilizadoAsync(tenantId, sucursalId, desde, hasta, minDias, maxCantidad, cancellationToken);
         return new ReportTableDto<StockInmovilizadoItemDto>(datos);
     }
 
