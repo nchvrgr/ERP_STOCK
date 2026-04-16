@@ -29,11 +29,13 @@
           >
             <template #append>
               <span
-                v-if="isStockMenuItem(item) && stockAlerts.hasAlerts"
-                :class="['stock-alert-dot', `stock-alert-dot--${stockAlertMeta.color}`]"
-                :title="stockAlertMeta.label"
-                :aria-label="stockAlertMeta.label"
-              ></span>
+                v-if="isStockMenuItem(item) && hasStockCriticalAlerts"
+                :class="['stock-alert-dot', 'stock-alert-dot--badge', 'stock-alert-dot--error']"
+                title="Críticas"
+                aria-label="Críticas"
+              >
+                {{ stockCriticalAlertCountLabel }}
+              </span>
             </template>
           </v-list-item>
         </v-list>
@@ -221,7 +223,11 @@ const currentTitle = computed(() => {
   return match ? match.title : 'Caja';
 });
 
-const stockAlertMeta = computed(() => stockAlerts.chipMeta);
+const stockCriticalAlertCount = computed(() => Number(stockAlerts.countsByLevel?.CRITICO ?? 0));
+const hasStockCriticalAlerts = computed(() => stockCriticalAlertCount.value > 0);
+const stockCriticalAlertCountLabel = computed(() =>
+  stockCriticalAlertCount.value > 99 ? '99+' : String(stockCriticalAlertCount.value || 0)
+);
 
 const POS_CAJA_SESSION_KEY = 'pos-caja-session';
 
@@ -439,6 +445,20 @@ const logout = () => {
   border-radius: 999px;
   display: inline-block;
   flex: 0 0 12px;
+}
+
+.stock-alert-dot--badge {
+  width: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--pos-ink-strong);
 }
 
 .stock-alert-dot--warning {

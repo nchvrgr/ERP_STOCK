@@ -1,6 +1,6 @@
 <template>
   <div class="remitos-page">
-    <v-card class="pos-card pa-4">
+    <v-card class="pos-card pa-4 remitos-main-card">
       <div class="d-flex align-center gap-3">
         <div>
           <div class="text-h6">Ingreso manual de remito</div>
@@ -36,7 +36,7 @@
         </v-col>
       </v-row>
 
-      <v-row dense>
+      <v-row dense class="align-start">
         <v-col cols="12" md="8">
           <v-autocomplete
             :key="productoInputKey"
@@ -68,18 +68,6 @@
             </template>
           </v-autocomplete>
         </v-col>
-        <v-col cols="12" md="4" class="d-flex align-center">
-          <v-btn
-            color="secondary"
-            variant="tonal"
-            class="text-none"
-            prepend-icon="mdi-currency-usd"
-            :disabled="!selectedProductoId"
-            @click="openActualizarPrecioDialog(selectedProductoId)"
-          >
-            Actualizar precio
-          </v-btn>
-        </v-col>
       </v-row>
 
       <div v-if="recentAddMessage" class="remitos-add-feedback">
@@ -95,6 +83,8 @@
         item-key="productoId"
         density="compact"
         height="360"
+        :items-per-page="-1"
+        hide-default-footer
       >
         <template v-slot:[`header.feedback`]>
           <div class="remitos-marker-column" />
@@ -112,28 +102,6 @@
         </template>
         <template v-slot:[`item.name`]="{ item }">
           <span>{{ getTableItemData(item).name }}</span>
-        </template>
-        <template v-slot:[`item.precioBase`]="{ item }">
-          <MoneyField
-            :model-value="getTableItemData(item).precioBase"
-            variant="outlined"
-            density="compact"
-            hide-details
-            :step="100"
-            :show-stepper="false"
-            @update:model-value="(value) => updatePrecioItem(getTableItemData(item).productoId, 'precioBase', value)"
-          />
-        </template>
-        <template v-slot:[`item.precioVenta`]="{ item }">
-          <MoneyField
-            :model-value="getTableItemData(item).precioVenta"
-            variant="outlined"
-            density="compact"
-            hide-details
-            :step="100"
-            :show-stepper="false"
-            @update:model-value="(value) => updatePrecioItem(getTableItemData(item).productoId, 'precioVenta', value)"
-          />
         </template>
         <template v-slot:[`item.cantidad`]="{ item }">
           <div class="quantity-stepper">
@@ -674,8 +642,6 @@ const headers = [
   { title: 'Producto', value: 'name' },
   { title: 'Proveedor', value: 'proveedor' },
   { title: 'SKU', value: 'sku' },
-  { title: 'Costo', value: 'precioBase', align: 'end' },
-  { title: 'Venta', value: 'precioVenta', align: 'end' },
   { title: 'Cantidad', value: 'cantidad', width: 180, align: 'center' },
   { title: '', value: 'actions', sortable: false, align: 'end', width: 80 }
 ];
@@ -1691,6 +1657,10 @@ watch(
 <style scoped>
 .remitos-page {
   animation: fade-in 0.3s ease;
+}
+
+.remitos-main-card {
+  margin-top: 10px;
 }
 
 .remitos-action-btn {

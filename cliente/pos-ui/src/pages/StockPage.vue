@@ -5,11 +5,13 @@
       <v-tab value="alertas">
         <span>Alertas</span>
         <span
-          v-if="showGlobalAlertChip"
-          :class="['stock-alert-dot', `stock-alert-dot--${globalAlertMeta.color}`]"
-          :title="globalAlertMeta.label"
-          :aria-label="globalAlertMeta.label"
-        ></span>
+          v-if="showGlobalCriticalAlert"
+          :class="['stock-alert-dot', 'stock-alert-dot--badge', 'stock-alert-dot--error']"
+          title="Críticas"
+          aria-label="Críticas"
+        >
+          {{ globalCriticalAlertCountLabel }}
+        </span>
       </v-tab>
     </v-tabs>
 
@@ -24,8 +26,8 @@
             Modificá la cantidad, guardá el motivo y el sistema dejará el ajuste asentado.
           </div>
 
-          <v-row dense class="mt-2 stock-adjust-row">
-            <v-col cols="12" md="4">
+          <v-row dense class="mt-2 align-end stock-adjust-row">
+            <v-col cols="12" md="3">
               <v-autocomplete
                 v-model="ajusteProducto"
                 :items="ajusteItems"
@@ -61,7 +63,7 @@
                 :error-messages="ajusteErrors.cantidad"
               />
             </v-col>
-            <v-col cols="12" md="4">
+            <v-col cols="12" md="3">
               <v-text-field
                 v-model="ajusteMotivo"
                 label="Motivo"
@@ -70,18 +72,17 @@
                 :error-messages="ajusteErrors.motivo"
               />
             </v-col>
+            <v-col cols="12" md="2" class="d-flex align-end">
+              <v-btn
+                color="primary"
+                class="text-none w-100 alert-action-btn"
+                :loading="ajusteSaving"
+                @click="aplicarAjuste"
+              >
+                Guardar ajuste
+              </v-btn>
+            </v-col>
           </v-row>
-
-          <div class="d-flex justify-end mt-2">
-            <v-btn
-              color="primary"
-              class="text-none"
-              :loading="ajusteSaving"
-              @click="aplicarAjuste"
-            >
-              Guardar ajuste
-            </v-btn>
-          </div>
 
           <v-divider class="my-4" />
 
@@ -159,54 +160,60 @@
       </v-window-item>
 
       <v-window-item value="alertas" class="stock-window-item">
-        <v-card class="pos-card pa-4 stock-list-card">
-          <div class="d-flex flex-wrap align-center gap-3 mb-4">
+        <v-card class="pos-card pa-4 stock-list-card stock-list-card--alert">
+          <div class="d-flex flex-wrap align-center gap-3 mb-1">
             <div class="text-h6">Alertas de stock</div>
-            <span
-              v-if="showPageAlertChip"
-              :class="['stock-alert-dot', `stock-alert-dot--${pageAlertMeta.color}`]"
-              :title="pageAlertMeta.label"
-              :aria-label="pageAlertMeta.label"
-            ></span>
           </div>
-          <div class="d-flex flex-wrap align-center gap-3">
-            <v-autocomplete
-              v-model="alertaProveedor"
-              :items="proveedoresLookup"
-              item-title="label"
-              return-object
-              clearable
-              label="Proveedor"
-              variant="outlined"
-              density="comfortable"
-              :loading="proveedorLoading"
-              style="min-width: 260px"
-              @update:search="searchProveedores"
-            />
-            <v-btn
-              color="primary"
-              variant="tonal"
-              class="text-none"
-              :loading="alertasLoading"
-              @click="loadAlertas"
-            >
-              Actualizar
-            </v-btn>
-            <v-btn
-              color="primary"
-              class="text-none"
-              :disabled="!alertas.length"
-              @click="openRemito"
-            >
-              Generar remito
-            </v-btn>
+          <div class="text-caption text-medium-emphasis stock-alert-breakdown mb-3">
+            Críticas: {{ pageCriticalAlertCount }} | Medias: {{ pageMediumAlertCount }} | Bajas: {{ pageLowAlertCount }}
           </div>
+          <v-row dense class="alert-toolbar">
+            <v-col cols="12" md="8">
+              <v-autocomplete
+                v-model="alertaProveedor"
+                :items="proveedoresLookup"
+                item-title="label"
+                return-object
+                clearable
+                label="Proveedor"
+                variant="outlined"
+                density="comfortable"
+                :loading="proveedorLoading"
+                hide-details
+                @update:search="searchProveedores"
+              />
+            </v-col>
+            <v-col cols="12" sm="6" md="2" class="d-flex">
+              <v-btn
+                color="primary"
+                variant="tonal"
+                class="text-none w-100 alert-action-btn"
+                :loading="alertasLoading"
+                @click="loadAlertas"
+              >
+                Actualizar
+              </v-btn>
+            </v-col>
+            <v-col cols="12" sm="6" md="2" class="d-flex">
+              <v-btn
+                color="primary"
+                class="text-none w-100 alert-action-btn"
+                :disabled="!alertas.length"
+                @click="openRemito"
+              >
+                Generar remito
+              </v-btn>
+            </v-col>
+          </v-row>
 
-          <v-list density="compact" class="mt-3 stock-alert-list">
+          <v-list density="compact" class="stock-alert-list">
             <v-list-item v-for="alerta in alertas" :key="alerta.productoId">
               <v-list-item-title>{{ alerta.nombre }}</v-list-item-title>
               <v-list-item-subtitle>
-                Stock: {{ alerta.cantidadActual }} / Min: {{ alerta.stockMinimo }} / Deseado: {{ alerta.stockDeseado }}
+                Stock: {{ formatCantidad(alerta.cantidadActual) }} | Min: {{ formatCantidad(alerta.stockMinimo) }} |
+                <span :class="['stock-alert-gap', `stock-alert-gap--${getAlertColor(getAlertaNivel(alerta))}`]">
+                  {{ getAlertaEstadoTexto(alerta) }}
+                </span>
                 <div class="text-caption text-medium-emphasis">
                   Proveedor: {{ alerta.proveedor || 'SIN PROVEEDOR' }}
                 </div>
@@ -215,10 +222,10 @@
                 <v-chip
                   size="small"
                   class="status-chip"
-                  :color="alerta.nivel === 'CRITICO' ? 'error' : 'warning'"
+                  :color="getAlertColor(getAlertaNivel(alerta))"
                   variant="outlined"
                 >
-                  {{ alerta.nivel }}
+                  {{ getAlertaNivel(alerta) }}
                 </v-chip>
               </template>
             </v-list-item>
@@ -248,9 +255,12 @@
           <div class="remito-preview-list">
             <div v-for="item in remitoItems" :key="item.productoId" class="remito-preview-row">
               <div>
-                <div class="remito-preview-row__title">{{ item.nombre }} ({{ item.sku }})</div>
+                <div class="remito-preview-row__title-wrap">
+                  <span :class="['remito-alert-dot', `remito-alert-dot--${getAlertColor(item.nivel)}`]" />
+                  <div class="remito-preview-row__title">{{ item.nombre }} ({{ item.sku }})</div>
+                </div>
                 <div class="text-caption text-medium-emphasis">
-                  Actual: {{ item.cantidadActual }} / Deseado: {{ item.stockDeseado }}
+                  Actual: {{ item.cantidadActual }} / Mínimo: {{ item.stockMinimo }}
                 </div>
                 <div class="text-caption text-medium-emphasis">
                   Proveedor: {{ item.proveedor || 'SIN PROVEEDOR' }}
@@ -314,8 +324,13 @@ import { buildApiUrl, getJson, postJson } from '../services/apiClient';
 import { getTicketWindowStyles } from '../theme/printStyles';
 import { formatMoney } from '../utils/currency';
 import {
-  getHighestStockAlertLevel,
+  resolveStockAlertLevel,
+  summarizeStockAlerts,
+  getStockAlertDistanceToMinimum,
+  getStockAlertMissingUnits,
   getStockAlertMeta,
+  isApproachingStockAlertLevel,
+  isActionableStockAlert,
   useStockAlertsStore
 } from '../stores/stockAlerts';
 
@@ -370,14 +385,20 @@ const saldoHeaders = [
   { title: 'Cantidad', value: 'cantidadActual', align: 'end' }
 ];
 
-const globalAlertMeta = computed(() => stockAlerts.chipMeta);
-const showGlobalAlertChip = computed(() => stockAlerts.hasAlerts);
-const pageAlertLevel = computed(() =>
-  alertasLoaded.value ? getHighestStockAlertLevel(alertas.value) : stockAlerts.highestLevel
+const globalCriticalAlertCount = computed(() => Number(stockAlerts.countsByLevel?.CRITICO ?? 0));
+const showGlobalCriticalAlert = computed(() => globalCriticalAlertCount.value > 0);
+const globalCriticalAlertCountLabel = computed(() =>
+  globalCriticalAlertCount.value > 99 ? '99+' : String(globalCriticalAlertCount.value || 0)
 );
-const pageAlertCount = computed(() => (alertasLoaded.value ? alertas.value.length : stockAlerts.count));
-const pageAlertMeta = computed(() => getStockAlertMeta(pageAlertLevel.value));
-const showPageAlertChip = computed(() => pageAlertCount.value > 0 && !!pageAlertLevel.value);
+const pageAlertSummary = computed(() =>
+  alertasLoaded.value ? summarizeStockAlerts(alertas.value) : summarizeStockAlerts([])
+);
+const pageAlertCounts = computed(() =>
+  alertasLoaded.value ? pageAlertSummary.value.countsByLevel : stockAlerts.countsByLevel
+);
+const pageCriticalAlertCount = computed(() => Number(pageAlertCounts.value?.CRITICO ?? 0));
+const pageMediumAlertCount = computed(() => Number(pageAlertCounts.value?.MEDIO ?? 0));
+const pageLowAlertCount = computed(() => Number(pageAlertCounts.value?.BAJO ?? 0));
 
 const flash = (type, text) => {
   snackbar.value = {
@@ -443,6 +464,63 @@ const formatDateTime = (value) => {
     return value;
   }
 };
+
+const formatCantidad = (value) => {
+  const numeric = Number(value ?? 0);
+  if (Number.isNaN(numeric)) return '0';
+  if (Number.isInteger(numeric)) return String(numeric);
+  return numeric.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+};
+
+const ALERT_LEVEL_SORT_ORDER = {
+  CRITICO: 0,
+  MEDIO: 1,
+  BAJO: 2
+};
+
+const sortAlertasByPriority = (items) =>
+  (items || [])
+    .slice()
+    .sort((a, b) => {
+      const nivelA = resolveStockAlertLevel(a);
+      const nivelB = resolveStockAlertLevel(b);
+      const rankA = ALERT_LEVEL_SORT_ORDER[nivelA] ?? 99;
+      const rankB = ALERT_LEVEL_SORT_ORDER[nivelB] ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a?.nombre || '').localeCompare(b?.nombre || '', 'es');
+    });
+
+const getAlertaFaltante = (alerta) => {
+  return getStockAlertMissingUnits(alerta);
+};
+
+const getAlertaNivel = (alerta) => {
+  return resolveStockAlertLevel(alerta);
+};
+
+const getAlertaDistanciaMinimo = (alerta) => {
+  return getStockAlertDistanceToMinimum(alerta);
+};
+
+const getAlertaEstadoTexto = (alerta) => {
+  const nivel = getAlertaNivel(alerta);
+  if (nivel === 'MEDIO' && getAlertaFaltante(alerta) <= 0) {
+    return 'Stock mínimo alcanzado';
+  }
+
+  if (isApproachingStockAlertLevel(nivel)) {
+    return `A ${formatCantidad(getAlertaDistanciaMinimo(alerta))} unidades del mínimo`;
+  }
+
+  const faltante = getAlertaFaltante(alerta);
+  if (faltante <= 0) {
+    return `A ${formatCantidad(getAlertaDistanciaMinimo(alerta))} unidades del mínimo`;
+  }
+
+  return `Faltante: ${formatCantidad(faltante)} unidades`;
+};
+
+const getAlertColor = (nivel) => getStockAlertMeta(nivel).color;
 
 const printVentaTicket = async (ventaNumero) => {
   if (!ventaNumero || printingVentaTicket.value) return;
@@ -711,8 +789,8 @@ const loadAlertas = async () => {
       throw new Error(extractProblemMessage(data));
     }
     alertas.value = (data || [])
-      .slice()
-      .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+      .filter((item) => isActionableStockAlert(item));
+    alertas.value = sortAlertasByPriority(alertas.value);
     alertasLoaded.value = true;
     await stockAlerts.refreshSummary();
   } catch (err) {
@@ -723,6 +801,7 @@ const loadAlertas = async () => {
 };
 
 const shouldIncludeInRemito = (alerta) => {
+  if (!isActionableStockAlert(alerta)) return false;
   const minimo = Number(alerta.stockMinimo ?? 0);
   const tolerancia = Number(alerta.toleranciaPct ?? 0);
   const limite = minimo * (1 + tolerancia / 100);
@@ -732,21 +811,20 @@ const shouldIncludeInRemito = (alerta) => {
 const openRemito = async () => {
   if (alertasLoading.value) return;
   await loadAlertas();
-  const filtradas = alertas.value.filter(shouldIncludeInRemito);
+  const filtradas = sortAlertasByPriority(alertas.value.filter(shouldIncludeInRemito));
   remitoItems.value = filtradas.map((alerta) => ({
     productoId: alerta.productoId,
     nombre: alerta.nombre,
     sku: alerta.sku,
+    nivel: resolveStockAlertLevel(alerta),
     proveedorId: alerta.proveedorId || null,
     proveedor: alerta.proveedor,
-    cantidadActual: alerta.cantidadActual,
-    stockDeseado: alerta.stockDeseado ?? 0,
+    cantidadActual: Number(alerta.cantidadActual ?? 0),
+    stockMinimo: Number(alerta.stockMinimo ?? 0),
     cantidad: (() => {
-      const deseado = Number(alerta.stockDeseado ?? 0);
       const minimo = Number(alerta.stockMinimo ?? 0);
-      const objetivo = deseado > 0 ? deseado : minimo;
-      const sugerido = alerta.sugerido ?? Math.max(objetivo - alerta.cantidadActual, 0);
-      return sugerido;
+      const actual = Number(alerta.cantidadActual ?? 0);
+      return Math.max(minimo - actual, 0);
     })()
   }));
   remitoDialog.value = true;
@@ -944,12 +1022,30 @@ onBeforeUnmount(() => {});
   flex-direction: column;
 }
 
+.stock-list-card--alert {
+  min-height: auto;
+}
+
 .stock-section-copy,
 .stock-adjust-row,
 .stock-search-row {
   width: 100%;
-  max-width: 1040px;
-  margin-inline: auto;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.alert-toolbar {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.alert-action-btn {
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .stock-table-shell {
@@ -980,7 +1076,6 @@ onBeforeUnmount(() => {});
 .stock-alert-dot {
   width: 12px;
   height: 12px;
-  margin-left: 8px;
   border-radius: 999px;
   display: inline-block;
   flex: 0 0 12px;
@@ -1000,11 +1095,29 @@ onBeforeUnmount(() => {});
   background-color: transparent;
 }
 
+.stock-alert-list {
+  margin-top: 12px;
+  flex: 0 0 auto;
+}
+
 .stock-alert-list :deep(.v-list-item) {
   background-color: transparent;
   border: 1px solid var(--pos-list-item-border);
   border-radius: 6px;
   margin-bottom: 8px;
+}
+
+.stock-alert-list :deep(.v-list-item__content) {
+  overflow: visible;
+}
+
+.stock-alert-list :deep(.v-list-item-subtitle) {
+  display: block;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .stock-alert-dot--secondary {
@@ -1015,6 +1128,38 @@ onBeforeUnmount(() => {});
 .stock-alert-dot--info {
   background: rgba(var(--v-theme-info), 0.2);
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-info), 0.42);
+}
+
+.stock-alert-dot--badge {
+  width: auto;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--pos-ink-strong);
+}
+
+.stock-alert-gap {
+  font-weight: 700;
+}
+
+.stock-alert-gap--error {
+  color: rgb(var(--v-theme-error));
+}
+
+.stock-alert-gap--warning {
+  color: rgb(var(--v-theme-warning));
+}
+
+.stock-alert-gap--secondary,
+.stock-alert-gap--info {
+  color: rgb(var(--v-theme-info));
 }
 
 .remito-preview-list {
@@ -1035,6 +1180,31 @@ onBeforeUnmount(() => {});
 .remito-preview-row__title {
   font-weight: 700;
   color: var(--pos-remito-preview-title);
+}
+
+.remito-preview-row__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remito-alert-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 10px;
+}
+
+.remito-alert-dot--error {
+  background: rgb(var(--v-theme-error));
+}
+
+.remito-alert-dot--warning {
+  background: rgb(var(--v-theme-warning));
+}
+
+.remito-alert-dot--info {
+  background: rgb(var(--v-theme-info));
 }
 
 @media (max-width: 960px) {
