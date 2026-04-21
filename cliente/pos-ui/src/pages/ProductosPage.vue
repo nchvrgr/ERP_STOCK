@@ -2,9 +2,10 @@
   <div class="productos-page">
     <v-tabs v-model="tab" color="primary" class="mb-4">
       <v-tab value="productos">Productos</v-tab>
-      <v-tab value="combos">Combo</v-tab>
+      <v-tab value="combos">Combos</v-tab>
       <v-tab value="proveedores">Proveedores</v-tab>
       <v-tab value="listas-precio">Categorías</v-tab>
+      <v-tab value="descuentos-recargos">Descuentos/Recargos</v-tab>
     </v-tabs>
 
     <v-window v-model="tab">
@@ -40,6 +41,7 @@
               </div>
               <div class="mt-4 d-flex flex-wrap align-center gap-3">
                 <v-text-field
+                  ref="productosSearchFieldRef"
                   v-model="search"
                   label="Buscar por nombre o SKU"
                   prepend-inner-icon="mdi-magnify"
@@ -177,6 +179,7 @@
               </div>
               <div class="mt-4 d-flex flex-wrap align-center gap-3">
                 <v-text-field
+                  ref="proveedoresSearchFieldRef"
                   v-model="proveedorSearch"
                   label="Buscar proveedor"
                   prepend-inner-icon="mdi-magnify"
@@ -255,6 +258,7 @@
               </div>
               <div class="mt-4 d-flex flex-wrap align-center gap-3">
                 <v-text-field
+                  ref="categoriasSearchFieldRef"
                   v-model="categoriaSearch"
                   label="Buscar categoría"
                   prepend-inner-icon="mdi-magnify"
@@ -303,6 +307,120 @@
                         color="error"
                         class="delete-row-action"
                         @click="promptDelete('categoria', item)"
+                      />
+                    </div>
+                  </template>
+                </v-data-table>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <v-window-item value="descuentos-recargos" class="productos-window-item">
+        <div class="discount-surcharge-actions mb-4">
+          <v-btn
+            color="primary"
+            size="large"
+            variant="elevated"
+            class="text-none product-primary-action"
+            prepend-icon="mdi-plus"
+            @click="openDescuentoRecargoDialogForCreate('DESCUENTO')"
+          >
+            Nuevo descuento
+          </v-btn>
+          <v-btn
+            color="primary"
+            size="large"
+            variant="elevated"
+            class="text-none product-primary-action"
+            prepend-icon="mdi-plus"
+            @click="openDescuentoRecargoDialogForCreate('RECARGO')"
+          >
+            Nuevo recargo
+          </v-btn>
+        </div>
+        <v-row dense>
+          <v-col cols="12" lg="6">
+            <v-card class="pos-card pa-4 productos-list-card">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <div class="text-h6">Descuentos</div>
+              </div>
+              <div class="products-table-shell mt-3">
+                <v-data-table
+                  :headers="descuentoRecargoHeaders"
+                  :items="descuentosTable"
+                  :loading="descuentoRecargoLoading"
+                  :items-per-page="10"
+                  item-key="id"
+                  class="products-table"
+                  density="compact"
+                >
+                  <template v-slot:[`item.porcentaje`]="{ item }">
+                    {{ formatPct(item.porcentaje) }}
+                  </template>
+                  <template v-slot:[`item.actions`]="{ item }">
+                    <div class="table-actions">
+                      <v-btn
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        class="text-none"
+                        @click="openEditDescuentoRecargo(item)"
+                      >
+                        Editar
+                      </v-btn>
+                      <v-btn
+                        size="small"
+                        icon="mdi-delete-outline"
+                        variant="text"
+                        color="error"
+                        class="delete-row-action"
+                        @click="promptDelete('descuento-recargo', item)"
+                      />
+                    </div>
+                  </template>
+                </v-data-table>
+              </div>
+            </v-card>
+          </v-col>
+
+          <v-col cols="12" lg="6">
+            <v-card class="pos-card pa-4 productos-list-card">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <div class="text-h6">Recargos</div>
+              </div>
+              <div class="products-table-shell mt-3">
+                <v-data-table
+                  :headers="descuentoRecargoHeaders"
+                  :items="recargosTable"
+                  :loading="descuentoRecargoLoading"
+                  :items-per-page="10"
+                  item-key="id"
+                  class="products-table"
+                  density="compact"
+                >
+                  <template v-slot:[`item.porcentaje`]="{ item }">
+                    {{ formatPct(item.porcentaje) }}
+                  </template>
+                  <template v-slot:[`item.actions`]="{ item }">
+                    <div class="table-actions">
+                      <v-btn
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        class="text-none"
+                        @click="openEditDescuentoRecargo(item)"
+                      >
+                        Editar
+                      </v-btn>
+                      <v-btn
+                        size="small"
+                        icon="mdi-delete-outline"
+                        variant="text"
+                        color="error"
+                        class="delete-row-action"
+                        @click="promptDelete('descuento-recargo', item)"
                       />
                     </div>
                   </template>
@@ -668,6 +786,49 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="descuentoRecargoDialog" persistent width="560">
+      <v-card>
+        <v-card-title>
+          {{ descuentoRecargoDialogMode === 'edit'
+            ? `Editar ${descuentoRecargoTipoLabel.toLowerCase()}`
+            : `Nuevo ${descuentoRecargoTipoLabel.toLowerCase()}` }}
+        </v-card-title>
+        <v-card-text class="pt-4">
+          <v-form @submit.prevent="saveDescuentoRecargo">
+            <v-text-field
+              v-model="descuentoRecargoForm.name"
+              label="Nombre"
+              variant="outlined"
+              density="comfortable"
+              maxlength="120"
+              counter="120"
+              :error-messages="descuentoRecargoErrors.name"
+              @blur="validateDescuentoRecargoField('name')"
+              required
+            />
+            <v-text-field
+              v-model="descuentoRecargoForm.porcentaje"
+              :label="`% ${descuentoRecargoTipoLabel}`"
+              variant="outlined"
+              density="comfortable"
+              type="number"
+              min="0.01"
+              max="100"
+              step="0.01"
+              :error-messages="descuentoRecargoErrors.porcentaje"
+              @blur="validateDescuentoRecargoField('porcentaje')"
+              required
+            />
+            <button type="submit" class="d-none" aria-hidden="true" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeDescuentoRecargoDialog">Cancelar</v-btn>
+          <v-btn color="primary" :loading="descuentoRecargoSaving" @click="saveDescuentoRecargo">Guardar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="comboDialog" persistent width="860">
       <v-card class="pa-4">
         <div class="text-h6">{{ comboEditorMode === 'edit' ? 'Editar combo' : 'Nuevo combo' }}</div>
@@ -801,7 +962,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import MoneyField from '../components/MoneyField.vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -828,6 +989,9 @@ const barcodeLoading = ref(false);
 
 const search = ref('');
 const activoFilter = ref('all');
+const productosSearchFieldRef = ref(null);
+const proveedoresSearchFieldRef = ref(null);
+const categoriasSearchFieldRef = ref(null);
 let loadProductsDebounceId = null;
 let loadProveedoresDebounceId = null;
 let loadCategoriasDebounceId = null;
@@ -840,6 +1004,8 @@ const proveedorLookupSearch = ref('');
 const productEditorMode = ref('');
 const proveedorDialogMode = ref('');
 const categoriaDialogMode = ref('');
+const descuentoRecargoDialog = ref(false);
+const descuentoRecargoDialogMode = ref('new');
 const deleteDialog = ref(false);
 const deleteLoading = ref(false);
 const deleteTarget = ref(null);
@@ -895,6 +1061,8 @@ const errors = reactive({
 const dialogDesactivar = ref(false);
 const proveedorDialog = ref(false);
 const categoriaDialog = ref(false);
+const descuentoRecargoLoading = ref(false);
+const descuentoRecargoSaving = ref(false);
 const seleccionarProveedorDespuesDeGuardar = ref(false);
 const seleccionarCategoriaDespuesDeGuardar = ref(false);
 const pendingActive = ref(true);
@@ -910,7 +1078,8 @@ const deleteEntityLabels = {
   producto: 'el producto',
   combo: 'el combo',
   proveedor: 'el proveedor',
-  categoria: 'la categoría'
+  categoria: 'la categoría',
+  'descuento-recargo': 'el ajuste'
 };
 
 const headers = [
@@ -971,6 +1140,12 @@ const categoriaHeaders = [
   { title: '', value: 'actions', sortable: false, align: 'end' }
 ];
 
+const descuentoRecargoHeaders = [
+  { title: 'Nombre', value: 'name' },
+  { title: 'Porcentaje', value: 'porcentaje', align: 'end' },
+  { title: '', value: 'actions', sortable: false, align: 'end' }
+];
+
 const proveedoresTable = ref([]);
 const proveedorSearch = ref('');
 const proveedorActivoFilter = ref('all');
@@ -1010,6 +1185,20 @@ const categoriaErrors = reactive({
   margenGananciaPct: ''
 });
 
+const descuentosRecargos = ref([]);
+
+const descuentoRecargoForm = reactive({
+  id: '',
+  name: '',
+  porcentaje: '10',
+  tipo: 'DESCUENTO'
+});
+
+const descuentoRecargoErrors = reactive({
+  name: '',
+  porcentaje: ''
+});
+
 const deleteDialogText = computed(() => {
   if (!deleteTarget.value) return '';
   if (deleteTarget.value.type === 'combo') {
@@ -1017,6 +1206,125 @@ const deleteDialogText = computed(() => {
   }
   return `Vas a eliminar ${deleteEntityLabels[deleteTarget.value.type]} "${deleteTarget.value.name}". Esta acción no se puede deshacer.`;
 });
+
+const descuentoRecargoTipoLabel = computed(() => (
+  descuentoRecargoForm.tipo === 'RECARGO' ? 'Recargo' : 'Descuento'
+));
+
+const descuentosTable = computed(() =>
+  (descuentosRecargos.value || [])
+    .filter((item) => item.tipo === 'DESCUENTO')
+    .slice()
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'))
+);
+
+const recargosTable = computed(() =>
+  (descuentosRecargos.value || [])
+    .filter((item) => item.tipo === 'RECARGO')
+    .slice()
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'))
+);
+
+const hasBlockingDialog = computed(() =>
+  !!productEditorMode.value
+  || proveedorDialog.value
+  || categoriaDialog.value
+  || descuentoRecargoDialog.value
+  || deleteDialog.value
+  || dialogDesactivar.value
+  || comboDialog.value
+  || comboPriceUpdateDialog.value
+);
+
+const getActiveSearchBinding = () => {
+  if (tab.value === 'proveedores') {
+    return {
+      fieldRef: proveedoresSearchFieldRef,
+      getValue: () => proveedorSearch.value,
+      setValue: (value) => { proveedorSearch.value = value; },
+      load: loadProveedores
+    };
+  }
+
+  if (tab.value === 'listas-precio') {
+    return {
+      fieldRef: categoriasSearchFieldRef,
+      getValue: () => categoriaSearch.value,
+      setValue: (value) => { categoriaSearch.value = value; },
+      load: loadCategorias
+    };
+  }
+
+  if (tab.value === 'productos') {
+    return {
+      fieldRef: productosSearchFieldRef,
+      getValue: () => search.value,
+      setValue: (value) => { search.value = value; },
+      load: loadProducts
+    };
+  }
+
+  return null;
+};
+
+const focusActiveSearchField = async () => {
+  const binding = getActiveSearchBinding();
+  if (!binding) return;
+
+  await nextTick();
+  binding.fieldRef.value?.focus?.();
+};
+
+const isEditableTarget = (target) => {
+  const element = target instanceof HTMLElement ? target : null;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+
+  const editableContainer = element.closest('input, textarea, [contenteditable="true"], .v-field input, .v-field textarea');
+  if (editableContainer) return true;
+
+  const role = element.getAttribute('role');
+  return role === 'textbox' || role === 'combobox' || role === 'spinbutton';
+};
+
+const handlePersistentSearchKeydown = (event) => {
+  if (hasBlockingDialog.value) return;
+  if (event.defaultPrevented) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (isEditableTarget(event.target)) return;
+
+  const binding = getActiveSearchBinding();
+  if (!binding) return;
+
+  const currentValue = String(binding.getValue() || '');
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    focusActiveSearchField();
+    binding.load();
+    return;
+  }
+
+  if (event.key === 'Backspace') {
+    event.preventDefault();
+    binding.setValue(currentValue.slice(0, -1));
+    focusActiveSearchField();
+    return;
+  }
+
+  if (event.key === 'Delete') {
+    event.preventDefault();
+    binding.setValue('');
+    focusActiveSearchField();
+    return;
+  }
+
+  if (event.key.length !== 1) return;
+
+  event.preventDefault();
+  binding.setValue(`${currentValue}${event.key}`);
+  focusActiveSearchField();
+};
 
 const categoriasLookupDisplay = computed(() =>
   (categoriasLookup.value || []).map((item) => ({
@@ -1067,6 +1375,8 @@ const flash = (type, text) => {
     icon: type === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle'
   };
 };
+
+const formatPct = (value) => `${Number(value || 0).toFixed(2)}%`;
 
 const extractProblemMessage = (data) => {
   if (!data) return 'Error inesperado.';
@@ -1248,6 +1558,16 @@ const resetComboForm = () => {
   comboEditorMode.value = 'new';
 };
 
+const resetDescuentoRecargoForm = (tipo = 'DESCUENTO') => {
+  descuentoRecargoForm.id = '';
+  descuentoRecargoForm.name = '';
+  descuentoRecargoForm.porcentaje = '10';
+  descuentoRecargoForm.tipo = tipo;
+  descuentoRecargoDialogMode.value = 'new';
+  descuentoRecargoErrors.name = '';
+  descuentoRecargoErrors.porcentaje = '';
+};
+
 const onComboSkuInput = (value) => {
   comboForm.sku = String(value || '').replace(/\D+/g, '');
 };
@@ -1299,6 +1619,30 @@ const openEditCombo = async (row) => {
 const closeComboDialog = () => {
   comboDialog.value = false;
   resetComboForm();
+};
+
+const openDescuentoRecargoDialogForCreate = (tipo) => {
+  resetDescuentoRecargoForm(tipo);
+  descuentoRecargoDialog.value = true;
+};
+
+const openEditDescuentoRecargo = (row) => {
+  const item = resolveTableRow(row);
+  if (!item?.id) return;
+
+  descuentoRecargoForm.id = item.id;
+  descuentoRecargoForm.name = item.name || '';
+  descuentoRecargoForm.porcentaje = String(item.porcentaje ?? '');
+  descuentoRecargoForm.tipo = item.tipo || 'DESCUENTO';
+  descuentoRecargoDialogMode.value = 'edit';
+  descuentoRecargoErrors.name = '';
+  descuentoRecargoErrors.porcentaje = '';
+  descuentoRecargoDialog.value = true;
+};
+
+const closeDescuentoRecargoDialog = () => {
+  descuentoRecargoDialog.value = false;
+  resetDescuentoRecargoForm();
 };
 
 const addComboItem = () => {
@@ -2076,6 +2420,75 @@ const saveCategoria = async () => {
   }
 };
 
+const validateDescuentoRecargoField = (field) => {
+  if (field === 'name') {
+    descuentoRecargoErrors.name = descuentoRecargoForm.name.trim() ? '' : 'El nombre es obligatorio.';
+  }
+  if (field === 'porcentaje') {
+    const value = Number(descuentoRecargoForm.porcentaje);
+    descuentoRecargoErrors.porcentaje = Number.isNaN(value) || value <= 0 || value > 100
+      ? 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'
+      : '';
+  }
+};
+
+const loadDescuentosRecargos = async () => {
+  descuentoRecargoLoading.value = true;
+  try {
+    const { response, data } = await getJson('/api/v1/descuentos-recargos');
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    descuentosRecargos.value = (data || []).slice();
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron cargar los descuentos y recargos.');
+  } finally {
+    descuentoRecargoLoading.value = false;
+  }
+};
+
+const saveDescuentoRecargo = async () => {
+  if (descuentoRecargoSaving.value) return;
+
+  validateDescuentoRecargoField('name');
+  validateDescuentoRecargoField('porcentaje');
+  if (descuentoRecargoErrors.name || descuentoRecargoErrors.porcentaje) return;
+
+  descuentoRecargoSaving.value = true;
+  try {
+    const tipoLabel = descuentoRecargoForm.tipo === 'RECARGO' ? 'Recargo' : 'Descuento';
+    const payload = {
+      name: descuentoRecargoForm.name.trim(),
+      porcentaje: Number(descuentoRecargoForm.porcentaje),
+      tipo: descuentoRecargoForm.tipo
+    };
+
+    const isEdit = descuentoRecargoDialogMode.value === 'edit' && descuentoRecargoForm.id;
+    const { response, data } = isEdit
+      ? await requestJson(`/api/v1/descuentos-recargos/${descuentoRecargoForm.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: payload.name,
+          porcentaje: payload.porcentaje
+        })
+      })
+      : await postJson('/api/v1/descuentos-recargos', payload);
+
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    await loadDescuentosRecargos();
+    closeDescuentoRecargoDialog();
+    flash('success', isEdit ? 'Ajuste actualizado' : `${tipoLabel} creado`);
+  } catch (err) {
+    flash('error', err?.message || 'No se pudo guardar el ajuste.');
+  } finally {
+    descuentoRecargoSaving.value = false;
+  }
+};
+
 const promptDelete = (type, row) => {
   const entity = resolveTableRow(row);
   if (!entity?.id) return;
@@ -2101,13 +2514,15 @@ const confirmDelete = async () => {
     producto: `/api/v1/productos/${target.id}`,
     combo: `/api/v1/productos/${target.id}`,
     proveedor: `/api/v1/proveedores/${target.id}`,
-    categoria: `/api/v1/categorias-precio/${target.id}`
+    categoria: `/api/v1/categorias-precio/${target.id}`,
+    'descuento-recargo': `/api/v1/descuentos-recargos/${target.id}`
   };
   const successMap = {
     producto: 'Producto eliminado',
     combo: 'Combo dado de baja',
     proveedor: 'Proveedor eliminado',
-    categoria: 'Categoría eliminada'
+    categoria: 'Categoría eliminada',
+    'descuento-recargo': 'Ajuste eliminado'
   };
 
   deleteLoading.value = true;
@@ -2144,6 +2559,8 @@ const confirmDelete = async () => {
       if (form.categoriaId === target.id) {
         form.categoriaId = '';
       }
+    } else if (target.type === 'descuento-recargo') {
+      await loadDescuentosRecargos();
     }
 
     flash('success', successMap[target.type]);
@@ -2166,6 +2583,10 @@ const syncTabFromRoute = (value) => {
   }
   if (value === 'listas-precio') {
     tab.value = 'listas-precio';
+    return;
+  }
+  if (value === 'descuentos-recargos') {
+    tab.value = 'descuentos-recargos';
     return;
   }
   tab.value = 'productos';
@@ -2216,8 +2637,12 @@ watch(
     if (value === 'combos') {
       loadCombos();
     }
+    if (value === 'descuentos-recargos') {
+      loadDescuentosRecargos();
+    }
     const nextQuery = { ...route.query, tab: value };
     router.replace({ path: '/productos', query: nextQuery });
+    focusActiveSearchField();
   }
 );
 
@@ -2250,14 +2675,30 @@ watch(
   }
 );
 
+watch(
+  () => hasBlockingDialog.value,
+  (isOpen) => {
+    if (!isOpen) {
+      focusActiveSearchField();
+    }
+  }
+);
+
 onMounted(() => {
   syncTabFromRoute(route.query.tab);
   loadProducts();
   loadCombos();
   loadProveedores();
   loadCategorias();
+  loadDescuentosRecargos();
   searchProveedores('');
   searchCategorias('');
+  window.addEventListener('keydown', handlePersistentSearchKeydown, true);
+  focusActiveSearchField();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handlePersistentSearchKeydown, true);
 });
 </script>
 
@@ -2271,39 +2712,41 @@ onMounted(() => {
 }
 
 .productos-list-card {
-  min-height: calc(100vh - 180px);
-  display: flex;
-  flex-direction: column;
+  min-height: auto;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  row-gap: 12px;
+  align-content: start;
 }
 
 .products-table-shell {
-  flex: 1;
   min-height: 0;
   display: flex;
+  align-items: flex-start;
 }
 
 .products-table {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
 }
 
 .products-table :deep(.v-table) {
-  height: 100%;
+  height: auto;
 }
 
 .products-table :deep(.v-table__wrapper) {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
   overflow: auto;
 }
 
 .products-table :deep(.v-data-table__wrapper) {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
 }
 
 .products-table :deep(.v-data-table-footer) {
-  margin-top: auto;
+  margin-top: 0;
 }
 
 .product-primary-action {
@@ -2311,6 +2754,26 @@ onMounted(() => {
   min-height: 46px;
   font-weight: 800;
   box-shadow: var(--pos-primary-btn-shadow);
+}
+
+.discount-surcharge-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 12px;
+}
+
+.discount-surcharge-actions .product-primary-action {
+  justify-self: start;
+  background: var(--pos-adjustment-btn-bg) !important;
+  color: var(--pos-adjustment-btn-text) !important;
+  box-shadow: var(--pos-adjustment-btn-shadow);
+}
+
+@media (max-width: 1279px) {
+  .discount-surcharge-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .product-print-action {

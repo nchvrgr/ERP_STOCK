@@ -6,6 +6,7 @@
   "author": "Codex",
   "main": "electron/main.cjs",
   "scripts": {
+    "rebuild": "powershell -ExecutionPolicy Bypass -File scripts/rebuild-desktop.ps1",
     "desktop:build": "node scripts/build-desktop.mjs",
     "desktop:pack": "npm run desktop:build && set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win dir",
     "desktop:open": "powershell -ExecutionPolicy Bypass -File scripts/open-desktop.ps1",

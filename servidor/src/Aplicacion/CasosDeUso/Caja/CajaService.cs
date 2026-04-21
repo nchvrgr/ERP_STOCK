@@ -198,6 +198,30 @@ public sealed class CajaService
         return sesion;
     }
 
+    public async Task<CajaSesionDto?> ObtenerSesionAbiertaAsync(Guid cajaId, CancellationToken cancellationToken)
+    {
+        if (cajaId == Guid.Empty)
+        {
+            throw new ValidationException(
+                "Validacion fallida.",
+                new Dictionary<string, string[]>
+                {
+                    ["cajaId"] = new[] { "La caja es obligatoria." }
+                });
+        }
+
+        var tenantId = AsegurarTenant();
+        var sucursalId = AsegurarSucursal();
+
+        var existe = await _repositorioCaja.CajaExistsAsync(tenantId, sucursalId, cajaId, cancellationToken);
+        if (!existe)
+        {
+            throw new NotFoundException("Caja no encontrada.");
+        }
+
+        return await _repositorioCaja.GetOpenSessionAsync(tenantId, sucursalId, cajaId, cancellationToken);
+    }
+
     public async Task<CajaMovimientoDto> RegistrarMovimientoAsync(
         Guid sesionId,
         CajaMovimientoCreateDto solicitud,

@@ -24,9 +24,14 @@
             :key="item.to"
             :to="item.to"
             :prepend-icon="item.icon"
-            :title="item.title"
             rounded
           >
+            <template #title>
+              <div class="drawer-nav-title">
+                <span>{{ item.title }}</span>
+                <span v-if="isCajaMenuItem(item)" class="shortcut-key drawer-nav-shortcut">[F1]</span>
+              </div>
+            </template>
             <template #append>
               <span
                 v-if="isStockMenuItem(item) && hasStockCriticalAlerts"
@@ -205,6 +210,10 @@ const visibleItems = computed(() =>
   })
 );
 
+const canNavigateToCaja = computed(() =>
+  visibleItems.value.some((item) => (item.path || item.to) === '/caja')
+);
+
 const currentTitle = computed(() => {
   if (route.path.startsWith('/productos') && route.query.tab === 'proveedores') {
     return 'Proveedores';
@@ -215,6 +224,9 @@ const currentTitle = computed(() => {
   if (route.path.startsWith('/empresa')) {
     return 'Datos de mi empresa';
   }
+  if (route.path.startsWith('/caja')) {
+    return 'Caja';
+  }
 
   const match = menuItems.find((item) => {
     const path = item.path || item.to;
@@ -222,6 +234,16 @@ const currentTitle = computed(() => {
   });
   return match ? match.title : 'Caja';
 });
+
+const handleCajaShortcut = (event) => {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (event.key !== 'F1') return;
+  if (route.path.startsWith('/caja')) return;
+  if (!canNavigateToCaja.value) return;
+
+  event.preventDefault();
+  router.push('/caja');
+};
 
 const stockCriticalAlertCount = computed(() => Number(stockAlerts.countsByLevel?.CRITICO ?? 0));
 const hasStockCriticalAlerts = computed(() => stockCriticalAlertCount.value > 0);
@@ -304,6 +326,7 @@ const isDarkMode = computed({
 const brandMarkSrc = computed(() => (isDarkMode.value ? brandMarkDark : brandMarkLight));
 
 const isStockMenuItem = (item) => (item?.path || item?.to) === '/stock';
+const isCajaMenuItem = (item) => (item?.path || item?.to) === '/caja';
 
 const refreshStockAlerts = () => {
   if (!auth.hasPermission('PERM_STOCK_AJUSTAR')) {
@@ -326,6 +349,7 @@ onMounted(() => {
   window.addEventListener('focus', refreshStockAlerts);
   window.addEventListener('storage', handleStorageEvent);
   window.addEventListener('pos-caja-session-changed', syncCajaInfo);
+  window.addEventListener('keydown', handleCajaShortcut);
   refreshStockAlerts();
   syncCajaInfo();
 });
@@ -334,6 +358,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshStockAlerts);
   window.removeEventListener('storage', handleStorageEvent);
   window.removeEventListener('pos-caja-session-changed', syncCajaInfo);
+  window.removeEventListener('keydown', handleCajaShortcut);
 });
 
 const logout = () => {
@@ -389,6 +414,21 @@ const logout = () => {
 .drawer-brand-role {
   color: var(--pos-ink-muted);
   font-weight: 600;
+}
+
+.drawer-nav-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shortcut-key {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.drawer-nav-shortcut {
+  color: color-mix(in srgb, var(--pos-accent-dark) 76%, var(--pos-shortcut-highlight) 24%);
 }
 
 .theme-toggle {

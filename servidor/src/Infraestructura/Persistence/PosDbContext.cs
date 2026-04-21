@@ -46,6 +46,7 @@ public sealed class PosDbContext : DbContext
     public DbSet<Venta> Ventas => Set<Venta>();
     public DbSet<VentaItem> VentaItems => Set<VentaItem>();
     public DbSet<VentaPago> VentaPagos => Set<VentaPago>();
+    public DbSet<DescuentoRecargo> DescuentosRecargos => Set<DescuentoRecargo>();
     public DbSet<Caja> Cajas => Set<Caja>();
     public DbSet<CajaSesion> CajaSesiones => Set<CajaSesion>();
     public DbSet<CajaMovimiento> CajaMovimientos => Set<CajaMovimiento>();

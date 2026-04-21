@@ -11,34 +11,10 @@
         {{ error }}
       </v-alert>
 
-      <v-row dense class="mt-2">
-        <v-col cols="12" md="6">
+      <div class="remitos-search-row mt-2">
+        <div class="remitos-search-row__search">
           <v-autocomplete
-            v-model="selectedProveedorId"
-            :items="proveedores"
-            item-title="name"
-            item-value="id"
-            label="Proveedor"
-            variant="outlined"
-            density="comfortable"
-            clearable
-            :loading="loadingProveedores"
-            @update:model-value="onProveedorChanged"
-          >
-            <template #no-data>
-              <v-list-item
-                prepend-icon="mdi-plus-circle-outline"
-                title="Crear proveedor"
-                @click="openCreateProveedorDialog('')"
-              />
-            </template>
-          </v-autocomplete>
-        </v-col>
-      </v-row>
-
-      <v-row dense class="align-start">
-        <v-col cols="12" md="8">
-          <v-autocomplete
+            ref="productSearchFieldRef"
             :key="productoInputKey"
             v-model="selectedProductoId"
             v-model:search="productSearch"
@@ -67,8 +43,30 @@
               />
             </template>
           </v-autocomplete>
-        </v-col>
-      </v-row>
+        </div>
+        <div class="remitos-search-row__provider">
+          <v-autocomplete
+            v-model="selectedProveedorId"
+            :items="proveedores"
+            item-title="name"
+            item-value="id"
+            label="Proveedor"
+            variant="outlined"
+            density="comfortable"
+            clearable
+            :loading="loadingProveedores"
+            @update:model-value="onProveedorChanged"
+          >
+            <template #no-data>
+              <v-list-item
+                prepend-icon="mdi-plus-circle-outline"
+                title="Crear proveedor"
+                @click="openCreateProveedorDialog('')"
+              />
+            </template>
+          </v-autocomplete>
+        </div>
+      </div>
 
       <div v-if="recentAddMessage" class="remitos-add-feedback">
         <span class="remitos-add-feedback__dot" />
@@ -103,6 +101,11 @@
         <template v-slot:[`item.name`]="{ item }">
           <span>{{ getTableItemData(item).name }}</span>
         </template>
+        <template v-slot:[`item.precioVenta`]="{ item }">
+          <div class="text-right">
+            {{ formatMoney(getTableItemData(item).precioVenta) }}
+          </div>
+        </template>
         <template v-slot:[`item.cantidad`]="{ item }">
           <div class="quantity-stepper">
             <v-btn
@@ -136,12 +139,14 @@
         <template v-slot:[`item.actions`]="{ item }">
           <div class="d-flex align-center justify-end ga-1">
             <v-btn
-              icon="mdi-currency-usd"
               size="small"
-              variant="text"
+              variant="tonal"
               color="primary"
+              class="text-none"
               @click="openActualizarPrecioDialog(getTableItemData(item).productoId)"
-            />
+            >
+              Actualizar precio
+            </v-btn>
             <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="removeItem(getTableItemData(item).productoId)" />
           </div>
         </template>
@@ -489,43 +494,89 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="actualizarPrecioDialog" persistent width="520">
+    <v-dialog v-model="actualizarPrecioDialog" persistent width="760">
       <v-card>
         <v-card-title>Actualizar precio del producto</v-card-title>
         <v-card-text>
-          <v-text-field
-            :model-value="actualizarPrecioForm.nombre"
-            label="Producto"
-            variant="outlined"
-            density="comfortable"
-            readonly
-            class="mb-2"
-          />
-          <v-text-field
-            :model-value="actualizarPrecioForm.sku"
-            label="SKU"
-            variant="outlined"
-            density="comfortable"
-            readonly
-            class="mb-2"
-          />
-          <MoneyField
-            v-model="actualizarPrecioForm.precioBase"
-            label="Precio costo"
-            variant="outlined"
-            density="comfortable"
-            :step="100"
-            :show-stepper="false"
-            class="mb-2"
-          />
-          <MoneyField
-            v-model="actualizarPrecioForm.precioVenta"
-            label="Precio venta"
-            variant="outlined"
-            density="comfortable"
-            :step="100"
-            :show-stepper="false"
-          />
+          <div class="price-dialog-meta mb-4">
+            <div class="price-dialog-meta__item">
+              <div class="price-dialog-meta__label">Producto</div>
+              <div class="price-dialog-meta__value">{{ actualizarPrecioForm.nombre || '-' }}</div>
+            </div>
+            <div class="price-dialog-meta__item">
+              <div class="price-dialog-meta__label">SKU</div>
+              <div class="price-dialog-meta__value">{{ actualizarPrecioForm.sku || '-' }}</div>
+            </div>
+          </div>
+
+          <div class="text-subtitle-2 product-section-title">Precio</div>
+          <v-row dense>
+            <v-col cols="12" md="4">
+              <MoneyField
+                v-model="actualizarPrecioForm.precioBase"
+                label="Precio costo"
+                variant="outlined"
+                density="comfortable"
+                :step="100"
+                :show-stepper="false"
+              />
+            </v-col>
+            <v-col cols="12" md="4">
+              <v-select
+                v-model="actualizarPrecioForm.pricingMode"
+                :items="pricingModeItems"
+                label="Modo de precio"
+                variant="outlined"
+                density="comfortable"
+                item-title="title"
+                item-value="value"
+              />
+            </v-col>
+            <v-col v-if="actualizarPrecioForm.pricingMode === 'CATEGORIA'" cols="12" md="4">
+              <v-autocomplete
+                v-model="actualizarPrecioForm.categoriaId"
+                :items="categoriasLookupDisplay"
+                :loading="loadingCategorias"
+                label="Categoría"
+                item-title="displayTitle"
+                item-value="id"
+                variant="outlined"
+                density="comfortable"
+                clearable
+              />
+            </v-col>
+            <v-col v-else-if="actualizarPrecioForm.pricingMode === 'FIJO_PCT'" cols="12" md="4">
+              <v-text-field
+                v-model="actualizarPrecioForm.margenPct"
+                label="% Ganancia fija"
+                variant="outlined"
+                density="comfortable"
+                type="number"
+                min="0"
+                step="0.01"
+                @focus="clearZeroOnFocus(actualizarPrecioForm, 'margenPct')"
+              />
+            </v-col>
+            <v-col v-else-if="actualizarPrecioForm.pricingMode === 'MANUAL'" cols="12" md="4">
+              <MoneyField
+                v-model="actualizarPrecioForm.precioVentaManual"
+                label="Precio venta manual"
+                variant="outlined"
+                density="comfortable"
+                :step="100"
+                :show-stepper="false"
+              />
+            </v-col>
+            <v-col v-else cols="12" md="4" class="d-flex align-center">
+              <div class="text-caption text-medium-emphasis">
+                Precio de venta calculado: {{ formatMoney(actualizarPrecioVentaCalculado) }}
+              </div>
+            </v-col>
+          </v-row>
+          <div :class="['product-final-price', { 'product-final-price--night': isNightMode }]">
+            <span class="product-final-price__label">Precio final:</span>
+            <span class="product-final-price__value">{{ formatMoney(actualizarPrecioVentaCalculado) }}</span>
+          </div>
         </v-card-text>
         <v-card-actions class="justify-end">
           <v-btn variant="text" :disabled="actualizarPrecioLoading" @click="closeActualizarPrecioDialog">Cancelar</v-btn>
@@ -537,7 +588,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import MoneyField from '../components/MoneyField.vue';
 import { getJson, postJson, requestJson } from '../services/apiClient';
@@ -561,6 +612,7 @@ const categorias = ref([]);
 const selectedProveedorId = ref(null);
 const selectedProductoId = ref(null);
 const productSearch = ref('');
+const productSearchFieldRef = ref(null);
 const productoInputKey = ref(0);
 const suppressNextSearchClear = ref(false);
 const ignoreAutocompleteSearchEvents = ref(false);
@@ -576,10 +628,13 @@ const actualizarPrecioForm = reactive({
   productoId: '',
   nombre: '',
   sku: '',
+  categoriaId: '',
   precioBase: '',
   pricingMode: 'FIJO_PCT',
   margenGananciaPct: null,
-  precioVenta: '',
+  margenPct: '30',
+  margenCategoriaPct: '0',
+  precioVentaManual: '',
   precioVentaOriginal: 0
 });
 const items = ref([]);
@@ -643,7 +698,8 @@ const headers = [
   { title: 'Proveedor', value: 'proveedor' },
   { title: 'SKU', value: 'sku' },
   { title: 'Cantidad', value: 'cantidad', width: 180, align: 'center' },
-  { title: '', value: 'actions', sortable: false, align: 'end', width: 80 }
+  { title: 'Precio actual', value: 'precioVenta', align: 'end', width: 150 },
+  { title: '', value: 'actions', sortable: false, align: 'end', width: 190 }
 ];
 
 const comboPriceUpdateHeaders = [
@@ -671,6 +727,71 @@ const productoOptions = computed(() =>
     }))
 );
 
+const hasBlockingDialog = computed(() =>
+  cantidadModalDialog.value
+  || actualizarPrecioDialog.value
+  || comboPriceUpdateDialog.value
+  || createDialog.value
+  || proveedorDialog.value
+);
+
+const focusProductSearchField = async () => {
+  await nextTick();
+  productSearchFieldRef.value?.focus?.();
+};
+
+const isEditableTarget = (target) => {
+  const element = target instanceof HTMLElement ? target : null;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+
+  const editableContainer = element.closest('input, textarea, [contenteditable="true"], .v-field input, .v-field textarea');
+  if (editableContainer) return true;
+
+  const role = element.getAttribute('role');
+  return role === 'textbox' || role === 'combobox' || role === 'spinbutton';
+};
+
+const handlePersistentProductSearchKeydown = (event) => {
+  if (hasBlockingDialog.value) return;
+  if (event.defaultPrevented) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (isEditableTarget(event.target)) return;
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    focusProductSearchField();
+    handleProductInputEnter();
+    return;
+  }
+
+  if (event.key === 'Backspace') {
+    event.preventDefault();
+    productSearch.value = String(productSearch.value || '').slice(0, -1);
+    selectedProductoId.value = null;
+    focusProductSearchField();
+    onProductSearch(productSearch.value);
+    return;
+  }
+
+  if (event.key === 'Delete') {
+    event.preventDefault();
+    productSearch.value = '';
+    selectedProductoId.value = null;
+    focusProductSearchField();
+    onProductSearch('');
+    return;
+  }
+
+  if (event.key.length !== 1) return;
+
+  event.preventDefault();
+  productSearch.value = `${String(productSearch.value || '')}${event.key}`;
+  selectedProductoId.value = null;
+  focusProductSearchField();
+  onProductSearch(productSearch.value);
+};
+
 const categoriasLookupDisplay = computed(() =>
   (categorias.value || []).map((item) => ({
     ...item,
@@ -690,6 +811,22 @@ const createPrecioVentaCalculado = computed(() => {
   const margen = createForm.pricingMode === 'CATEGORIA'
     ? Number(createForm.margenCategoriaPct || 0)
     : Number(createForm.margenPct);
+  if (Number.isNaN(margen) || margen < 0) return base;
+  return base * (1 + margen / 100);
+});
+
+const actualizarPrecioVentaCalculado = computed(() => {
+  const base = Number(actualizarPrecioForm.precioBase);
+  if (Number.isNaN(base) || base <= 0) return 0;
+
+  if (actualizarPrecioForm.pricingMode === 'MANUAL') {
+    const manual = Number(actualizarPrecioForm.precioVentaManual);
+    return Number.isNaN(manual) || manual < 0 ? 0 : manual;
+  }
+
+  const margen = actualizarPrecioForm.pricingMode === 'CATEGORIA'
+    ? Number(actualizarPrecioForm.margenCategoriaPct || 0)
+    : Number(actualizarPrecioForm.margenPct);
   if (Number.isNaN(margen) || margen < 0) return base;
   return base * (1 + margen / 100);
 });
@@ -900,6 +1037,7 @@ const onProveedorChanged = async () => {
   clearRecentAddFeedback();
   selectedProductoId.value = null;
   await loadProductos('');
+  focusProductSearchField();
 };
 
 const onProductSearch = async (value) => {
@@ -969,11 +1107,19 @@ const closeActualizarPrecioDialog = () => {
   actualizarPrecioForm.productoId = '';
   actualizarPrecioForm.nombre = '';
   actualizarPrecioForm.sku = '';
+  actualizarPrecioForm.categoriaId = '';
   actualizarPrecioForm.precioBase = '';
   actualizarPrecioForm.pricingMode = 'FIJO_PCT';
   actualizarPrecioForm.margenGananciaPct = null;
-  actualizarPrecioForm.precioVenta = '';
+  actualizarPrecioForm.margenPct = '30';
+  actualizarPrecioForm.margenCategoriaPct = '0';
+  actualizarPrecioForm.precioVentaManual = '';
   actualizarPrecioForm.precioVentaOriginal = 0;
+};
+
+const applyActualizarCategoriaMargin = () => {
+  const categoria = categorias.value.find((item) => item.id === actualizarPrecioForm.categoriaId);
+  actualizarPrecioForm.margenCategoriaPct = categoria ? Number(categoria.margenGananciaPct || 0).toString() : '0';
 };
 
 const openActualizarPrecioDialog = async (productoId) => {
@@ -989,11 +1135,21 @@ const openActualizarPrecioDialog = async (productoId) => {
     actualizarPrecioForm.productoId = data.id;
     actualizarPrecioForm.nombre = data.name || '';
     actualizarPrecioForm.sku = data.sku || '';
-    actualizarPrecioForm.precioBase = Number(data.precioBase || 0).toString();
+    actualizarPrecioForm.categoriaId = data.categoriaId || '';
+    const base = Number(data.precioBase ?? 0);
+    const venta = Number(data.precioVenta ?? base);
+    const margen = base > 0 ? ((venta / base) - 1) * 100 : 0;
+    actualizarPrecioForm.precioBase = base ? base.toString() : '';
     actualizarPrecioForm.pricingMode = data.pricingMode || 'FIJO_PCT';
+    actualizarPrecioForm.margenPct = Number.isFinite(margen) ? margen.toFixed(2) : '0';
+    actualizarPrecioForm.margenCategoriaPct = data.margenGananciaPct != null
+      ? Number(data.margenGananciaPct).toString()
+      : '0';
+    actualizarPrecioForm.precioVentaManual = venta ? venta.toString() : '';
+    actualizarPrecioForm.precioVentaOriginal = venta;
     actualizarPrecioForm.margenGananciaPct = data.margenGananciaPct;
-    actualizarPrecioForm.precioVenta = Number(data.precioVenta || 0).toString();
-    actualizarPrecioForm.precioVentaOriginal = Number(data.precioVenta || 0);
+    await ensureCategoriasLookup();
+    applyActualizarCategoriaMargin();
     actualizarPrecioDialog.value = true;
   } catch (err) {
     flash('error', err?.message || 'No se pudo cargar el producto.');
@@ -1013,7 +1169,7 @@ const saveActualizarPrecio = async () => {
 
   actualizarPrecioLoading.value = true;
   try {
-    const precioVenta = Number(actualizarPrecioForm.precioVenta);
+    const precioVenta = Number(actualizarPrecioVentaCalculado.value);
     if (Number.isNaN(precioVenta) || precioVenta < 0) {
       flash('error', 'El precio venta debe ser valido.');
       return;
@@ -1022,9 +1178,10 @@ const saveActualizarPrecio = async () => {
     const payload = {
       precioBase,
       precioVenta,
+      categoriaId: actualizarPrecioForm.categoriaId || null,
       pricingMode: actualizarPrecioForm.pricingMode,
       margenGananciaPct: actualizarPrecioForm.pricingMode === 'FIJO_PCT'
-        ? Number(actualizarPrecioForm.margenGananciaPct || 0)
+        ? Number(actualizarPrecioForm.margenPct || 0)
         : null
     };
 
@@ -1163,6 +1320,7 @@ const clearForm = () => {
   error.value = '';
   localStorage.removeItem(remitoDraftStorageKey);
   loadProductos('');
+  focusProductSearchField();
 };
 
 const resetCreateForm = () => {
@@ -1621,6 +1779,12 @@ onMounted(async () => {
   await loadProductos('');
   await loadCategorias();
   resetCreateForm();
+  window.addEventListener('keydown', handlePersistentProductSearchKeydown, true);
+  focusProductSearchField();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handlePersistentProductSearchKeydown, true);
 });
 
 watch(
@@ -1646,6 +1810,35 @@ watch(
 );
 
 watch(
+  () => actualizarPrecioForm.pricingMode,
+  async (value) => {
+    if (value === 'MANUAL' && !actualizarPrecioForm.precioVentaManual) {
+      actualizarPrecioForm.precioVentaManual = actualizarPrecioVentaCalculado.value.toFixed(2);
+    }
+    if (value === 'CATEGORIA') {
+      await ensureCategoriasLookup();
+      applyActualizarCategoriaMargin();
+    }
+  }
+);
+
+watch(
+  () => actualizarPrecioForm.categoriaId,
+  () => {
+    applyActualizarCategoriaMargin();
+  }
+);
+
+watch(
+  () => hasBlockingDialog.value,
+  (isOpen) => {
+    if (!isOpen) {
+      focusProductSearchField();
+    }
+  }
+);
+
+watch(
   [selectedProveedorId, items],
   () => {
     saveDraft();
@@ -1661,6 +1854,18 @@ watch(
 
 .remitos-main-card {
   margin-top: 10px;
+}
+
+.remitos-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.remitos-search-row__search,
+.remitos-search-row__provider {
+  min-width: 0;
 }
 
 .remitos-action-btn {
@@ -1699,6 +1904,30 @@ watch(
 
 .product-section-title {
   margin: 16px 0 12px;
+}
+
+.price-dialog-meta {
+  display: grid;
+  gap: 12px;
+}
+
+.price-dialog-meta__item {
+  display: grid;
+  gap: 4px;
+}
+
+.price-dialog-meta__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.price-dialog-meta__value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .product-final-price {
@@ -1816,6 +2045,12 @@ watch(
 .quantity-stepper__input :deep(input::-webkit-inner-spin-button) {
   -webkit-appearance: none;
   margin: 0;
+}
+
+@media (max-width: 960px) {
+  .remitos-search-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 

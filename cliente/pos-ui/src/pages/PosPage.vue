@@ -20,16 +20,23 @@
                   color="primary"
                   align-tabs="start"
                   density="comfortable"
+                  mandatory
                   class="pos-ventas-tabs-track"
                 >
                   <v-tab
                     v-for="(tabItem, index) in ventaTabs"
                     :key="tabItem.id"
                     :value="tabItem.id"
-                    class="text-none"
+                    :class="['text-none', { 'pos-ventas-tab--active': activeVentaTabId === tabItem.id }]"
                   >
-                    <div class="pos-ventas-tab-content">
-                      <span>{{ ventaTabTitle(tabItem, index) }}</span>
+                    <div class="pos-ventas-tab-content" :style="ventaTabToneStyle(index)">
+                      <span class="pos-ventas-tab-label">{{ ventaTabLabel(index) }}</span>
+                      <span
+                        v-if="getVentaHotkeyLabel(index)"
+                        class="shortcut-key pos-ventas-tab-shortcut"
+                      >
+                        [{{ getVentaHotkeyLabel(index) }}]
+                      </span>
                       <v-btn
                         v-if="ventaTabs.length > 1"
                         icon="mdi-close"
@@ -49,7 +56,12 @@
                   @click="crearPestanaVenta"
                 >
                   <v-icon start size="16">mdi-plus</v-icon>
-                  Nueva venta
+                  <span class="pos-button-label">
+                    Nueva venta<span
+                      v-if="nuevaVentaButtonShortcut"
+                      class="shortcut-key pos-button-shortcut"
+                    > [{{ nuevaVentaButtonShortcut }}]</span>
+                  </span>
                 </v-btn>
               </div>
             </div>
@@ -166,36 +178,114 @@
               <span>Total bruto</span>
               <strong>{{ formatMoney(totalBruto) }}</strong>
             </div>
-            <div class="d-flex justify-space-between mb-2 pos-total-row">
-              <span>Descuento</span>
-              <strong>- {{ formatMoney(totalDescuento) }}</strong>
+            <div
+              v-if="totalDescuentoAplicado > 0"
+              class="d-flex justify-space-between mb-2 pos-total-row pos-total-row--discount"
+            >
+              <span>{{ resumenDescuentoLabel }}</span>
+              <strong>- {{ formatMoney(totalDescuentoAplicado) }}</strong>
+            </div>
+            <div
+              v-if="totalRecargoAplicado > 0"
+              class="d-flex justify-space-between mb-2 pos-total-row pos-total-row--surcharge"
+            >
+              <span>{{ resumenRecargoLabel }}</span>
+              <strong>{{ formatMoney(totalRecargoAplicado) }}</strong>
             </div>
             <div class="mt-3">
-              <div class="text-caption text-medium-emphasis mb-2">Descuento manual sobre el total</div>
               <div class="pos-discount-row">
-                <v-text-field
-                  v-model="discountPct"
-                  label="%"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                  :disabled="!canEdit || !items.length || applyingDiscount"
-                  @focus="clearZeroDiscount"
-                />
-                <v-btn
-                  color="secondary"
-                  variant="tonal"
-                  class="text-none"
-                  :loading="applyingDiscount"
-                  :disabled="!canEdit || !items.length"
-                  @click="applyDiscount"
-                >
-                  Aplicar
-                </v-btn>
+                <div class="pos-adjustment-group">
+                  <v-menu location="bottom start">
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        color="secondary"
+                        variant="tonal"
+                        class="text-none pos-adjustment-btn"
+                        :loading="descuentosTotalLoading || applyingAdjustment"
+                        :disabled="!canEdit || !items.length"
+                        @click="loadDescuentosTotal"
+                      >
+                        Aplicar descuento
+                      </v-btn>
+                    </template>
+                    <v-list density="compact" class="pos-discount-menu">
+                      <v-list-item
+                        v-if="normalizePct(discountPct) !== '0'"
+                        prepend-icon="mdi-close-circle-outline"
+                        title="Quitar descuento"
+                        @click="clearAppliedDiscount"
+                      />
+                      <v-list-item
+                        v-for="preset in descuentosTotalOptions"
+                        :key="preset.id"
+                        :title="preset.name"
+                        :subtitle="formatPct(preset.porcentaje)"
+                        @click="applyDiscountPreset(preset)"
+                      />
+                      <v-list-item
+                        v-if="!descuentosTotalLoading && !descuentosTotalOptions.length"
+                        title="No hay descuentos creados"
+                        disabled
+                      />
+                      <v-divider class="my-1" />
+                      <v-list-item
+                        prepend-icon="mdi-plus-circle-outline"
+                        title="Crear nuevo descuento"
+                        @click="openAjustePresetDialog('DESCUENTO')"
+                      />
+                    </v-list>
+                  </v-menu>
+                  <div v-if="descuentoTotalActivoLabel" class="text-caption pos-discount-active">
+                    {{ descuentoTotalActivoLabel }}
+                  </div>
+                </div>
+                <div class="pos-adjustment-group">
+                  <v-menu location="bottom start">
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        color="secondary"
+                        variant="tonal"
+                        class="text-none pos-adjustment-btn"
+                        :loading="recargosTotalLoading || applyingAdjustment"
+                        :disabled="!canEdit || !items.length"
+                        @click="loadRecargosTotal"
+                      >
+                        Aplicar recargo
+                      </v-btn>
+                    </template>
+                    <v-list density="compact" class="pos-discount-menu">
+                      <v-list-item
+                        v-if="normalizePct(surchargePct) !== '0'"
+                        prepend-icon="mdi-close-circle-outline"
+                        title="Quitar recargo"
+                        @click="clearAppliedSurcharge"
+                      />
+                      <v-list-item
+                        v-for="preset in recargosTotalOptions"
+                        :key="preset.id"
+                        :title="preset.name"
+                        :subtitle="formatPct(preset.porcentaje)"
+                        @click="applySurchargePreset(preset)"
+                      />
+                      <v-list-item
+                        v-if="!recargosTotalLoading && !recargosTotalOptions.length"
+                        title="No hay recargos creados"
+                        disabled
+                      />
+                      <v-divider class="my-1" />
+                      <v-list-item
+                        prepend-icon="mdi-plus-circle-outline"
+                        title="Crear nuevo recargo"
+                        @click="openAjustePresetDialog('RECARGO')"
+                      />
+                    </v-list>
+                  </v-menu>
+                  <div v-if="recargoTotalActivoLabel" class="text-caption pos-discount-active">
+                    {{ recargoTotalActivoLabel }}
+                  </div>
+                </div>
               </div>
             </div>
             <div class="pos-total-net">
@@ -208,7 +298,7 @@
             <v-btn
               color="primary"
               size="large"
-              class="text-none pos-primary-action"
+              class="text-none pos-checkout-action"
               block
               :disabled="!canEdit || !items.length"
               @click="openPagos"
@@ -219,24 +309,27 @@
             <v-btn
               color="secondary"
               variant="tonal"
-              class="text-none mt-3 pos-secondary-action"
+              class="text-none mt-3 pos-whatsapp-action"
               block
               :disabled="!items.length"
               @click="generarCotizacionWhatsapp"
             >
               <v-icon start>mdi-whatsapp</v-icon>
-              Cotizacion (WhatsApp)
+              Cotización (WhatsApp)
             </v-btn>
             <v-btn
               color="error"
               variant="tonal"
-              class="text-none mt-3 pos-secondary-action"
+              class="text-none mt-3 pos-danger-action"
               block
-              :disabled="!ventaId || !items.length || !canEdit"
-              @click="clearCarrito"
+              :loading="anularLoading"
+              :disabled="!canRemoveVentaTab || anularLoading"
+              @click="cancelarYEliminarVenta"
             >
               <v-icon start>mdi-cart-off</v-icon>
-              Cancelar / Vaciar carrito
+              <span class="pos-button-label">
+                Cancelar venta / Vaciar carrito<span class="shortcut-key pos-button-shortcut"> [ESC]</span>
+              </span>
             </v-btn>
           </v-card>
 
@@ -898,6 +991,49 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="dialogNuevoAjusteTotal" width="520" persistent>
+      <v-card>
+        <v-card-title>{{ nuevoAjusteTotalDialogTitle }}</v-card-title>
+        <v-card-text>
+          <v-form @submit.prevent="saveNuevoAjusteTotal">
+            <v-text-field
+              v-model="nuevoAjusteTotal.name"
+              label="Nombre"
+              variant="outlined"
+              density="comfortable"
+              maxlength="120"
+              counter="120"
+              :error-messages="nuevoAjusteTotalErrors.name"
+              @blur="validateNuevoAjusteTotalField('name')"
+              required
+            />
+            <v-text-field
+              v-model="nuevoAjusteTotal.porcentaje"
+              :label="nuevoAjusteTotalPorcentajeLabel"
+              variant="outlined"
+              density="comfortable"
+              type="number"
+              min="0.01"
+              max="100"
+              step="0.01"
+              :error-messages="nuevoAjusteTotalErrors.porcentaje"
+              @blur="validateNuevoAjusteTotalField('porcentaje')"
+              required
+            />
+            <button type="submit" class="d-none" aria-hidden="true" />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" :disabled="nuevoAjusteTotalSaving" @click="dialogNuevoAjusteTotal = false">
+            Cancelar
+          </v-btn>
+          <v-btn color="primary" :loading="nuevoAjusteTotalSaving" @click="saveNuevoAjusteTotal">
+            Guardar y aplicar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top end" timeout="1600">
       <div class="d-flex align-center gap-2">
         <v-icon>{{ snackbar.icon }}</v-icon>
@@ -924,7 +1060,14 @@ const venta = ref(null);
 const items = ref([]);
 const pricing = ref(null);
 const discountPct = ref('0');
-const applyingDiscount = ref(false);
+const surchargePct = ref('0');
+const appliedDiscountPresetId = ref('');
+const appliedSurchargePresetId = ref('');
+const applyingAdjustment = ref(false);
+const descuentosTotalOptions = ref([]);
+const descuentosTotalLoading = ref(false);
+const recargosTotalOptions = ref([]);
+const recargosTotalLoading = ref(false);
 const cajaStatus = ref('CERRADA');
 const cajaSessionId = ref('');
 const scanInput = ref('');
@@ -941,6 +1084,7 @@ const dialogNuevaCaja = ref(false);
 const dialogCerrarCaja = ref(false);
 const dialogStock = ref(false);
 const dialogStockAjuste = ref(false);
+const dialogNuevoAjusteTotal = ref(false);
 const qtyEdits = ref({});
 const descuentoPctEdits = ref({});
 const productoSearchLoading = ref(false);
@@ -949,6 +1093,7 @@ const productoSeleccionado = ref(null);
 const POS_VENTA_KEY = 'pos-venta-id';
 const POS_VENTA_DRAFT_KEY = 'pos-venta-draft';
 const POS_SESSION_META_KEY = 'pos-session-meta';
+const MAX_VENTA_HOTKEY = 9;
 const ventaTabs = ref([{ id: 'venta-tab-1', ventaId: '' }]);
 const activeVentaTabId = ref('venta-tab-1');
 const displayVentaNumero = ref(null);
@@ -957,6 +1102,8 @@ const cajaNombre = ref('');
 const cajaTurno = ref('');
 const cajaAperturaAt = ref('');
 let productoSearchTimer = null;
+let lastVentasShortcutId = '';
+let lastVentasShortcutAt = 0;
 
 const snackbar = ref({
   show: false,
@@ -1074,6 +1221,16 @@ const stockAjuste = reactive({
 const stockAjustesPendientes = ref([]);
 const stockAjusteProductoOriginal = ref(null);
 const stockAjusteDebeReintentarOriginal = ref(false);
+const nuevoAjusteTotalSaving = ref(false);
+const nuevoAjusteTotalTipo = ref('DESCUENTO');
+const nuevoAjusteTotal = reactive({
+  name: '',
+  porcentaje: '10'
+});
+const nuevoAjusteTotalErrors = reactive({
+  name: '',
+  porcentaje: ''
+});
 
 const headers = [
   { title: 'Producto', value: 'nombre' },
@@ -1093,6 +1250,7 @@ const createSessionMeta = (sessionId = '') => ({
 const sessionMeta = ref(createSessionMeta());
 
 const createVentaTabId = () => `venta-tab-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+const createBlankVentaTab = (id = createVentaTabId()) => ({ id, ventaId: '' });
 
 const resolveCurrentTab = () => {
   const byActive = ventaTabs.value.find((tab) => tab.id === activeVentaTabId.value);
@@ -1103,6 +1261,26 @@ const resolveCurrentTab = () => {
     activeVentaTabId.value = firstTab.id;
   }
   return firstTab;
+};
+
+const ensureVentaTabSelection = () => {
+  if (!ventaTabs.value.length) {
+    const newTab = createBlankVentaTab();
+    ventaTabs.value = [newTab];
+    activeVentaTabId.value = newTab.id;
+    return newTab;
+  }
+
+  const activeTab = ventaTabs.value.find((tab) => tab.id === activeVentaTabId.value);
+  if (activeTab) return activeTab;
+
+  const fallbackTab = ventaTabs.value.find((tab) => tab.id) || ventaTabs.value[ventaTabs.value.length - 1];
+  if (fallbackTab) {
+    activeVentaTabId.value = fallbackTab.id;
+    return fallbackTab;
+  }
+
+  return null;
 };
 
 const persistVentaTabs = () => {
@@ -1124,7 +1302,12 @@ const syncLegacyVentaStorage = () => {
 const loadVentaTabs = () => {
   try {
     const raw = localStorage.getItem(POS_VENTAS_STATE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      ensureVentaTabSelection();
+      persistVentaTabs();
+      syncLegacyVentaStorage();
+      return;
+    }
 
     const parsed = JSON.parse(raw);
     const parsedTabs = Array.isArray(parsed?.tabs) ? parsed.tabs : [];
@@ -1135,28 +1318,47 @@ const loadVentaTabs = () => {
       }))
       .filter((item) => item.id);
 
-    if (!tabs.length) return;
-
     ventaTabs.value = tabs;
     activeVentaTabId.value = tabs.some((tab) => tab.id === parsed?.activeTabId)
       ? parsed.activeTabId
-      : tabs[0].id;
+      : (tabs[tabs.length - 1]?.id || '');
+    ensureVentaTabSelection();
+    persistVentaTabs();
     syncLegacyVentaStorage();
   } catch {
-    // Ignora estado local invalido.
+    ensureVentaTabSelection();
+    persistVentaTabs();
+    syncLegacyVentaStorage();
   }
 };
 
-const ventaTabTitle = (tabItem, index) => {
-  const hotkey = `F${index + 1}`;
-  return tabItem.ventaId ? `${hotkey} · Venta` : `${hotkey} · Nueva`;
+const getVentaHotkeyLabel = (index) => (index < MAX_VENTA_HOTKEY ? `F${index + 1}` : '');
+const getVentaTabTone = (index) => `var(--pos-venta-tab-tone-${(index % MAX_VENTA_HOTKEY) + 1})`;
+const ventaTabToneStyle = (index) => ({ '--venta-tab-tone': getVentaTabTone(index) });
+
+const getVentaLetter = (index) => {
+  let value = index + 1;
+  let result = '';
+
+  while (value > 0) {
+    value -= 1;
+    result = String.fromCharCode(65 + (value % 26)) + result;
+    value = Math.floor(value / 26);
+  }
+
+  return result;
 };
+
+const ventaTabLabel = (index) => `Venta ${getVentaLetter(index)}`;
 
 const clearVentaStateOnly = () => {
   venta.value = null;
   items.value = [];
   pricing.value = null;
   discountPct.value = '0';
+  surchargePct.value = '0';
+  appliedDiscountPresetId.value = '';
+  appliedSurchargePresetId.value = '';
   qtyEdits.value = {};
   pagos.value = [];
   facturacionSeleccion.value = false;
@@ -1174,7 +1376,14 @@ const ventaId = computed(() => venta.value?.id || '');
 const ventaEstado = computed(() => venta.value?.estado || 'SIN_VENTA');
 const canEdit = computed(() => ventaEstado.value === 'BORRADOR');
 const activeVentaTab = computed(() => ventaTabs.value.find((tab) => tab.id === activeVentaTabId.value) || null);
+const canRemoveVentaTab = computed(() => Boolean(activeVentaTab.value));
 const cajaAbierta = computed(() => cajaStatus.value === 'ABIERTA');
+const nextVentaHotkeyNumber = computed(() =>
+  ventaTabs.value.length < MAX_VENTA_HOTKEY ? ventaTabs.value.length + 1 : null
+);
+const nuevaVentaButtonShortcut = computed(() =>
+  nextVentaHotkeyNumber.value ? `F${nextVentaHotkeyNumber.value}` : ''
+);
 const canScan = computed(() => cajaAbierta.value && (ventaEstado.value === 'BORRADOR' || ventaEstado.value === 'SIN_VENTA'));
 const cajaDisplay = computed(() => cajaNumero.value || 'n/a');
 const cajeroDisplay = computed(() => cajaNombre.value || 'n/a');
@@ -1187,9 +1396,31 @@ const totalBruto = computed(() => {
   return items.value.reduce((acc, item) => acc + ((item.precioLista ?? item.precioUnitario) * item.cantidad), 0);
 });
 
+const totalBaseConDescuentoItem = computed(() => items.value.reduce((acc, item) => {
+  const precioLista = Number(item.precioLista ?? item.precioUnitario ?? 0);
+  const descuentoItemPct = Number(item.descuentoPct || 0);
+  const precioConDescuentoItem = roundMoneyValue(precioLista * (1 - descuentoItemPct / 100));
+  return acc + (precioConDescuentoItem * Number(item.cantidad || 0));
+}, 0));
+
 const totalDescuento = computed(() => {
-  if (pricing.value?.totalDescuento != null) return pricing.value.totalDescuento;
-  return Math.max(totalBruto.value - totalNeto.value, 0);
+  const descuentoItems = Math.max(totalBruto.value - totalBaseConDescuentoItem.value, 0);
+  const descuentoTotal = totalBaseConDescuentoItem.value * (Number(discountPct.value || 0) / 100);
+  return descuentoItems + descuentoTotal;
+});
+
+const totalDescuentoAplicado = computed(() =>
+  totalBaseConDescuentoItem.value * (Number(discountPct.value || 0) / 100)
+);
+
+const totalRecargo = computed(() => {
+  const totalConDescuentos = totalBaseConDescuentoItem.value * (1 - Number(discountPct.value || 0) / 100);
+  return Math.max(totalConDescuentos * (Number(surchargePct.value || 0) / 100), 0);
+});
+
+const totalRecargoAplicado = computed(() => {
+  const totalConDescuentos = totalBaseConDescuentoItem.value * (1 - Number(discountPct.value || 0) / 100);
+  return Math.max(totalConDescuentos * (Number(surchargePct.value || 0) / 100), 0);
 });
 
 const totalNeto = computed(() => {
@@ -1200,6 +1431,59 @@ const totalNeto = computed(() => {
 const totalItems = computed(() => items.value.reduce((acc, item) => acc + item.cantidad, 0));
 
 const totalPagos = computed(() => pagos.value.reduce((acc, line) => acc + (line.monto || 0), 0));
+const descuentoTotalActivoLabel = computed(() => {
+  const pct = normalizePct(discountPct.value);
+  if (pct === '0') return '';
+
+  const preset = descuentosTotalOptions.value.find((item) => item.id === appliedDiscountPresetId.value);
+  if (preset) {
+    return `${preset.name} (${formatPct(preset.porcentaje)})`;
+  }
+
+  return `Descuento total activo: ${pct}%`;
+});
+
+const resumenDescuentoLabel = computed(() => {
+  const pct = normalizePct(discountPct.value);
+  if (pct === '0') return '';
+
+  const preset = descuentosTotalOptions.value.find((item) => item.id === appliedDiscountPresetId.value);
+  if (preset?.name) {
+    return `${preset.name} (-${formatPct(preset.porcentaje)})`;
+  }
+
+  return `Descuento (-${pct}%)`;
+});
+
+const recargoTotalActivoLabel = computed(() => {
+  const pct = normalizePct(surchargePct.value);
+  if (pct === '0') return '';
+
+  const preset = recargosTotalOptions.value.find((item) => item.id === appliedSurchargePresetId.value);
+  if (preset) {
+    return `${preset.name} (${formatPct(preset.porcentaje)})`;
+  }
+
+  return `Recargo total activo: ${pct}%`;
+});
+
+const resumenRecargoLabel = computed(() => {
+  const pct = normalizePct(surchargePct.value);
+  if (pct === '0') return '';
+
+  const preset = recargosTotalOptions.value.find((item) => item.id === appliedSurchargePresetId.value);
+  if (preset?.name) {
+    return `${preset.name} (${formatPct(preset.porcentaje)})`;
+  }
+
+  return `Recargo (${pct}%)`;
+});
+const nuevoAjusteTotalDialogTitle = computed(() =>
+  nuevoAjusteTotalTipo.value === 'RECARGO' ? 'Nuevo recargo' : 'Nuevo descuento'
+);
+const nuevoAjusteTotalPorcentajeLabel = computed(() =>
+  nuevoAjusteTotalTipo.value === 'RECARGO' ? '% recargo' : '% descuento'
+);
 const diferenciaPagos = computed(() => totalPagos.value - totalNeto.value);
 const canAddPago = computed(() => pagos.value.length < MAX_MEDIOS_PAGO);
 const canRemovePago = computed(() => pagos.value.length > 1);
@@ -1248,6 +1532,17 @@ const canSaveCerrarCaja = computed(() => {
   if (!cierreResumen.value) return false;
   return true;
 });
+const hasOpenDialog = computed(() =>
+  dialogPagos.value
+  || dialogMovimientoCaja.value
+  || dialogResumenCaja.value
+  || dialogAbrirCaja.value
+  || dialogNuevaCaja.value
+  || dialogCerrarCaja.value
+  || dialogStock.value
+  || dialogStockAjuste.value
+  || dialogNuevoAjusteTotal.value
+);
 const canAjustarStock = computed(() => auth.hasPermission('PERM_STOCK_AJUSTAR'));
 const cajaAperturaOptions = computed(() => [
   ...cajasDisponibles.value,
@@ -1257,55 +1552,134 @@ const cajaAperturaOptions = computed(() => [
   }
 ]);
 
-const loadCajaSession = () => {
+const getCajaInfo = (cajaId) => cajasDisponibles.value.find((item) => item.id === cajaId) || null;
+
+const persistCajaSession = (session) => {
+  if (!session?.id || !session?.cajaId) return;
+
+  const cajaSeleccionada = getCajaInfo(session.cajaId);
+  localStorage.setItem(POS_LAST_CAJA_KEY, session.cajaId);
+  localStorage.setItem('pos-caja-session', JSON.stringify({
+    ...session,
+    cajaNumero: cajaSeleccionada?.numero || shortId(session.cajaId),
+    cajaNombre: cajaSeleccionada?.nombre || 'n/a'
+  }));
+};
+
+const applyCajaSession = (session, previousSessionId = cajaSessionId.value) => {
+  cajaStatus.value = 'ABIERTA';
+  cajaSessionId.value = session.id || '';
+  cajaNumero.value = session.cajaNumero || shortId(session.cajaId);
+  cajaNombre.value = session.cajaNombre || 'n/a';
+  cajaTurno.value = session.turno || '';
+  cajaAperturaAt.value = session.aperturaAt || '';
+
+  if (session.cajaId) {
+    localStorage.setItem(POS_LAST_CAJA_KEY, session.cajaId);
+  }
+
+  if (previousSessionId && previousSessionId !== cajaSessionId.value) {
+    resetVentaWorkspace();
+  }
+
+  syncSessionMeta();
+};
+
+const tryRecoverOpenCajaSession = async (cajaId, options = {}) => {
+  const { notify = false, successText = '' } = options;
+  if (!cajaId) return false;
+
+  const { response, data } = await getJson(`/api/v1/caja/sesiones/abierta?cajaId=${encodeURIComponent(cajaId)}`);
+  if (response.status === 404) {
+    return false;
+  }
+
+  if (!response.ok) {
+    throw new Error(extractProblemMessage(data));
+  }
+
+  if (!data?.id) {
+    return false;
+  }
+
+  const previousSessionId = cajaSessionId.value;
+  persistCajaSession(data);
+  applyCajaSession(
+    {
+      ...data,
+      cajaNumero: getCajaInfo(data.cajaId)?.numero || shortId(data.cajaId),
+      cajaNombre: getCajaInfo(data.cajaId)?.nombre || 'n/a'
+    },
+    previousSessionId
+  );
+
+  if (notify) {
+    window.dispatchEvent(new CustomEvent('pos-caja-session-changed'));
+  }
+
+  if (successText) {
+    flash('success', successText);
+  }
+
+  return true;
+};
+
+const clearCajaSession = () => {
+  cajaStatus.value = 'CERRADA';
+  cajaSessionId.value = '';
+  cajaNumero.value = '';
+  cajaNombre.value = '';
+  cajaTurno.value = '';
+  cajaAperturaAt.value = '';
+  localStorage.removeItem('pos-caja-session');
+  resetVentaWorkspace();
+  clearSessionMeta();
+};
+
+const loadCajaSession = async () => {
   const previousSessionId = cajaSessionId.value;
   const raw = localStorage.getItem('pos-caja-session');
   if (!raw) {
-    cajaStatus.value = 'CERRADA';
-    cajaSessionId.value = '';
-    cajaNumero.value = '';
-    cajaNombre.value = '';
-    cajaTurno.value = '';
-    cajaAperturaAt.value = '';
-    resetVentaWorkspace();
-    clearSessionMeta();
+    const recovered = await tryRecoverOpenCajaSession(cajaAperturaId.value || getPreferredCajaId(cajasDisponibles.value));
+    if (recovered) {
+      return;
+    }
+
+    clearCajaSession();
     return;
   }
   try {
     const session = JSON.parse(raw);
-    if (session?.estado === 'ABIERTA') {
-      cajaStatus.value = 'ABIERTA';
-      cajaSessionId.value = session.id || '';
-      cajaNumero.value = session.cajaNumero || shortId(session.cajaId);
-      cajaNombre.value = session.cajaNombre || 'n/a';
-      cajaTurno.value = session.turno || '';
-      cajaAperturaAt.value = session.aperturaAt || '';
-      if (session.cajaId) {
-        localStorage.setItem(POS_LAST_CAJA_KEY, session.cajaId);
+    if (session?.estado !== 'ABIERTA' || !session.id) {
+      const recovered = await tryRecoverOpenCajaSession(session?.cajaId || cajaAperturaId.value || getPreferredCajaId(cajasDisponibles.value));
+      if (recovered) {
+        return;
       }
-      if (previousSessionId && previousSessionId !== cajaSessionId.value) {
-        resetVentaWorkspace();
+
+      clearCajaSession();
+      return;
+    }
+
+    // Validar con el backend que la sesión realmente existe y está abierta
+    try {
+      const { response } = await getJson(`/api/v1/caja/sesiones/${session.id}/resumen`);
+      if (!response.ok) {
+        clearCajaSession();
+        return;
       }
-      syncSessionMeta();
-    } else {
-      cajaStatus.value = 'CERRADA';
-      cajaSessionId.value = '';
-      cajaNumero.value = '';
-      cajaNombre.value = '';
-      cajaTurno.value = '';
-      cajaAperturaAt.value = '';
-      resetVentaWorkspace();
-      clearSessionMeta();
+
+      // Sesión válida, actualizar el estado
+      applyCajaSession(session, previousSessionId);
+    } catch (err) {
+      const recovered = await tryRecoverOpenCajaSession(session?.cajaId || cajaAperturaId.value || getPreferredCajaId(cajasDisponibles.value));
+      if (recovered) {
+        return;
+      }
+
+      clearCajaSession();
     }
   } catch {
-    cajaStatus.value = 'CERRADA';
-    cajaSessionId.value = '';
-    cajaNumero.value = '';
-    cajaNombre.value = '';
-    cajaTurno.value = '';
-    cajaAperturaAt.value = '';
-    resetVentaWorkspace();
-    clearSessionMeta();
+    clearCajaSession();
   }
 };
 
@@ -1319,12 +1693,14 @@ const saveVentaId = (id) => {
   persistVentaTabs();
 };
 
-const normalizeDiscountPct = (value) => {
+const normalizePct = (value) => {
   const numeric = Number(value);
   if (Number.isNaN(numeric) || numeric <= 0) return '0';
   const clamped = Math.min(100, Math.max(0, numeric));
   return Number.isInteger(clamped) ? String(clamped) : clamped.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
 };
+
+const formatPct = (value) => `${normalizePct(value)}%`;
 
 const inferDiscountPctFromItems = (saleItems) => {
   for (const item of saleItems || []) {
@@ -1336,7 +1712,7 @@ const inferDiscountPctFromItems = (saleItems) => {
 
     const pct = ((precioLista - precioUnitario) / precioLista) * 100;
     if (pct > 0.01) {
-      return normalizeDiscountPct(pct);
+      return normalizePct(pct);
     }
   }
 
@@ -1367,13 +1743,16 @@ const persistVentaDraft = () => {
 
   const itemDiscountMap = items.value.reduce((acc, item) => {
     if (!item?.id) return acc;
-    acc[String(item.id)] = normalizeDiscountPct(item.descuentoPct ?? '0');
+    acc[String(item.id)] = normalizePct(item.descuentoPct ?? '0');
     return acc;
   }, {});
 
   localStorage.setItem(POS_VENTA_DRAFT_KEY, JSON.stringify({
     ventaId: ventaId.value,
-    discountPct: normalizeDiscountPct(discountPct.value),
+    discountPct: normalizePct(discountPct.value),
+    discountPresetId: appliedDiscountPresetId.value || null,
+    surchargePct: normalizePct(surchargePct.value),
+    surchargePresetId: appliedSurchargePresetId.value || null,
     itemPriceMap,
     itemDiscountMap
   }));
@@ -1464,8 +1843,9 @@ const advanceVentaNumber = () => {
 };
 
 const resetVentaWorkspace = () => {
-  ventaTabs.value = [{ id: 'venta-tab-1', ventaId: '' }];
-  activeVentaTabId.value = 'venta-tab-1';
+  const newTab = createBlankVentaTab('venta-tab-1');
+  ventaTabs.value = [newTab];
+  activeVentaTabId.value = newTab.id;
   clearVentaStateOnly();
   localStorage.removeItem(POS_VENTA_KEY);
   clearVentaDraft();
@@ -1474,10 +1854,10 @@ const resetVentaWorkspace = () => {
 };
 
 const switchToVentaTab = async (tabId) => {
-  const tabItem = ventaTabs.value.find((tab) => tab.id === tabId);
+  const tabItem = ventaTabs.value.find((tab) => tab.id === tabId) || ensureVentaTabSelection();
   if (!tabItem) return;
 
-  activeVentaTabId.value = tabId;
+  activeVentaTabId.value = tabItem.id;
   syncLegacyVentaStorage();
   persistVentaTabs();
 
@@ -1493,7 +1873,7 @@ const switchToVentaTab = async (tabId) => {
 };
 
 const crearPestanaVenta = async () => {
-  const newTab = { id: createVentaTabId(), ventaId: '' };
+  const newTab = createBlankVentaTab();
   ventaTabs.value.push(newTab);
   await switchToVentaTab(newTab.id);
 };
@@ -1522,10 +1902,10 @@ const cerrarPestanaVenta = async (tabId) => {
 const cerrarVentaActiva = async () => {
   const currentTab = resolveCurrentTab();
   if (!currentTab) {
-    clearVentaStateOnly();
-    clearVentaDraft();
-    persistVentaTabs();
-    refreshDisplayVentaNumero();
+    const fallbackTab = ensureVentaTabSelection();
+    if (fallbackTab) {
+      await switchToVentaTab(fallbackTab.id);
+    }
     return;
   }
 
@@ -1534,26 +1914,149 @@ const cerrarVentaActiva = async () => {
     return;
   }
 
-  currentTab.ventaId = '';
-  clearVentaStateOnly();
+  const replacementTab = createBlankVentaTab();
+  ventaTabs.value = [replacementTab];
+  activeVentaTabId.value = replacementTab.id;
   clearVentaDraft();
   syncLegacyVentaStorage();
   persistVentaTabs();
   refreshDisplayVentaNumero();
+  clearVentaStateOnly();
+  focusScan();
+};
+
+const canHandleVentaShortcut = (shortcutId) => {
+  const now = Date.now();
+  if (lastVentasShortcutId === shortcutId && now - lastVentasShortcutAt < 220) {
+    return false;
+  }
+
+  lastVentasShortcutId = shortcutId;
+  lastVentasShortcutAt = now;
+  return true;
 };
 
 const handleVentasHotkeys = (event) => {
   if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.repeat) return;
+
+  const target = event.target;
+  const scanInputElement = scanInputRef.value?.$el?.querySelector('input') || null;
+  const isScanInputTarget = Boolean(
+    target instanceof HTMLElement
+    && scanInputElement
+    && target === scanInputElement
+  );
+  const isEditableTarget =
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
+  const isEscapeShortcut =
+    event.isEscape ||
+    event.code === 'Escape' ||
+    event.key === 'Escape' ||
+    event.key === 'Esc' ||
+    event.keyCode === 27 ||
+    event.which === 27;
+
+  if (isEscapeShortcut && !hasOpenDialog.value && (!isEditableTarget || isScanInputTarget)) {
+    if (!canRemoveVentaTab.value || anularLoading.value) return;
+    if (!canHandleVentaShortcut('escape-tab')) return;
+    event.preventDefault();
+    cancelarYEliminarVenta();
+    return;
+  }
+
   if (!event.key?.startsWith('F')) return;
 
   const number = Number(event.key.slice(1));
-  if (!Number.isInteger(number) || number < 1 || number > 9) return;
+  if (!Number.isInteger(number) || number < 1 || number > MAX_VENTA_HOTKEY) return;
 
   const tabItem = ventaTabs.value[number - 1];
-  if (!tabItem) return;
+  if (tabItem) {
+    if (!canHandleVentaShortcut(`venta-f${number}`)) return;
+    event.preventDefault();
+    switchToVentaTab(tabItem.id);
+    return;
+  }
+
+  if (number === nextVentaHotkeyNumber.value) {
+    if (!canHandleVentaShortcut(`new-venta-f${number}`)) return;
+    event.preventDefault();
+    crearPestanaVenta();
+  }
+};
+
+const isEditableElement = (target) => {
+  const element = target instanceof HTMLElement ? target : null;
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+
+  const editableContainer = element.closest('input, textarea, select, [contenteditable="true"], .v-field input, .v-field textarea');
+  if (editableContainer) return true;
+
+  const role = element.getAttribute('role');
+  return role === 'textbox' || role === 'combobox' || role === 'spinbutton';
+};
+
+const handlePersistentScanInput = (event) => {
+  if (event.type !== 'keydown') return;
+  if (event.defaultPrevented) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.repeat) return;
+  if (!cajaAbierta.value || hasOpenDialog.value) return;
+
+  const target = event.target;
+  const scanInputElement = scanInputRef.value?.$el?.querySelector('input') || null;
+  const isScanInputTarget = Boolean(
+    target instanceof HTMLElement
+    && scanInputElement
+    && target === scanInputElement
+  );
+
+  if (isEditableElement(target) && !isScanInputTarget) {
+    return;
+  }
+
+  if (event.key === 'Enter') {
+    if (!isScanInputTarget) {
+      event.preventDefault();
+      focusScan();
+      handleScan();
+    }
+    return;
+  }
+
+  if (event.key === 'Backspace') {
+    if (!isScanInputTarget) {
+      event.preventDefault();
+      scanInput.value = String(scanInput.value || '').slice(0, -1);
+      productoSeleccionado.value = null;
+      searchProductos(scanInput.value);
+      focusScan();
+    }
+    return;
+  }
+
+  if (event.key === 'Delete') {
+    if (!isScanInputTarget) {
+      event.preventDefault();
+      scanInput.value = '';
+      productoSeleccionado.value = null;
+      searchProductos('');
+      focusScan();
+    }
+    return;
+  }
+
+  if (event.key.length !== 1 || isScanInputTarget) return;
 
   event.preventDefault();
-  switchToVentaTab(tabItem.id);
+  scanInput.value = `${String(scanInput.value || '')}${event.key}`;
+  productoSeleccionado.value = null;
+  searchProductos(scanInput.value);
+  focusScan();
 };
 
 const resetCierreCajaForm = () => {
@@ -2045,6 +2548,9 @@ const createVenta = async () => {
     });
     pricing.value = null;
     discountPct.value = '0';
+    surchargePct.value = '0';
+    appliedDiscountPresetId.value = '';
+    appliedSurchargePresetId.value = '';
     pagos.value = [];
     facturacionSeleccion.value = false;
     resetFacturaCliente();
@@ -2095,7 +2601,7 @@ const restoreVenta = async (forcedVentaId = '') => {
 
     if (draft?.itemDiscountMap && typeof draft.itemDiscountMap === 'object') {
       restoredItems.forEach((item) => {
-        item.descuentoPct = normalizeDiscountPct(draft.itemDiscountMap[String(item.id)] ?? '0');
+        item.descuentoPct = normalizePct(draft.itemDiscountMap[String(item.id)] ?? '0');
         item.subtotal = item.cantidad * item.precioUnitario;
       });
     }
@@ -2106,7 +2612,10 @@ const restoreVenta = async (forcedVentaId = '') => {
       qtyEdits.value[item.id] = item.cantidad;
     });
     pricing.value = null;
-    discountPct.value = draft?.discountPct ? normalizeDiscountPct(draft.discountPct) : inferDiscountPctFromItems(items.value);
+    discountPct.value = draft?.discountPct ? normalizePct(draft.discountPct) : inferDiscountPctFromItems(items.value);
+    appliedDiscountPresetId.value = draft?.discountPresetId || '';
+    surchargePct.value = draft?.surchargePct ? normalizePct(draft.surchargePct) : '0';
+    appliedSurchargePresetId.value = draft?.surchargePresetId || '';
     pagos.value = [];
     persistVentaDraft();
     refreshDisplayVentaNumero();
@@ -2261,6 +2770,9 @@ const removeItem = async (item) => {
     delete descuentoPctEdits.value[item.id];
     if (!items.value.length) {
       discountPct.value = '0';
+      surchargePct.value = '0';
+      appliedDiscountPresetId.value = '';
+      appliedSurchargePresetId.value = '';
     }
     persistVentaDraft();
     flash('success', 'Item eliminado');
@@ -2269,39 +2781,16 @@ const removeItem = async (item) => {
   }
 };
 
-const clearCarrito = async () => {
-  if (!canEdit.value || !items.value.length || anularLoading.value) return;
-  if (!ventaId.value) return;
+const cancelarYEliminarVenta = async () => {
+  if (!canRemoveVentaTab.value || anularLoading.value) return;
 
   anularLoading.value = true;
   try {
-    const currentItems = [...items.value];
-    for (const item of currentItems) {
-      const { response } = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        const fallback = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ cantidad: 0 })
-        });
-        if (!fallback.response.ok) {
-          throw new Error(extractProblemMessage(fallback.data));
-        }
-      }
-    }
-
-    items.value = [];
-    qtyEdits.value = {};
-    descuentoPctEdits.value = {};
-    pricing.value = null;
-    discountPct.value = '0';
-    persistVentaDraft();
-    flash('success', 'Carrito vaciado');
+    await cerrarVentaActiva();
+    flash('success', 'Venta cerrada');
     focusScan();
   } catch (err) {
-    flash('error', err?.message || 'No se pudo vaciar el carrito.');
+    flash('error', err?.message || 'No se pudo cerrar la venta.');
   } finally {
     anularLoading.value = false;
   }
@@ -2349,8 +2838,7 @@ const commitDiscount = async (item) => {
   if (String(descuentoPct) === String(item.descuentoPct)) return;
   if (!ventaId.value) return;
 
-  const precioLista = Number(item.precioLista ?? item.precioUnitario ?? 0);
-  const nuevoPrecioUnitario = roundMoneyValue(precioLista * (1 - descuentoPct / 100));
+  const nuevoPrecioUnitario = buildAdjustedUnitPrice(item, descuentoPct, discountPct.value, surchargePct.value);
 
   try {
     const { response, data } = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
@@ -2365,11 +2853,11 @@ const commitDiscount = async (item) => {
       throw new Error(extractProblemMessage(data));
     }
 
-    item.descuentoPct = normalizeDiscountPct(descuentoPct);
+    item.descuentoPct = normalizePct(descuentoPct);
     applyItemDto(data);
     const updatedItem = items.value.find((line) => line.id === item.id);
     if (updatedItem) {
-      updatedItem.descuentoPct = normalizeDiscountPct(descuentoPct);
+      updatedItem.descuentoPct = normalizePct(descuentoPct);
       descuentoPctEdits.value[item.id] = updatedItem.descuentoPct;
     }
     pricing.value = null;
@@ -2392,27 +2880,105 @@ const clearDiscountZero = (item) => {
 
 const roundMoneyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
 
-const clearZeroDiscount = () => {
-  if (String(discountPct.value).trim() === '0') {
-    discountPct.value = '';
+const buildAdjustedUnitPrice = (
+  item,
+  itemDiscountPct = item?.descuentoPct ?? 0,
+  totalDiscountPct = discountPct.value,
+  totalSurchargePct = surchargePct.value
+) => {
+  const precioLista = Number(item?.precioLista ?? item?.precioUnitario ?? 0);
+  const descuentoItem = Number(itemDiscountPct || 0);
+  const descuentoTotal = Number(totalDiscountPct || 0);
+  const recargoTotal = Number(totalSurchargePct || 0);
+  const precioConDescuentoItem = roundMoneyValue(precioLista * (1 - descuentoItem / 100));
+  return roundMoneyValue(precioConDescuentoItem * (1 - descuentoTotal / 100) * (1 + recargoTotal / 100));
+};
+
+const loadDescuentosTotal = async () => {
+  descuentosTotalLoading.value = true;
+  try {
+    const { response, data } = await getJson('/api/v1/descuentos-recargos?tipo=DESCUENTO');
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    descuentosTotalOptions.value = (data || [])
+      .slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron cargar los descuentos.');
+  } finally {
+    descuentosTotalLoading.value = false;
   }
 };
 
-const applyDiscount = async () => {
-  const pct = Number(discountPct.value);
-  if (!canEdit.value || !ventaId.value || !items.value.length || applyingDiscount.value) return;
-  if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+const loadRecargosTotal = async () => {
+  recargosTotalLoading.value = true;
+  try {
+    const { response, data } = await getJson('/api/v1/descuentos-recargos?tipo=RECARGO');
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    recargosTotalOptions.value = (data || [])
+      .slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron cargar los recargos.');
+  } finally {
+    recargosTotalLoading.value = false;
+  }
+};
+
+const resetNuevoAjusteTotal = () => {
+  nuevoAjusteTotal.name = '';
+  nuevoAjusteTotal.porcentaje = '10';
+  nuevoAjusteTotalErrors.name = '';
+  nuevoAjusteTotalErrors.porcentaje = '';
+};
+
+const validateNuevoAjusteTotalField = (field) => {
+  if (field === 'name') {
+    nuevoAjusteTotalErrors.name = nuevoAjusteTotal.name.trim() ? '' : 'El nombre es obligatorio.';
+  }
+  if (field === 'porcentaje') {
+    const value = Number(nuevoAjusteTotal.porcentaje);
+    nuevoAjusteTotalErrors.porcentaje = Number.isNaN(value) || value <= 0 || value > 100
+      ? 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'
+      : '';
+  }
+};
+
+const openAjustePresetDialog = (tipo) => {
+  nuevoAjusteTotalTipo.value = tipo === 'RECARGO' ? 'RECARGO' : 'DESCUENTO';
+  resetNuevoAjusteTotal();
+  dialogNuevoAjusteTotal.value = true;
+};
+
+const applyTotalAdjustments = async ({
+  nextDiscountPct = discountPct.value,
+  nextSurchargePct = surchargePct.value,
+  discountPreset = null,
+  surchargePreset = null,
+  successMessage = ''
+} = {}) => {
+  const normalizedDiscount = Number(nextDiscountPct);
+  const normalizedSurcharge = Number(nextSurchargePct);
+
+  if (!canEdit.value || !ventaId.value || !items.value.length || applyingAdjustment.value) return false;
+  if (Number.isNaN(normalizedDiscount) || normalizedDiscount < 0 || normalizedDiscount > 100) {
     flash('error', 'El descuento debe estar entre 0 y 100.');
     return;
   }
+  if (Number.isNaN(normalizedSurcharge) || normalizedSurcharge < 0 || normalizedSurcharge > 100) {
+    flash('error', 'El recargo debe estar entre 0 y 100.');
+    return false;
+  }
 
-  applyingDiscount.value = true;
+  applyingAdjustment.value = true;
   try {
     for (const item of items.value) {
-      const precioLista = Number(item.precioLista ?? item.precioUnitario ?? 0);
-      const descuentoItemPct = Number(item.descuentoPct || 0);
-      const precioConDescuentoItem = roundMoneyValue(precioLista * (1 - descuentoItemPct / 100));
-      const nuevoPrecio = roundMoneyValue(precioConDescuentoItem * (1 - pct / 100));
+      const nuevoPrecio = buildAdjustedUnitPrice(item, item.descuentoPct, normalizedDiscount, normalizedSurcharge);
       const { response, data } = await requestJson(`/api/v1/ventas/${ventaId.value}/items/${item.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -2426,15 +2992,115 @@ const applyDiscount = async () => {
       applyItemDto(data);
     }
 
-    if (pct === 0) {
-      flash('success', 'Descuento quitado.');
+    discountPct.value = normalizePct(normalizedDiscount);
+    surchargePct.value = normalizePct(normalizedSurcharge);
+    appliedDiscountPresetId.value = normalizedDiscount > 0 ? String(discountPreset?.id || '') : '';
+    appliedSurchargePresetId.value = normalizedSurcharge > 0 ? String(surchargePreset?.id || '') : '';
+    persistVentaDraft();
+    if (successMessage) {
+      flash('success', successMessage);
+    }
+    return true;
+  } catch (err) {
+    flash('error', err?.message || 'No se pudieron aplicar los ajustes.');
+    return false;
+  } finally {
+    applyingAdjustment.value = false;
+  }
+};
+
+const applyDiscount = async (pctInput = discountPct.value, preset = null) => {
+  const pct = Number(pctInput);
+  let successMessage = '';
+  if (pct === 0) {
+    successMessage = 'Descuento quitado.';
+  } else if (preset?.name) {
+    successMessage = `${preset.name} aplicado.`;
+  } else {
+    successMessage = `Descuento del ${pct}% aplicado.`;
+  }
+
+  await applyTotalAdjustments({
+    nextDiscountPct: pct,
+    nextSurchargePct: surchargePct.value,
+    discountPreset: preset,
+    surchargePreset: recargosTotalOptions.value.find((item) => item.id === appliedSurchargePresetId.value) || null,
+    successMessage
+  });
+};
+
+const applyDiscountPreset = async (preset) => {
+  if (!preset?.id) return;
+  await applyDiscount(preset.porcentaje, preset);
+};
+
+const clearAppliedDiscount = async () => {
+  await applyDiscount(0, null);
+};
+
+const applySurcharge = async (pctInput = surchargePct.value, preset = null) => {
+  const pct = Number(pctInput);
+  let successMessage = '';
+  if (pct === 0) {
+    successMessage = 'Recargo quitado.';
+  } else if (preset?.name) {
+    successMessage = `${preset.name} aplicado.`;
+  } else {
+    successMessage = `Recargo del ${pct}% aplicado.`;
+  }
+
+  await applyTotalAdjustments({
+    nextDiscountPct: discountPct.value,
+    nextSurchargePct: pct,
+    discountPreset: descuentosTotalOptions.value.find((item) => item.id === appliedDiscountPresetId.value) || null,
+    surchargePreset: preset,
+    successMessage
+  });
+};
+
+const applySurchargePreset = async (preset) => {
+  if (!preset?.id) return;
+  await applySurcharge(preset.porcentaje, preset);
+};
+
+const clearAppliedSurcharge = async () => {
+  await applySurcharge(0, null);
+};
+
+const saveNuevoAjusteTotal = async () => {
+  if (nuevoAjusteTotalSaving.value) return;
+
+  validateNuevoAjusteTotalField('name');
+  validateNuevoAjusteTotalField('porcentaje');
+  if (nuevoAjusteTotalErrors.name || nuevoAjusteTotalErrors.porcentaje) return;
+
+  nuevoAjusteTotalSaving.value = true;
+  try {
+    const payload = {
+      name: nuevoAjusteTotal.name.trim(),
+      porcentaje: Number(nuevoAjusteTotal.porcentaje),
+      tipo: nuevoAjusteTotalTipo.value
+    };
+
+    const { response, data } = await postJson('/api/v1/descuentos-recargos', payload);
+    if (!response.ok) {
+      throw new Error(extractProblemMessage(data));
+    }
+
+    dialogNuevoAjusteTotal.value = false;
+    if (payload.tipo === 'RECARGO') {
+      await loadRecargosTotal();
+      flash('success', 'Recargo creado');
+      await applySurcharge(data?.porcentaje ?? payload.porcentaje, data || payload);
     } else {
-      flash('success', `Descuento del ${pct}% aplicado.`);
+      await loadDescuentosTotal();
+      flash('success', 'Descuento creado');
+      await applyDiscount(data?.porcentaje ?? payload.porcentaje, data || payload);
     }
   } catch (err) {
-    flash('error', err?.message || 'No se pudo aplicar el descuento.');
+    flash('error', err?.message || 'No se pudo guardar el ajuste.');
   } finally {
-    applyingDiscount.value = false;
+    nuevoAjusteTotalSaving.value = false;
   }
 };
 
@@ -2681,16 +3347,26 @@ const guardarAperturaCaja = async () => {
 
     const { response, data } = await postJson('/api/v1/caja/sesiones/abrir', payload);
     if (!response.ok) {
-      throw new Error(extractProblemMessage(data));
+      const message = extractProblemMessage(data);
+      if (response.status === 409 && message.toLowerCase().includes('sesion abierta')) {
+        const recovered = await tryRecoverOpenCajaSession(
+          cajaAperturaId.value,
+          {
+            notify: true,
+            successText: 'Se recupero la sesion abierta de la caja.'
+          }
+        );
+
+        if (recovered) {
+          dialogAbrirCaja.value = false;
+          return;
+        }
+      }
+
+      throw new Error(message);
     }
 
-    const cajaSeleccionada = cajasDisponibles.value.find((item) => item.id === cajaAperturaId.value);
-    localStorage.setItem(POS_LAST_CAJA_KEY, cajaAperturaId.value);
-    localStorage.setItem('pos-caja-session', JSON.stringify({
-      ...data,
-      cajaNumero: cajaSeleccionada?.numero || shortId(data.cajaId),
-      cajaNombre: cajaSeleccionada?.nombre || 'n/a'
-    }));
+    persistCajaSession(data);
     dialogAbrirCaja.value = false;
     window.dispatchEvent(new CustomEvent('pos-caja-session-changed'));
     flash('success', 'Caja abierta');
@@ -2717,7 +3393,7 @@ const confirmarVenta = async () => {
         return;
       }
     }
-    loadCajaSession();
+    await loadCajaSession();
     const payload = {
       pagos: pagos.value
         .filter((line) => line.medioPago && line.monto > 0)
@@ -2964,7 +3640,7 @@ const buildCotizacionWhatsappText = () => {
   });
 
   return [
-    'Cotizacion - Viñedo de la Villa',
+    'Cotización - Viñedo de la Villa',
     `Fecha: ${new Date().toLocaleString('es-AR', { hour12: false })}`,
     '',
     ...lines,
@@ -2990,7 +3666,7 @@ const generarCotizacionWhatsapp = async () => {
 
   const encoded = encodeURIComponent(message);
   window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
-  flash('success', 'Cotizacion lista para enviar por WhatsApp.');
+  flash('success', 'Cotización lista para enviar por WhatsApp.');
 };
 
 watch(dialogPagos, (open) => {
@@ -3030,6 +3706,13 @@ watch(dialogNuevaCaja, (open) => {
   }
 });
 
+watch(dialogNuevoAjusteTotal, (open) => {
+  if (!open) {
+    resetNuevoAjusteTotal();
+    focusScan();
+  }
+});
+
 watch(cajaAperturaId, (value, previousValue) => {
   if (value === CREATE_NEW_CAJA_OPTION_ID) {
     dialogNuevaCaja.value = true;
@@ -3056,12 +3739,18 @@ watch(dialogCerrarCaja, (open) => {
 });
 
 watch(activeVentaTabId, (nextTabId) => {
-  if (!nextTabId) return;
+  if (!nextTabId) {
+    const ensuredTab = ensureVentaTabSelection();
+    if (ensuredTab && ensuredTab.id !== nextTabId) {
+      switchToVentaTab(ensuredTab.id);
+    }
+    return;
+  }
   switchToVentaTab(nextTabId);
 });
 
-const handleCajaSessionChanged = () => {
-  loadCajaSession();
+const handleCajaSessionChanged = async () => {
+  await loadCajaSession();
   if (!cajaSessionId.value) {
     dialogResumenCaja.value = false;
     resetResumenCaja();
@@ -3069,26 +3758,40 @@ const handleCajaSessionChanged = () => {
     loadResumenCaja();
   }
   if (cajaSessionId.value) {
-    switchToVentaTab(activeVentaTabId.value);
+    const currentTab = ensureVentaTabSelection();
+    if (currentTab) {
+      switchToVentaTab(currentTab.id);
+    }
     focusScan();
   }
 };
 
 onMounted(async () => {
   loadVentaTabs();
+  await loadDescuentosTotal();
+  await loadRecargosTotal();
   await loadEmpresaPagoConfig();
-  loadCajaSession();
-  await switchToVentaTab(activeVentaTabId.value);
-  focusScan();
+  await loadCajasDisponibles();
+  await loadCajaSession();
   window.addEventListener('pos-caja-session-changed', handleCajaSessionChanged);
   window.addEventListener('message', handleTicketPreviewMessage);
-  window.addEventListener('keydown', handleVentasHotkeys);
+  window.addEventListener('keydown', handleVentasHotkeys, true);
+  window.addEventListener('keyup', handleVentasHotkeys, true);
+  window.addEventListener('keydown', handlePersistentScanInput, true);
+  document.addEventListener('keydown', handleVentasHotkeys, true);
+  document.addEventListener('keyup', handleVentasHotkeys, true);
+  window.addEventListener('pos-escape-handled', handleVentasHotkeys, true);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('pos-caja-session-changed', handleCajaSessionChanged);
   window.removeEventListener('message', handleTicketPreviewMessage);
-  window.removeEventListener('keydown', handleVentasHotkeys);
+  window.removeEventListener('keydown', handleVentasHotkeys, true);
+  window.removeEventListener('keyup', handleVentasHotkeys, true);
+  window.removeEventListener('keydown', handlePersistentScanInput, true);
+  document.removeEventListener('keydown', handleVentasHotkeys, true);
+  document.removeEventListener('keyup', handleVentasHotkeys, true);
+  window.removeEventListener('pos-escape-handled', handleVentasHotkeys, true);
 });
 </script>
 
@@ -3120,12 +3823,54 @@ onBeforeUnmount(() => {
 
 .pos-new-sale-btn {
   margin-inline-start: auto;
+  min-height: 42px;
+  padding-inline: 14px;
+  color: color-mix(in srgb, var(--pos-accent-strong) 88%, var(--pos-gold)) !important;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: color 0.16s ease;
+}
+
+.pos-new-sale-btn:hover {
+  color: color-mix(in srgb, var(--pos-accent-strong) 94%, var(--pos-gold)) !important;
+}
+
+.pos-new-sale-btn :deep(.v-btn__prepend) {
+  color: inherit;
 }
 
 .pos-ventas-tab-content {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.shortcut-key {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.pos-button-label {
+  display: inline;
+  white-space: nowrap;
+}
+
+.pos-button-shortcut {
+  color: color-mix(in srgb, currentColor 76%, var(--pos-shortcut-highlight) 24%);
+}
+
+.pos-ventas-tab-label {
+  color: var(--venta-tab-tone);
+}
+
+.pos-ventas-tab-shortcut {
+  color: color-mix(in srgb, var(--venta-tab-tone) 78%, var(--pos-shortcut-highlight) 22%);
+}
+
+.pos-ventas-tab--active {
+  background: var(--pos-venta-tab-active-bg, var(--pos-tab-active)) !important;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pos-accent-strong) 24%, var(--pos-border));
 }
 
 .pos-ventas-tab-close {
@@ -3324,11 +4069,51 @@ onBeforeUnmount(() => {
   font-size: 15px;
 }
 
+.pos-total-row--discount {
+  color: var(--pos-success-strong);
+}
+
+.pos-total-row--discount strong {
+  color: inherit;
+}
+
+.pos-total-row--surcharge {
+  color: var(--pos-error);
+}
+
+.pos-total-row--surcharge strong {
+  color: inherit;
+}
+
 .pos-discount-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.pos-adjustment-group {
+  display: grid;
+  gap: 6px;
+}
+
+.pos-adjustment-btn.v-btn--disabled {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--pos-card-soft) 84%, var(--pos-ink) 16%) !important;
+  color: color-mix(in srgb, var(--pos-ink-muted) 78%, var(--pos-ink) 22%) !important;
+  border-color: color-mix(in srgb, var(--pos-border) 78%, var(--pos-ink) 22%) !important;
+}
+
+.pos-adjustment-btn.v-btn--disabled :deep(.v-btn__overlay) {
+  opacity: 0;
+}
+
+.pos-discount-menu {
+  min-width: 260px;
+}
+
+.pos-discount-active {
+  color: var(--pos-ink-muted);
 }
 
 .pos-total-net {
@@ -3351,28 +4136,47 @@ onBeforeUnmount(() => {
   color: var(--pos-accent-dark);
 }
 
-.pos-primary-action {
+.pos-checkout-action {
   min-height: 52px;
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.01em;
-  background: var(--pos-primary-btn-bg) !important;
-  color: var(--pos-primary-btn-text) !important;
-  box-shadow: var(--pos-primary-btn-shadow);
+  background: var(--pos-checkout-btn-bg) !important;
+  color: var(--pos-checkout-btn-text) !important;
+  box-shadow: var(--pos-checkout-btn-shadow);
 }
 
-.pos-primary-action.v-btn--disabled {
+.pos-checkout-action.v-btn--disabled {
   opacity: 1 !important;
-  background: var(--pos-primary-btn-bg) !important;
-  color: var(--pos-primary-btn-text) !important;
-  box-shadow: var(--pos-primary-btn-shadow);
+  background: var(--pos-checkout-btn-bg) !important;
+  color: var(--pos-checkout-btn-text) !important;
+  box-shadow: var(--pos-checkout-btn-shadow);
 }
 
-.pos-primary-action.v-btn--disabled :deep(.v-btn__overlay) {
+.pos-checkout-action.v-btn--disabled :deep(.v-btn__overlay) {
   opacity: 0;
 }
 
-.pos-secondary-action {
+.pos-whatsapp-action {
+  min-height: 46px;
+  font-weight: 700;
+  background: var(--pos-whatsapp-btn-bg) !important;
+  border-color: var(--pos-whatsapp-btn-border) !important;
+  color: var(--pos-whatsapp-btn-text) !important;
+}
+
+.pos-whatsapp-action.v-btn--disabled {
+  opacity: 1 !important;
+  background: var(--pos-whatsapp-btn-bg) !important;
+  border-color: var(--pos-whatsapp-btn-border) !important;
+  color: var(--pos-whatsapp-btn-text) !important;
+}
+
+.pos-whatsapp-action.v-btn--disabled :deep(.v-btn__overlay) {
+  opacity: 0;
+}
+
+.pos-danger-action {
   min-height: 46px;
   font-weight: 700;
   background: var(--pos-danger-btn-bg) !important;
@@ -3380,14 +4184,14 @@ onBeforeUnmount(() => {
   color: var(--pos-danger-btn-text) !important;
 }
 
-.pos-secondary-action.v-btn--disabled {
+.pos-danger-action.v-btn--disabled {
   opacity: 1 !important;
   background: var(--pos-danger-btn-bg) !important;
   border-color: var(--pos-danger-btn-border) !important;
   color: var(--pos-danger-btn-text) !important;
 }
 
-.pos-secondary-action.v-btn--disabled :deep(.v-btn__overlay) {
+.pos-danger-action.v-btn--disabled :deep(.v-btn__overlay) {
   opacity: 0;
 }
 
@@ -3408,13 +4212,14 @@ onBeforeUnmount(() => {
   margin-top: 10px;
   padding-inline: 10px;
   border: 1px solid color-mix(in srgb, var(--pos-accent-strong) 16%, var(--pos-border));
-  color: var(--pos-accent-dark);
+  color: var(--pos-utility-btn-text);
   font-weight: 600;
 }
 
 .pos-utility-action-danger {
-  border-color: var(--pos-danger-btn-border);
-  color: var(--pos-danger-btn-text);
+  background: var(--pos-danger-strong-bg) !important;
+  border-color: var(--pos-danger-strong-border);
+  color: var(--pos-danger-strong-text);
   font-weight: 700;
   box-shadow: var(--pos-danger-soft-shadow);
 }

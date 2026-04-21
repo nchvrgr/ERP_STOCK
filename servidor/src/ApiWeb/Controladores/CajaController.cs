@@ -49,6 +49,23 @@ public sealed class CajaController : ControllerBase
         return CreatedAtAction(nameof(ObtenerResumen), new { id = sesion.Id }, sesion);
     }
 
+    [HttpGet("sesiones/abierta")]
+    [Authorize(Policy = "ROLE_ENCARGADO_ADMIN")]
+    [ProducesResponseType(typeof(CajaSesionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CajaSesionDto>> ObtenerSesionAbierta(
+        [FromQuery] Guid cajaId,
+        CancellationToken cancellationToken)
+    {
+        var sesion = await _servicioCaja.ObtenerSesionAbiertaAsync(cajaId, cancellationToken);
+        if (sesion is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(sesion);
+    }
+
     [HttpPost("sesiones/{id:guid}/movimientos")]
     [Authorize(Policy = "PERM_CAJA_MOVIMIENTO")]
     [ProducesResponseType(typeof(CajaMovimientoDto), StatusCodes.Status201Created)]

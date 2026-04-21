@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IFiscalProvider, DummyFiscalProvider>();
         services.AddScoped<IComprobanteRepository, ComprobanteRepository>();
         services.AddScoped<ICategoriaPrecioRepository, CategoriaPrecioRepository>();
+        services.AddScoped<IDescuentoRecargoRepository, DescuentoRecargoRepository>();
         services.AddScoped<IEmpresaDatosRepository, EmpresaDatosRepository>();
         services.AddSingleton<IPasswordHasher, Sha256PasswordHasher>();
         return services;

@@ -1,7 +1,7 @@
 <template>
   <div class="stock-page">
     <v-tabs v-model="tab" color="primary" class="mb-3">
-      <v-tab value="saldos">Saldos</v-tab>
+      <v-tab value="saldos">Productos</v-tab>
       <v-tab value="alertas">
         <span>Alertas</span>
         <span
@@ -15,128 +15,51 @@
       </v-tab>
     </v-tabs>
 
-    <v-window v-model="tab">
+<v-window v-model="tab">
       <v-window-item value="saldos" class="stock-window-item">
         <v-card class="pos-card pa-4 stock-list-card">
-          <div class="d-flex flex-wrap align-center gap-3 mb-4">
-            <div class="text-h6">Ajuste de stock</div>
+          <div class="stock-toolbar">
+            <div class="d-flex flex-wrap align-center gap-3">
+              <div class="text-h6">Stock</div>
+            </div>
+            <v-row dense class="align-center stock-search-row">
+              <v-col cols="12" md="7">
+                <v-autocomplete
+                  v-model="saldoProducto"
+                  :items="saldoProductosLookup"
+                  :loading="saldoProductosLoading"
+                  item-title="label"
+                  return-object
+                  clearable
+                  label="Producto"
+                  prepend-inner-icon="mdi-magnify"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  @update:search="searchSaldoProductos"
+                  @update:model-value="onSaldoProductoChanged"
+                />
+              </v-col>
+              <v-col cols="12" md="5">
+                <v-autocomplete
+                  v-model="saldoProveedor"
+                  :items="proveedoresLookup"
+                  item-title="label"
+                  return-object
+                  clearable
+                  label="Proveedor"
+                  prepend-inner-icon="mdi-magnify"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  :loading="proveedorLoading"
+                  @update:search="searchProveedores"
+                />
+              </v-col>
+            </v-row>
           </div>
 
-          <div class="text-caption text-medium-emphasis stock-section-copy">
-            Modificá la cantidad, guardá el motivo y el sistema dejará el ajuste asentado.
-          </div>
-
-          <v-row dense class="mt-2 align-end stock-adjust-row">
-            <v-col cols="12" md="3">
-              <v-autocomplete
-                v-model="ajusteProducto"
-                :items="ajusteItems"
-                :loading="ajusteLoading"
-                item-title="label"
-                return-object
-                label="Producto"
-                variant="outlined"
-                density="comfortable"
-                clearable
-                :error-messages="ajusteErrors.producto"
-                @update:search="searchAjusteProductos"
-              />
-            </v-col>
-            <v-col cols="12" md="2">
-              <v-text-field
-                v-model="ajusteCantidadActual"
-                label="Actual"
-                variant="outlined"
-                density="comfortable"
-                readonly
-              />
-            </v-col>
-            <v-col cols="12" md="2">
-              <v-text-field
-                v-model="ajusteCantidadNueva"
-                label="Nuevo"
-                type="number"
-                min="0"
-                step="0.01"
-                variant="outlined"
-                density="comfortable"
-                :error-messages="ajusteErrors.cantidad"
-              />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-text-field
-                v-model="ajusteMotivo"
-                label="Motivo"
-                variant="outlined"
-                density="comfortable"
-                :error-messages="ajusteErrors.motivo"
-              />
-            </v-col>
-            <v-col cols="12" md="2" class="d-flex align-end">
-              <v-btn
-                color="primary"
-                class="text-none w-100 alert-action-btn"
-                :loading="ajusteSaving"
-                @click="aplicarAjuste"
-              >
-                Guardar ajuste
-              </v-btn>
-            </v-col>
-          </v-row>
-
-          <v-divider class="my-4" />
-
-          <div class="d-flex flex-wrap align-center gap-3 mb-4">
-            <div class="text-h6">Lista de stock</div>
-          </div>
-          <v-row dense class="align-center stock-search-row">
-            <v-col cols="12" md="4">
-              <v-autocomplete
-                v-model="saldoProducto"
-                :items="saldoProductosLookup"
-                :loading="saldoProductosLoading"
-                item-title="label"
-                return-object
-                clearable
-                label="Producto"
-                prepend-inner-icon="mdi-magnify"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                @update:search="searchSaldoProductos"
-                @update:model-value="onSaldoProductoChanged"
-              />
-            </v-col>
-            <v-col cols="12" md="5">
-              <v-autocomplete
-                v-model="saldoProveedor"
-                :items="proveedoresLookup"
-                item-title="label"
-                return-object
-                clearable
-                label="Proveedor"
-                prepend-inner-icon="mdi-magnify"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                :loading="proveedorLoading"
-                @update:search="searchProveedores"
-              />
-            </v-col>
-            <v-col cols="12" md="3" class="d-flex align-center">
-              <v-btn
-                color="primary"
-                variant="tonal"
-                class="text-none w-100"
-                :loading="saldosLoading"
-                @click="loadSaldos"
-              >
-                Buscar
-              </v-btn>
-            </v-col>
-          </v-row>
-
-          <div class="stock-table-shell mt-3">
+          <div class="stock-table-shell">
             <v-data-table
               :headers="saldoHeaders"
               :items="saldos"
@@ -153,6 +76,23 @@
               </template>
               <template v-slot:[`item.sku`]="{ item }">
                 <div class="saldo-text-truncate saldo-text-truncate--sku">{{ item.sku }}</div>
+              </template>
+              <template v-slot:[`item.cantidadActual`]="{ item }">
+                <div class="stock-cantidad-cell">
+                  {{ formatCantidad(item.cantidadActual) }}
+                </div>
+              </template>
+              <template v-slot:[`item.actions`]="{ item }">
+                <div class="stock-actions-cell">
+                  <v-btn
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    @click="openAjusteDialog(item)"
+                  >
+                    Ajustar
+                  </v-btn>
+                </div>
               </template>
             </v-data-table>
           </div>
@@ -245,6 +185,48 @@
       </div>
     </v-snackbar>
 
+    <v-dialog v-model="ajusteDialog" width="400">
+      <v-card>
+        <v-card-title>Ajustar stock</v-card-title>
+        <v-card-text>
+          <div class="text-subtitle-2 mb-2">{{ ajusteDialogProducto?.nombre }}</div>
+          <div class="text-caption text-medium-emphasis mb-4">
+            SKU: {{ ajusteDialogProducto?.sku }} | Stock actual: {{ formatCantidad(ajusteDialogProducto?.cantidadActual) }}
+          </div>
+          <v-text-field
+            v-model="ajusteCantidadNueva"
+            label="Nuevo stock"
+            type="number"
+            min="0"
+            step="0.01"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="ajusteErrors.cantidad"
+            class="mb-2"
+            @focus="handleAjusteCantidadFocus"
+          />
+          <v-text-field
+            v-model="ajusteMotivo"
+            label="Motivo"
+            variant="outlined"
+            density="comfortable"
+            :error-messages="ajusteErrors.motivo"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="primary" variant="text" @click="ajusteDialog = false">Cancelar</v-btn>
+          <v-btn
+            color="primary"
+            :loading="ajusteSaving"
+            @click="aplicarAjusteFromDialog"
+          >
+            Guardar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="remitoDialog" width="720">
       <v-card>
         <v-card-title>Remito de compra</v-card-title>
@@ -280,7 +262,7 @@
                 <v-btn
                   icon="mdi-delete"
                   variant="text"
-                  color="error"
+color="primary"
                   @click="removeRemitoItem(item.productoId)"
                 />
               </div>
@@ -353,8 +335,9 @@ const ajusteCantidadActual = ref(0);
 const ajusteCantidadNueva = ref('');
 const ajusteMotivo = ref('');
 const ajusteSaving = ref(false);
+const ajusteDialog = ref(false);
+const ajusteDialogProducto = ref(null);
 const ajusteErrors = reactive({
-  producto: '',
   cantidad: '',
   motivo: ''
 });
@@ -382,7 +365,8 @@ const saldoHeaders = [
   { title: 'Producto', value: 'nombre' },
   { title: 'Proveedor', value: 'proveedor' },
   { title: 'SKU', value: 'sku' },
-  { title: 'Cantidad', value: 'cantidadActual', align: 'end' }
+  { title: 'Cantidad', value: 'cantidadActual', align: 'center' },
+  { title: '', value: 'actions', sortable: false, align: 'end', width: '1%' }
 ];
 
 const globalCriticalAlertCount = computed(() => Number(stockAlerts.countsByLevel?.CRITICO ?? 0));
@@ -472,6 +456,11 @@ const formatCantidad = (value) => {
   return numeric.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
 };
 
+const formatUnidadLabel = (value) => {
+  const numeric = Number(value ?? 0);
+  return Math.abs(numeric) === 1 ? 'unidad' : 'unidades';
+};
+
 const ALERT_LEVEL_SORT_ORDER = {
   CRITICO: 0,
   MEDIO: 1,
@@ -509,15 +498,17 @@ const getAlertaEstadoTexto = (alerta) => {
   }
 
   if (isApproachingStockAlertLevel(nivel)) {
-    return `A ${formatCantidad(getAlertaDistanciaMinimo(alerta))} unidades del mínimo`;
+    const distancia = getAlertaDistanciaMinimo(alerta);
+    return `A ${formatCantidad(distancia)} ${formatUnidadLabel(distancia)} del mínimo`;
   }
 
   const faltante = getAlertaFaltante(alerta);
   if (faltante <= 0) {
-    return `A ${formatCantidad(getAlertaDistanciaMinimo(alerta))} unidades del mínimo`;
+    const distancia = getAlertaDistanciaMinimo(alerta);
+    return `A ${formatCantidad(distancia)} ${formatUnidadLabel(distancia)} del mínimo`;
   }
 
-  return `Faltante: ${formatCantidad(faltante)} unidades`;
+  return `Faltante: ${formatCantidad(faltante)} ${formatUnidadLabel(faltante)}`;
 };
 
 const getAlertColor = (nivel) => getStockAlertMeta(nivel).color;
@@ -706,19 +697,18 @@ const searchAjusteProductos = async (term) => {
 };
 
 const resetAjusteErrors = () => {
-  ajusteErrors.producto = '';
   ajusteErrors.cantidad = '';
   ajusteErrors.motivo = '';
 };
 
-const validateAjuste = () => {
+const validateAjuste = (forDialog = false) => {
   resetAjusteErrors();
-  if (!ajusteProducto.value) {
+  if (!forDialog && !ajusteProducto.value) {
     ajusteErrors.producto = 'Selecciona un producto.';
   }
 
   if (ajusteCantidadNueva.value === '' || Number.isNaN(Number(ajusteCantidadNueva.value))) {
-    ajusteErrors.cantidad = 'Cantidad invalida.';
+    ajusteErrors.cantidad = 'Cantidad inválida.';
   } else if (Number(ajusteCantidadNueva.value) < 0) {
     ajusteErrors.cantidad = 'Cantidad no puede ser negativa.';
   }
@@ -727,19 +717,34 @@ const validateAjuste = () => {
     ajusteErrors.motivo = 'El motivo es obligatorio.';
   }
 
-  return !ajusteErrors.producto && !ajusteErrors.cantidad && !ajusteErrors.motivo;
+  return !ajusteErrors.cantidad && !ajusteErrors.motivo;
 };
 
-const aplicarAjuste = async () => {
-  if (ajusteSaving.value) return;
-  if (!validateAjuste()) return;
+const openAjusteDialog = (item) => {
+  ajusteDialogProducto.value = item;
+  ajusteCantidadNueva.value = (item?.cantidadActual ?? '').toString();
+  ajusteMotivo.value = '';
+  resetAjusteErrors();
+  ajusteDialog.value = true;
+};
 
-  const actual = Number(ajusteCantidadActual.value || 0);
+const handleAjusteCantidadFocus = (event) => {
+  const input = event?.target;
+  if (!input) return;
+  input.select?.();
+};
+
+const aplicarAjusteFromDialog = async () => {
+  if (ajusteSaving.value) return;
+  if (!ajusteDialogProducto.value) return;
+  if (!validateAjuste(true)) return;
+
+  const actual = Number(ajusteDialogProducto.value.cantidadActual ?? 0);
   const nuevo = Number(ajusteCantidadNueva.value);
   const delta = nuevo - actual;
 
   if (delta === 0) {
-    flash('error', 'La cantidad no cambio.');
+    flash('error', 'La cantidad no cambió.');
     return;
   }
 
@@ -750,7 +755,7 @@ const aplicarAjuste = async () => {
       motivo: ajusteMotivo.value.trim(),
       items: [
         {
-          productoId: ajusteProducto.value.productoId,
+          productoId: ajusteDialogProducto.value.productoId,
           cantidad: Math.abs(delta),
           esIngreso: delta > 0
         }
@@ -763,6 +768,9 @@ const aplicarAjuste = async () => {
     }
 
     flash('success', 'Stock ajustado');
+    ajusteDialog.value = false;
+    ajusteDialogProducto.value = null;
+    ajusteCantidadNueva.value = '';
     ajusteMotivo.value = '';
     await loadSaldos();
     await stockAlerts.refreshSummary();
@@ -1017,13 +1025,21 @@ onBeforeUnmount(() => {});
 }
 
 .stock-list-card {
-  min-height: calc(100vh - 180px);
-  display: flex;
-  flex-direction: column;
+  min-height: auto;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  row-gap: 12px;
+  align-content: start;
 }
 
 .stock-list-card--alert {
   min-height: auto;
+}
+
+.stock-toolbar {
+  display: grid;
+  row-gap: 8px;
+  align-content: start;
 }
 
 .stock-section-copy,
@@ -1032,6 +1048,12 @@ onBeforeUnmount(() => {});
   width: 100%;
   max-width: none;
   margin-inline: 0;
+  margin-block: 0;
+}
+
+.stock-search-row :deep(.v-col) {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .alert-toolbar {
@@ -1049,28 +1071,46 @@ onBeforeUnmount(() => {});
 }
 
 .stock-table-shell {
-  flex: 1;
   min-height: 0;
   display: flex;
+  align-items: flex-start;
 }
 
 .stock-table {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
 }
 
 .stock-table :deep(.v-table) {
-  height: 100%;
+  height: auto;
 }
 
 .stock-table :deep(.v-table__wrapper) {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
   overflow: auto;
 }
 
 .stock-table :deep(.v-data-table-footer) {
-  margin-top: auto;
+  margin-top: 0;
+}
+
+.stock-table :deep(th[data-v-data-table-column-key="cantidadActual"] .v-data-table-header__content) {
+  justify-content: center;
+}
+
+.stock-table :deep(td[data-v-data-table-column-key="cantidadActual"]) {
+  text-align: center;
+}
+
+.stock-cantidad-cell {
+  width: 100%;
+  text-align: center;
+}
+
+.stock-actions-cell {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .stock-alert-dot {

@@ -53,6 +53,12 @@ public interface ICajaRepository
         Guid cajaSesionId,
         CancellationToken cancellationToken = default);
 
+    Task<CajaSesionDto?> GetOpenSessionAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid cajaId,
+        CancellationToken cancellationToken = default);
+
     Task<CajaCierreResultDto> CloseSessionAsync(
         Guid tenantId,
         Guid sucursalId,

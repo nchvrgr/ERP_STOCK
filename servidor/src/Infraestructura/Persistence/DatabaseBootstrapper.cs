@@ -22,6 +22,7 @@ public static class DatabaseBootstrapper
         await EnsureCajaSchemaAsync(dbContext, cancellationToken);
         await EnsureEmpresaDatosSchemaAsync(dbContext, cancellationToken);
         await EnsureProductoComboSchemaAsync(dbContext, cancellationToken);
+        await EnsureDescuentoRecargoSchemaAsync(dbContext, cancellationToken);
         await EnsureVentaFacturaSchemaAsync(dbContext, cancellationToken);
         await EnsureStockMovimientoFacturaSchemaAsync(dbContext, cancellationToken);
 
@@ -215,6 +216,63 @@ public static class DatabaseBootstrapper
                     cancellationToken);
             }
         }
+    }
+
+    private static async Task EnsureDescuentoRecargoSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS descuentos_recargos (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_descuentos_recargos" PRIMARY KEY,
+                    "Name" TEXT NOT NULL,
+                    "Porcentaje" NUMERIC NOT NULL,
+                    "Tipo" INTEGER NOT NULL,
+                    "TenantId" TEXT NOT NULL,
+                    "CreatedAt" TEXT NOT NULL,
+                    "UpdatedAt" TEXT NOT NULL,
+                    "DeletedAt" TEXT NULL,
+                    CONSTRAINT "FK_descuentos_recargos_tenants_TenantId"
+                        FOREIGN KEY ("TenantId") REFERENCES tenants ("Id") ON DELETE RESTRICT
+                );
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_descuentos_recargos_TenantId_Tipo_Name"
+                ON descuentos_recargos ("TenantId", "Tipo", "Name");
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS descuentos_recargos (
+                "Id" uuid NOT NULL,
+                "Name" character varying(120) NOT NULL,
+                "Porcentaje" numeric(6,2) NOT NULL,
+                "Tipo" integer NOT NULL,
+                "TenantId" uuid NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL,
+                "DeletedAt" timestamp with time zone NULL,
+                CONSTRAINT "PK_descuentos_recargos" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_descuentos_recargos_tenants_TenantId"
+                    FOREIGN KEY ("TenantId") REFERENCES tenants ("Id") ON DELETE RESTRICT
+            );
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_descuentos_recargos_TenantId_Tipo_Name"
+            ON descuentos_recargos ("TenantId", "Tipo", "Name");
+            """,
+            cancellationToken);
     }
 
     private static async Task EnsureStockMovimientoFacturaSchemaAsync(PosDbContext dbContext, CancellationToken cancellationToken)

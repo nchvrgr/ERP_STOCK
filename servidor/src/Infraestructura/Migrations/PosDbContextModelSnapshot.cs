@@ -365,6 +365,43 @@ namespace Servidor.Infraestructura.MigrationsNew
                     b.ToTable("comprobantes", (string)null);
                 });
 
+            modelBuilder.Entity("Servidor.Dominio.Entities.DescuentoRecargo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<decimal>("Porcentaje")
+                        .HasColumnType("numeric(6,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Tipo", "Name")
+                        .IsUnique();
+
+                    b.ToTable("descuentos_recargos", (string)null);
+                });
+
             modelBuilder.Entity("Servidor.Dominio.Entities.Devolucion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1946,6 +1983,15 @@ namespace Servidor.Infraestructura.MigrationsNew
                     b.HasOne("Servidor.Dominio.Entities.Venta", null)
                         .WithMany()
                         .HasForeignKey("VentaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Servidor.Dominio.Entities.DescuentoRecargo", b =>
+                {
+                    b.HasOne("Servidor.Dominio.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -91,6 +91,17 @@ public static class AuthenticationExtensions
                     context.User.HasClaim("roles", "CAJERO")
                     || context.User.HasClaim("roles", "ENCARGADO")
                     || context.User.HasClaim("roles", "ADMIN")));
+
+            options.AddPolicy("PERM_PRODUCTO_VER_O_VENTA_CREAR", policy =>
+                policy.RequireAssertion(context =>
+                    context.User.HasClaim("permissions", PermissionCodes.ProductoVer)
+                    || context.User.HasClaim("permissions", PermissionCodes.ProductoEditar)
+                    || context.User.HasClaim("permissions", PermissionCodes.VentaCrear)));
+
+            options.AddPolicy("PERM_PRODUCTO_EDITAR_O_VENTA_CREAR", policy =>
+                policy.RequireAssertion(context =>
+                    context.User.HasClaim("permissions", PermissionCodes.ProductoEditar)
+                    || context.User.HasClaim("permissions", PermissionCodes.VentaCrear)));
         });
 
         return services;

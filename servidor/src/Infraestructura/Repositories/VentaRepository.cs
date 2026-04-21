@@ -536,10 +536,13 @@ public sealed class VentaRepository : IVentaRepository
         }
         else
         {
-            cajaSesion = await _dbContext.CajaSesiones
+            var sesionesAbiertas = await _dbContext.CajaSesiones
                 .Where(s => s.TenantId == tenantId && s.SucursalId == sucursalId && s.Estado == CajaSesionEstado.Abierta)
+                .ToListAsync(cancellationToken);
+
+            cajaSesion = sesionesAbiertas
                 .OrderByDescending(s => s.AperturaAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .FirstOrDefault();
 
             if (cajaSesion is null)
             {

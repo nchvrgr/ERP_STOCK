@@ -231,6 +231,39 @@ public sealed class CajaRepository : ICajaRepository
             session.Estado.ToString().ToUpperInvariant());
     }
 
+    public async Task<CajaSesionDto?> GetOpenSessionAsync(
+        Guid tenantId,
+        Guid sucursalId,
+        Guid cajaId,
+        CancellationToken cancellationToken = default)
+    {
+        var sesiones = await _dbContext.CajaSesiones.AsNoTracking()
+            .Where(s =>
+                s.TenantId == tenantId
+                && s.SucursalId == sucursalId
+                && s.CajaId == cajaId
+                && s.Estado == CajaSesionEstado.Abierta)
+            .ToListAsync(cancellationToken);
+
+        var session = sesiones
+            .OrderByDescending(s => s.AperturaAt)
+            .FirstOrDefault();
+
+        if (session is null)
+        {
+            return null;
+        }
+
+        return new CajaSesionDto(
+            session.Id,
+            session.CajaId,
+            session.SucursalId,
+            session.Turno,
+            session.MontoInicial,
+            session.AperturaAt,
+            session.Estado.ToString().ToUpperInvariant());
+    }
+
     public async Task<CajaCierreResultDto> CloseSessionAsync(
         Guid tenantId,
         Guid sucursalId,

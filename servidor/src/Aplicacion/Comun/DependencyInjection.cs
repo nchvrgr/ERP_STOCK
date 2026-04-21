@@ -21,6 +21,7 @@ using Servidor.Aplicacion.CasosDeUso.Reportes;
 using Servidor.Aplicacion.CasosDeUso.Comprobantes;
 using Servidor.Aplicacion.CasosDeUso.Precios.Estrategias;
 using Servidor.Aplicacion.CasosDeUso.Categorias;
+using Servidor.Aplicacion.CasosDeUso.DescuentosRecargos;
 using Servidor.Aplicacion.CasosDeUso.Empresa;
 
 namespace Servidor.Aplicacion.Comun;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<ReportesService>();
         services.AddScoped<ComprobantesService>();
         services.AddScoped<CategoriaPrecioService>();
+        services.AddScoped<DescuentoRecargoService>();
         services.AddScoped<EmpresaDatosService>();
         services.AddScoped<IPromoStrategy, PorcCategoriaPromoStrategy>();
         services.AddScoped<IPromoStrategy, DosPorUnoPromoStrategy>();
