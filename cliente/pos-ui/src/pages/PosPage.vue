@@ -4097,11 +4097,17 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
+.pos-adjustment-btn {
+  border: 1px solid transparent;
+}
+
 .pos-adjustment-btn.v-btn--disabled {
-  opacity: 1 !important;
-  background: color-mix(in srgb, var(--pos-card-soft) 84%, var(--pos-ink) 16%) !important;
-  color: color-mix(in srgb, var(--pos-ink-muted) 78%, var(--pos-ink) 22%) !important;
-  border-color: color-mix(in srgb, var(--pos-border) 78%, var(--pos-ink) 22%) !important;
+  opacity: 0.52 !important;
+  background: color-mix(in srgb, var(--pos-border) 48%, var(--pos-card) 52%) !important;
+  color: color-mix(in srgb, var(--pos-ink-muted) 45%, var(--pos-border) 55%) !important;
+  border: 1px dashed color-mix(in srgb, var(--pos-border) 88%, var(--pos-ink-muted) 12%) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
 }
 
 .pos-adjustment-btn.v-btn--disabled :deep(.v-btn__overlay) {
